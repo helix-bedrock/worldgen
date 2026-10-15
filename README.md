@@ -41,6 +41,20 @@ Bedrock Edition server engine in Go. Standard library only. GPL-3.0.
 | Coral crust, magma and bubble columns, other small decorations | not started |
 | Nether and End | not started |
 
+## Performance
+
+Average load time per finished chunk (terrain and features), measured on the
+Helix test server while a player flew around for 21,000 chunks:
+
+| Step | Average |
+|---|---|
+| Generation | about 19 ms (18.6 to 20.7 ms) |
+| Copy into the server's chunk format | about 2.7 ms |
+
+Before the cache and feature work it was 200 to 390 ms per chunk. Chunks are
+generated on many threads at once, so the server loads far more than one
+chunk per 19 ms.
+
 ## How it is checked
 
 - `bdsdiff` (separate tool, not in this repo yet) generates the same chunks
