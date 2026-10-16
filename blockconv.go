@@ -178,7 +178,13 @@ func (o *Overworld) convertJavaState(st TemplateState) (uint32, bool, bool) {
 		case "waterlogged":
 			water = v == "true"
 		case "facing":
-			set("minecraft:cardinal_direction", v)
+			if strings.HasSuffix(target, "_door") && !strings.Contains(target, "trapdoor") {
+				// Doors: the legacy direction 0 was Java east and became
+				// "south" (block upgrade schema 1.21.60), a quarter turn.
+				set("minecraft:cardinal_direction", rotateFacing(v, 1))
+			} else {
+				set("minecraft:cardinal_direction", v)
+			}
 			set("minecraft:facing_direction", v)
 			if f, ok := javaFacing[v]; ok {
 				set("facing_direction", f)

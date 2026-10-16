@@ -48,6 +48,12 @@ type Chunk struct {
 type BlockEntity struct {
 	X, Y, Z int32
 	Data    map[string]any
+	// LootTable is the loot table of a container the structure fills, as a
+	// Bedrock path ("loot_tables/chests/village/village_plains_house.json"),
+	// empty otherwise. It is also in Data, with a LootTableSeed, so the game
+	// fills the chest when it is first opened; a server that wants other
+	// loot can put its own Items in Data instead.
+	LootTable string
 }
 
 // Waterlogged reports whether the block at local (x, z) and world y also

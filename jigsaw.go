@@ -589,7 +589,13 @@ func (o *Overworld) placePiece(p *jigsawPiece, c *Chunk, chunkBox box, height fu
 		i := int(y-MinY)<<8 | lz<<4 | lx
 		c.Blocks[i] = uint16(cs.id)
 		if d := o.blockEntityFor(cs.id, st.Name, x, y, z); d != nil {
-			c.BlockEntities = append(c.BlockEntities, BlockEntity{x, y, z, d})
+			be := BlockEntity{X: x, Y: y, Z: z, Data: d}
+			if lt, ok := b.NBT["LootTable"].(string); ok && lt != "" {
+				be.LootTable = "loot_tables/" + strings.TrimPrefix(lt, "minecraft:") + ".json"
+				d["LootTable"] = be.LootTable
+				d["LootTableSeed"] = int32(positionSeed(o.seed, x, y, z))
+			}
+			c.BlockEntities = append(c.BlockEntities, be)
 		}
 		if cs.water {
 			c.Water[i>>6] |= 1 << (i & 63)
@@ -673,4 +679,14 @@ func (o *Overworld) surfaceHeight(terrain func(cx, cz int32) *PackedChunk, x, z 
 		}
 	}
 	return MinY
+}
+
+// positionSeed mixes the world seed and a block position into a seed for a
+// container's loot (the game rolls the table with it when it is opened).
+func positionSeed(seed int64, x, y, z int32) uint32 {
+	h := uint64(seed) ^ uint64(uint32(x))*0x9E3779B97F4A7C15 ^ uint64(uint32(y))*0xC2B2AE3D27D4EB4F ^ uint64(uint32(z))*0x165667B19E3779F9
+	h ^= h >> 31
+	h *= 0xBF58476D1CE4E5B9
+	h ^= h >> 29
+	return uint32(h)
 }
