@@ -206,3 +206,12 @@ func (d *nbtReader) payload(t uint8, depth int) (any, error) {
 	}
 	return nil, fmt.Errorf("nbt: unknown tag type %d", t)
 }
+
+// ReadNBT reads a big-endian NBT root compound (Java Edition files such as
+// structure templates). Bytes come back as uint8, shorts as int16, ints as
+// int32, longs as int64, floats as float32, doubles as float64, strings as
+// string, lists as []any and compounds as map[string]any; int and long
+// arrays are skipped (nil).
+func ReadNBT(r io.Reader) (map[string]any, error) {
+	return (&nbtReader{r: r}).root()
+}
