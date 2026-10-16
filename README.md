@@ -4,7 +4,7 @@
 > **This is early and not finished.** It is under active, heavy development, and it will take a
 > while before it is complete.
 >
-> Today:
+> Status as of 2026-10-16:
 >
 > - **The base world matches BDS:** terrain, biomes, surface, caves, aquifers, ores and most ocean
 >   decorations.
