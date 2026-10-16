@@ -108,6 +108,7 @@ func Pack(c *Chunk) *PackedChunk {
 // Unpack writes the chunk back into c.
 func (p *PackedChunk) Unpack(c *Chunk) {
 	clear(c.Water[:])
+	c.BlockEntities = c.BlockEntities[:0]
 	for i, b := range p.biomes {
 		c.Biomes[i] = uint32(b)
 	}

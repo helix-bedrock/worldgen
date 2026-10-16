@@ -38,6 +38,16 @@ type Chunk struct {
 	// block also holds source water (BDS's second block layer), as kelp,
 	// seagrass and coral fans placed in the sea do.
 	Water [16 * 16 * Height / 64]uint64
+	// BlockEntities are the block entities of blocks structures placed
+	// (beds, bells, chests...): the client draws these blocks from them.
+	BlockEntities []BlockEntity
+}
+
+// BlockEntity is the Bedrock block entity data of one block, at a world
+// position. Data holds "id" and the block's fields, as the game saves them.
+type BlockEntity struct {
+	X, Y, Z int32
+	Data    map[string]any
 }
 
 // Waterlogged reports whether the block at local (x, z) and world y also
@@ -325,6 +335,7 @@ func (o *Overworld) GenerateChunk(chunkX, chunkZ int32, c *Chunk) {
 		}
 	}
 	clear(c.Water[:])
+	c.BlockEntities = c.BlockEntities[:0]
 	g := new(grids)
 	o.fillDensity(chunkX, chunkZ, &cols, g)
 	aq := newAquifer(o, chunkX, chunkZ)

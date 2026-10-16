@@ -63,6 +63,55 @@ var javaBlockContains = [][2]string{
 	{"potted", "flower_pot"},
 }
 
+// blockEntityIDs are the Bedrock block entity ids of the blocks that have
+// one, by Bedrock block name (suffix match for the families).
+var blockEntityIDs = map[string]string{
+	"minecraft:bed": "Bed", "minecraft:bell": "Bell", "minecraft:chest": "Chest",
+	"minecraft:trapped_chest": "Chest", "minecraft:barrel": "Barrel", "minecraft:furnace": "Furnace",
+	"minecraft:lit_furnace": "Furnace", "minecraft:blast_furnace": "BlastFurnace", "minecraft:smoker": "Smoker",
+	"minecraft:flower_pot": "FlowerPot", "minecraft:lectern": "Lectern", "minecraft:brewing_stand": "BrewingStand",
+	"minecraft:cauldron": "Cauldron", "minecraft:jukebox": "Jukebox", "minecraft:hopper": "Hopper",
+	"minecraft:dispenser": "Dispenser", "minecraft:dropper": "Dropper", "minecraft:campfire": "Campfire",
+	"minecraft:soul_campfire": "Campfire", "minecraft:beehive": "Beehive", "minecraft:bee_nest": "Beehive",
+	"minecraft:mob_spawner": "MobSpawner", "minecraft:noteblock": "Music", "minecraft:enchanting_table": "EnchantTable",
+	"minecraft:standing_sign": "Sign", "minecraft:wall_sign": "Sign", "minecraft:standing_banner": "Banner",
+	"minecraft:wall_banner": "Banner", "minecraft:skeleton_skull": "Skull", "minecraft:decorated_pot": "DecoratedPot",
+	"minecraft:chiseled_bookshelf": "ChiseledBookshelf", "minecraft:unpowered_comparator": "Comparator",
+}
+
+// bedColors are Bedrock's colour indexes for bed block entities.
+var bedColors = map[string]uint8{"white": 0, "orange": 1, "magenta": 2, "light_blue": 3, "yellow": 4, "lime": 5,
+	"pink": 6, "gray": 7, "light_gray": 8, "cyan": 9, "purple": 10, "blue": 11, "brown": 12, "green": 13, "red": 14, "black": 15}
+
+// blockEntityFor returns the block entity data of a converted block placed
+// at (x, y, z), nil if it has none. javaName gives the bed colour.
+func (o *Overworld) blockEntityFor(id uint32, javaName string, x, y, z int32) map[string]any {
+	name := o.blockName(id)
+	beID, ok := blockEntityIDs[name]
+	if !ok {
+		switch {
+		case strings.HasSuffix(name, "_sign") && strings.Contains(name, "hanging"):
+			beID = "HangingSign"
+		case strings.HasSuffix(name, "_sign"):
+			beID = "Sign"
+		case strings.HasSuffix(name, "_banner"):
+			beID = "Banner"
+		case strings.HasSuffix(name, "_skull") || strings.HasSuffix(name, "_head"):
+			beID = "Skull"
+		case strings.HasSuffix(name, "shulker_box"):
+			beID = "ShulkerBox"
+		default:
+			return nil
+		}
+	}
+	d := map[string]any{"id": beID, "x": x, "y": y, "z": z, "isMovable": uint8(1)}
+	if beID == "Bed" {
+		color := strings.TrimSuffix(strings.TrimPrefix(javaName, "minecraft:"), "_bed")
+		d["color"] = bedColors[color]
+	}
+	return d
+}
+
 // javaFacing maps a Java facing to Bedrock's facing_direction.
 var javaFacing = map[string]int32{"down": 0, "up": 1, "north": 2, "south": 3, "west": 4, "east": 5}
 
@@ -134,7 +183,9 @@ func (o *Overworld) convertJavaState(st TemplateState) (uint32, bool, bool) {
 			if f, ok := javaFacing[v]; ok {
 				set("facing_direction", f)
 			}
-			set("torch_facing_direction", v)
+			// A wall torch's Java facing points away from its wall; Bedrock
+			// names the side it hangs on.
+			set("torch_facing_direction", opposite(v))
 			switch {
 			case strings.HasSuffix(target, "_door"):
 				set("direction", dirESWN[v])
@@ -155,6 +206,18 @@ func (o *Overworld) convertJavaState(st TemplateState) (uint32, bool, bool) {
 		case "type":
 			if v == "top" || v == "bottom" {
 				set("minecraft:vertical_half", v)
+			}
+		case "north", "east", "south", "west":
+			// Panes, bars and fences (1.26: minecraft:connection_*); walls
+			// (low/tall -> short/tall).
+			set("minecraft:connection_"+k, v == "true")
+			switch v {
+			case "low":
+				set("wall_connection_type_"+k, "short")
+			case "tall":
+				set("wall_connection_type_"+k, "tall")
+			case "none":
+				set("wall_connection_type_"+k, "none")
 			}
 		case "axis":
 			set("pillar_axis", v)
@@ -196,6 +259,9 @@ func (o *Overworld) convertJavaState(st TemplateState) (uint32, bool, bool) {
 				}
 			}
 		}
+	}
+	if _, ok := st.Props["facing"]; !ok {
+		set("torch_facing_direction", "top")
 	}
 	id, ok := o.reg.Lookup(full, props)
 	if !ok {

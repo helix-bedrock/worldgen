@@ -588,6 +588,9 @@ func (o *Overworld) placePiece(p *jigsawPiece, c *Chunk, chunkBox box, height fu
 		lx, lz := int(x&15), int(z&15)
 		i := int(y-MinY)<<8 | lz<<4 | lx
 		c.Blocks[i] = uint16(cs.id)
+		if d := o.blockEntityFor(cs.id, st.Name, x, y, z); d != nil {
+			c.BlockEntities = append(c.BlockEntities, BlockEntity{x, y, z, d})
+		}
 		if cs.water {
 			c.Water[i>>6] |= 1 << (i & 63)
 		} else {
