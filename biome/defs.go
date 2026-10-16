@@ -163,7 +163,7 @@ type rawBiome struct {
 			Village         *struct {
 				Type string `json:"type"`
 			} `json:"minecraft:village_type"`
-			Tags            *struct {
+			Tags *struct {
 				Tags []string `json:"tags"`
 			} `json:"minecraft:tags"`
 		} `json:"components"`
