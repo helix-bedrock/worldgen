@@ -30,6 +30,9 @@ type Registry struct {
 	tags     map[string][]string
 	// light is each state's light dampening; nil until LoadLight.
 	light []uint8
+	// translucency is each state's translucency; nil until
+	// LoadTranslucency.
+	translucency []float32
 }
 
 // Load reads the gzipped big-endian NBT palette and the block types JSON.
@@ -131,6 +134,41 @@ func (r *Registry) LightDampening(i uint32) uint8 {
 		return 0
 	}
 	return 15
+}
+
+// LoadTranslucency reads translucency values: a JSON object from state hash
+// (decimal) to translucency, listing every state that is not 0 (opaque). It
+// is exported from BDS block states (Block::mTranslucency; air is 1). Call
+// it before using the registry from several goroutines.
+func (r *Registry) LoadTranslucency(rd io.Reader) error {
+	var m map[string]float32
+	if err := json.NewDecoder(rd).Decode(&m); err != nil {
+		return fmt.Errorf("blocks: read translucency: %w", err)
+	}
+	r.translucency = make([]float32, len(r.states))
+	for h, t := range m {
+		v, err := strconv.ParseUint(h, 10, 32)
+		if err != nil {
+			return fmt.Errorf("blocks: translucency key %q: %w", h, err)
+		}
+		if i, ok := r.byHash[uint32(v)]; ok {
+			r.translucency[i] = t
+		}
+	}
+	return nil
+}
+
+// Translucency returns a state's translucency, 0 (opaque) to 1. Without
+// LoadTranslucency it is 1 for states that do not dampen light and 0 for
+// the rest.
+func (r *Registry) Translucency(i uint32) float32 {
+	if int(i) < len(r.translucency) {
+		return r.translucency[i]
+	}
+	if r.LightDampening(i) == 0 {
+		return 1
+	}
+	return 0
 }
 
 // Tags returns a block's tags as BDS reports them ("minecraft:dirt", "wood").

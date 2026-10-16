@@ -27,6 +27,21 @@ func (o *Overworld) builtinFeatures(set *featureSet) {
 	add("minecraft:gravel_feature", &discFeature{block: o.ids.gravel, replace: dirt, radius: 6})
 	add("minecraft:reeds_feature", &reedsFeature{reeds: id("minecraft:reeds"), farmland: id("minecraft:farmland"), frostedIce: id("minecraft:frosted_ice")})
 	add("minecraft:pumpkin_feature", &pumpkinFeature{pumpkin: id("minecraft:pumpkin"), count: 96})
+	// Mushroom tries: 1, or 64 in old worlds (sub_4E2BB50 picks by a base
+	// game version check, as for the seagrass count).
+	soil := []uint32{id("minecraft:mycelium"), id("minecraft:podzol")}
+	add("minecraft:brown_mushroom_feature", &mushroomFeature{block: id("minecraft:brown_mushroom"), count: 1, soil: soil})
+	add("minecraft:red_mushroom_feature", &mushroomFeature{block: id("minecraft:red_mushroom"), count: 1, soil: soil})
+	add("minecraft:wildflowers_feature", o.newFlowerBed("minecraft:wildflowers"))
+	add("minecraft:leaf_litter_feature", o.newFlowerBed("minecraft:leaf_litter"))
+	for name, kind := range map[string]flowerKind{"flower_forest": flowersFlowerForest, "forest": flowersForest,
+		"overworld": flowersOverworld, "plains": flowersPlains, "swamp": flowersSwamp} {
+		add("minecraft:legacy:"+name+"_flower_feature", o.newLegacyFlower(kind, id))
+	}
+	add("minecraft:meadow_flower_feature", &meadowFlowerFeature{blocks: [8]uint32{id("minecraft:allium"), id("minecraft:poppy"),
+		id("minecraft:cornflower"), id("minecraft:oxeye_daisy"), id("minecraft:azure_bluet"), id("minecraft:dandelion"),
+		id("minecraft:short_grass"), id("minecraft:tall_grass")}})
+	add("minecraft:sweet_berry_bush_feature", o.newSweetBerry())
 
 	grass := func(typ string) uint32 {
 		b, _ := o.reg.Lookup("minecraft:seagrass", map[string]any{"sea_grass_type": typ})

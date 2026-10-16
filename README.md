@@ -6,11 +6,17 @@
 >
 > Today:
 >
-> - **The base world matches BDS:** terrain, biomes, surface, caves, aquifers, ores, trees, plants and
->   most ocean decorations.
-> - **Structures are not started:** no villages, ruins, shipwrecks, mineshafts or strongholds yet.
-> - **Many smaller details are missing:** coral crust, magma and bubble columns, some trees (fancy
->   oak, acacia, dark oak, big spruce and jungle, fallen logs) and more.
+> - **The base world matches BDS:** terrain, biomes, surface, caves, aquifers, ores and most ocean
+>   decorations.
+> - **Trees:** oak, birch, spruce, pine, jungle, fancy (big) oak, giant jungle and giant spruce/pine,
+>   acacia, dark oak, pale oak, azalea, fallen logs and the dappled forest's poplars. Cherry and
+>   mangrove trees are not done yet.
+> - **Plants:** grass, flowers (plains, forest, flower forest, swamp, meadow), wildflowers, leaf
+>   litter, sweet berry bushes, mushrooms, shelf mushrooms and swamp trees.
+> - **Structures:** villages are placed and built (with loot chests). Everything else (ruins,
+>   shipwrecks, mineshafts, strongholds, ancient cities, trial chambers...) is not started.
+> - **Still missing:** lily pads, huge mushrooms, melons, coral crust, magma and bubble columns,
+>   double tall grass in swamps and more.
 > - **The Nether and the End are not started.**
 > - **The API is not stable.** Names and behaviour change between commits.
 >
@@ -91,9 +97,11 @@ optimization that changes the world is not accepted.
 | Part | State |
 |---|---|
 | Terrain, biomes, surface, caves, aquifers, ores | ✅ done |
-| Plants, ocean decorations, freezing | ✅ done |
-| Trees | 🟡 partly done |
-| Structures | ⬜ not started |
+| Ocean decorations, freezing | ✅ done |
+| Plants and flowers | 🟡 most done (no lily pads, huge mushrooms, melons) |
+| Trees | 🟡 most done (no cherry, mangrove) |
+| Villages | 🟡 placed and built, layout close but not block-exact |
+| Other structures | ⬜ not started |
 | Nether and End | ⬜ not started |
 
 **The goal is to match the latest Minecraft version exactly.** After that, every time Minecraft

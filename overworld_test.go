@@ -39,6 +39,13 @@ func testRegistry(t testing.TB) (*blocks.Registry, map[string]uint32) {
 			t.Fatal(err)
 		}
 	}
+	if tf, err := os.Open(filepath.Join(dir, "block_translucency.json")); err == nil {
+		err = reg.LoadTranslucency(tf)
+		_ = tf.Close()
+		if err != nil {
+			t.Fatal(err)
+		}
+	}
 	bf, err := os.Open(filepath.Join(dir, "biomes.json"))
 	if err != nil {
 		t.Fatal(err)

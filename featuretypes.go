@@ -117,6 +117,7 @@ func (o *Overworld) loadFeatures(fsys fs.FS, dir string) (*featureSet, error) {
 	for id, lt := range legacyTrees {
 		set.byID[id] = &legacyTreeFeature{def: lt, set: set}
 	}
+	set.byID["minecraft:legacy:swamp_foliage_feature"] = &swampFoliageFeature{set: set}
 	o.builtinFeatures(set)
 	return set, nil
 }
@@ -194,14 +195,19 @@ func (o *Overworld) parseFeature(typ string, raw json.RawMessage, set *featureSe
 		}
 		return &searchFeature{feat: featureRef{r.Places, set}, min: r.Volume.Min, max: r.Volume.Max, axis: r.Axis, required: max(r.Required, 1)}, nil
 	case "minecraft:tree_feature":
-		return o.parseTree(raw)
+		return o.parseTree(raw, set)
+	case "minecraft:horizontal_tree_decoration_feature":
+		return o.parseHorizontalDecoration(raw)
 	}
 	return nil, nil
 }
 
-// aggregateFeature places its features at the same position in order.
-// first_success stops at the first one placed; first_failure stops at the
-// first one that fails and succeeds only if all were placed.
+// aggregateFeature places its features at the same position in order
+// (AggregateFeature, sub_D4100E0). It succeeds when any of them was placed,
+// with the position the last placed one returned. first_success stops at
+// the first one placed; first_failure stops at a failure only while none
+// has been placed yet, so "tree, then optional extras" keeps going once
+// the tree grew.
 type aggregateFeature struct {
 	feats        []featureRef
 	firstFailure bool
@@ -209,21 +215,20 @@ type aggregateFeature struct {
 }
 
 func (f *aggregateFeature) place(w *featureWorld, x, y, z int32, r *rand.MT) (blockPos, bool) {
+	var last blockPos
 	any := false
 	for _, c := range f.feats {
-		_, ok := c.place(w, x, y, z, r)
-		switch {
-		case ok && !f.firstFailure && !f.none:
-			return blockPos{x, y, z}, true
-		case !ok && f.firstFailure:
+		p, ok := c.place(w, x, y, z, r)
+		if ok {
+			last, any = p, true
+			if !f.firstFailure && !f.none {
+				return last, true
+			}
+		} else if f.firstFailure && !any {
 			return blockPos{}, false
 		}
-		any = any || ok
 	}
-	if f.firstFailure {
-		return blockPos{x, y, z}, true
-	}
-	return blockPos{x, y, z}, any
+	return last, any
 }
 
 // sequenceFeature places each feature where the previous one ended.
@@ -735,9 +740,9 @@ type legacyTree struct {
 func nextBool(r *rand.MT) bool { return r.Uint32()>>27&1 != 0 }
 
 // legacyTrees are the legacy tree features from BDS's constructor
-// (sub_51D3EA0), without the leaf-litter variants.
-// VERIFY: which world setting switches forest and mesa plateau to the
-// leaf-litter variants.
+// (sub_51D3EA0). Forest and mesa plateau use the leaf-litter variants, as
+// BDS does in new worlds (its constructor flag; BDS forests have leaf
+// litter in the bdsdiff test world).
 var legacyTrees = map[string]legacyTree{
 	"minecraft:legacy:bamboo_jungle_tree_feature": {30, []string{"fancy_oak_tree_feature", "jungle_bush_feature", "mega_jungle_tree_feature", "scatter_tall_grass_around_tree_feature"}, func(r *rand.MT) int {
 		switch {
@@ -776,7 +781,7 @@ var legacyTrees = map[string]legacyTree{
 		}
 		return 1
 	}},
-	"minecraft:legacy:forest_tree_feature": {10, []string{"select_birch_tree_feature", "fancy_oak_tree_with_optional_beehive_feature", "select_oak_tree_feature"}, forestChoice},
+	"minecraft:legacy:forest_tree_feature": {10, []string{"select_birch_tree_with_leaf_litter_feature", "fancy_oak_tree_with_leaf_litter_and_optional_beehive", "select_oak_tree_with_leaf_litter_feature"}, forestChoice},
 	"minecraft:legacy:ice_tree_feature":    {0.1, []string{"select_spruce_tree_feature"}, func(*rand.MT) int { return 0 }},
 	"minecraft:legacy:jungle_tree_feature": {50, []string{"fancy_oak_tree_feature", "jungle_bush_feature", "mega_jungle_tree_feature", "select_jungle_tree_feature"}, func(r *rand.MT) int {
 		switch {
@@ -798,7 +803,7 @@ var legacyTrees = map[string]legacyTree{
 		}
 		return 1
 	}},
-	"minecraft:legacy:mesa_plateau_stone_tree_feature": {5, []string{"select_oak_tree_feature"}, func(*rand.MT) int { return 0 }},
+	"minecraft:legacy:mesa_plateau_stone_tree_feature": {5, []string{"select_oak_tree_with_leaf_litter_feature"}, func(*rand.MT) int { return 0 }},
 	"minecraft:legacy:plains_tree_feature": {0.05, []string{"fancy_oak_tree_with_optional_beehive_feature", "select_oak_tree_feature", "oak_tree_with_beehive_feature"}, func(r *rand.MT) int {
 		if r.IntN(3) == 0 {
 			return 0
@@ -872,15 +877,55 @@ func (f *legacyTreeFeature) place(w *featureWorld, x, y, z int32, r *rand.MT) (b
 	} else {
 		n = int32(c * r.Float())
 	}
+	return blockPos{x, y, z}, placeLegacyTrees(w, x, z, n, r, f.set, func(r *rand.MT) string { return f.def.trees[f.def.choose(r)] })
+}
+
+// placeLegacyTrees is BDS's per-tree loop (sub_51D3D30): n times, choose
+// the tree, draw z then x, place it on the height map, then place
+// scatter_tall_grass_around_tree_feature at the same spot (skipped by BDS
+// only for the old "legacy" world generator).
+func placeLegacyTrees(w *featureWorld, x, z, n int32, r *rand.MT, set *featureSet, choose func(*rand.MT) string) bool {
+	grass := featureRef{"minecraft:scatter_tall_grass_around_tree_feature", set}
 	placed := false
 	for ; n > 0; n-- {
-		tree := featureRef{"minecraft:" + f.def.trees[f.def.choose(r)], f.set}
+		tree := featureRef{"minecraft:" + choose(r), set}
 		tz := z + r.IntN(14) + 1
 		tx := x + r.IntN(14) + 1
 		ty := w.heightmap(tx, tz)
 		if _, ok := tree.place(w, tx, ty, tz, r); ok {
 			placed = true
 		}
+		grass.place(w, tx, ty, tz, r)
 	}
-	return blockPos{x, y, z}, placed
+	return placed
+}
+
+// swampFoliageFeature is minecraft:legacy:swamp_foliage_feature
+// (LegacySwampFoliageFeature, place sub_51D39D0, constructor sub_51D3480):
+// ten seagrass tries 54 blocks above the origin (they find no water but
+// draw), then two to four swamp trees, one in twenty a huge mushroom.
+type swampFoliageFeature struct {
+	set *featureSet
+}
+
+func (f *swampFoliageFeature) place(w *featureWorld, x, y, z int32, r *rand.MT) (blockPos, bool) {
+	var n int32
+	if r.IntN(10) != 0 {
+		n = max(r.IntN(10), 7) - 5
+	} else {
+		n = int32(r.Float() * 2)
+	}
+	seagrass := featureRef{"minecraft:seagrass_feature", f.set}
+	for range 10 {
+		sx := x + r.IntN(16)
+		sz := z + r.IntN(16)
+		seagrass.place(w, sx, y+54, sz, r)
+	}
+	placeLegacyTrees(w, x, z, n, r, f.set, func(r *rand.MT) string {
+		if r.IntN(20) == 0 {
+			return "huge_mushroom_feature"
+		}
+		return "swamp_tree_feature"
+	})
+	return blockPos{x, y, z}, true
 }

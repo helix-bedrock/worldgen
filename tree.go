@@ -133,10 +133,19 @@ var vineSides = [4]struct {
 // apply rolls each side and hangs a column of the decoration block into
 // air (sub_D299270 / sub_D299070).
 func (d *decoration) apply(w *featureWorld, x, y, z int32, r *rand.MT) {
+	d.applyMask(w, x, y, z, r, sideMask{true, true, true, true})
+}
+
+// applyMask is apply for the sides in m only (west, east, north, south);
+// BDS rolls the chance only for those sides.
+func (d *decoration) applyMask(w *featureWorld, x, y, z int32, r *rand.MT, m sideMask) {
 	if !d.set {
 		return
 	}
-	for _, s := range vineSides {
+	for i, s := range vineSides {
+		if !m[i] {
+			continue
+		}
 		if !d.c.roll(r) {
 			continue
 		}
@@ -177,11 +186,37 @@ const (
 	canopySimple canopyKind = iota
 	canopySpruce
 	canopyPine
+	canopyPoplar
+	canopyFancy
+	canopyMega
+	canopyAcacia
+	canopyRoofed
+	canopyRandomSpread
 )
 
-// treeFeature is a tree with a simple trunk.
+type trunkKind uint8
+
+const (
+	trunkSimple trunkKind = iota
+	trunkPoplar
+	trunkFallen
+	trunkFancy
+	trunkMega
+	trunkAcacia
+)
+
+// treeFeature is a tree: a trunk and, except for fallen trees, a canopy.
 type treeFeature struct {
 	o *Overworld
+
+	trunkKind trunkKind
+	// logDeco is log_decoration_feature, placed at each log of poplar and
+	// fallen trunks; nil when unset.
+	logDeco *featureRef
+	// poplar trunk
+	remaining, branches intRange
+	// fallen trunk; modifier is shared with the simple trunk
+	stump intRange
 
 	mayGrowOn  blockMatcher
 	baseBlocks []uint32
@@ -211,9 +246,28 @@ type treeFeature struct {
 	// pine canopy
 	pineHeight intRange
 	baseRadius int32
+	// acacia trunk and its canopies
+	acacia       acaciaTrunk
+	acaciaCanopy *acaciaCanopy
+	roofedCanopy *roofedCanopy
+	spreadCanopy *randomSpreadCanopy
+	// mega trunk and canopy
+	mega       megaTrunk
+	megaCanopy *megaCanopy
+	// base_cluster (podzol around giant spruces)
+	clusters, clusterRadius int32
+	clusterReplace          blockMatcher
+	// fancy trunk and canopy
+	fancy                    fancyTrunk
+	fancyHeight, fancyRadius int32
+	// poplar canopy: radii are {radius, weight} pairs
+	radii        [][2]int32
+	canopyHeight intRange
+	holeChance   float32
+	branch       uint32
 }
 
-func (o *Overworld) parseTree(raw json.RawMessage) (placer, error) {
+func (o *Overworld) parseTree(raw json.RawMessage, set *featureSet) (placer, error) {
 	var r struct {
 		Trunk *struct {
 			Height   intRange        `json:"trunk_height"`
@@ -222,6 +276,119 @@ func (o *Overworld) parseTree(raw json.RawMessage) (placer, error) {
 			Deco     *rawDecoration  `json:"trunk_decoration"`
 			Submerge json.RawMessage `json:"can_be_submerged"`
 		} `json:"trunk"`
+		Poplar *struct {
+			Height    *intRange      `json:"trunk_height"`
+			Block     biome.Block    `json:"trunk_block"`
+			Remaining *intRange      `json:"remaining_trunk_height_above_branches"`
+			Branches  *intRange      `json:"amount_of_foliage_support_branches"`
+			Deco      *rawDecoration `json:"trunk_decoration"`
+			LogDeco   string         `json:"log_decoration_feature"`
+		} `json:"poplar_trunk"`
+		Fallen *struct {
+			Length   *intRange      `json:"log_length"`
+			Block    biome.Block    `json:"trunk_block"`
+			Deco     *rawDecoration `json:"trunk_decoration"`
+			LogDeco  string         `json:"log_decoration_feature"`
+			Modifier *intRange      `json:"height_modifier"`
+			Stump    *intRange      `json:"stump_height"`
+		} `json:"fallen_trunk"`
+		Fancy *struct {
+			Height struct {
+				Base     int32   `json:"base"`
+				Variance int32   `json:"variance"`
+				Scale    float32 `json:"scale"`
+			} `json:"trunk_height"`
+			Width    *int32      `json:"trunk_width"`
+			Block    biome.Block `json:"trunk_block"`
+			Branches struct {
+				Slope       float32 `json:"slope"`
+				Density     float32 `json:"density"`
+				MinAltitude float32 `json:"min_altitude_factor"`
+			} `json:"branches"`
+			WidthScale      *float32 `json:"width_scale"`
+			FoliageAltitude *float32 `json:"foliage_altitude_factor"`
+		} `json:"fancy_trunk"`
+		Mega *struct {
+			Width  *int32 `json:"trunk_width"`
+			Height struct {
+				Base      int32   `json:"base"`
+				Intervals []int32 `json:"intervals"`
+			} `json:"trunk_height"`
+			Block    biome.Block    `json:"trunk_block"`
+			Deco     *rawDecoration `json:"trunk_decoration"`
+			Branches *struct {
+				Length   int32     `json:"branch_length"`
+				Slope    *float32  `json:"branch_slope"`
+				Interval *intRange `json:"branch_interval"`
+				Altitude struct {
+					Min float32 `json:"min"`
+					Max float32 `json:"max"`
+				} `json:"branch_altitude_factor"`
+				Canopy struct {
+					Mega *rawMegaCanopy `json:"mega_canopy"`
+				} `json:"branch_canopy"`
+			} `json:"branches"`
+		} `json:"mega_trunk"`
+		Acacia *struct {
+			Width  *int32 `json:"trunk_width"`
+			Height struct {
+				Base      int32   `json:"base"`
+				Intervals []int32 `json:"intervals"`
+				MinCanopy *int32  `json:"min_height_for_canopy"`
+			} `json:"trunk_height"`
+			Block biome.Block    `json:"trunk_block"`
+			Deco  *rawDecoration `json:"trunk_decoration"`
+			Lean  *struct {
+				Diagonal *bool     `json:"allow_diagonal_growth"`
+				Height   *intRange `json:"lean_height"`
+				Steps    *intRange `json:"lean_steps"`
+				Length   *intRange `json:"lean_length"`
+			} `json:"trunk_lean"`
+			Branches *struct {
+				Chance   *chance   `json:"branch_chance"`
+				Length   *intRange `json:"branch_length"`
+				Position *intRange `json:"branch_position"`
+				Canopy   struct {
+					Acacia *rawAcaciaCanopy `json:"acacia_canopy"`
+				} `json:"branch_canopy"`
+			} `json:"branches"`
+		} `json:"acacia_trunk"`
+		AcaciaCanopy *rawAcaciaCanopy `json:"acacia_canopy"`
+		RoofedCanopy *struct {
+			Height int32       `json:"canopy_height"`
+			Core   *int32      `json:"core_width"`
+			Outer  int32       `json:"outer_radius"`
+			Inner  int32       `json:"inner_radius"`
+			Leaf   biome.Block `json:"leaf_block"`
+		} `json:"roofed_canopy"`
+		SpreadCanopy *struct {
+			Height   intRange            `json:"canopy_height"`
+			Radius   intRange            `json:"canopy_radius"`
+			Attempts int32               `json:"leaf_placement_attempts"`
+			Leaves   [][]json.RawMessage `json:"leaf_blocks"`
+		} `json:"random_spread_canopy"`
+		MegaCanopy     *rawMegaCanopy `json:"mega_canopy"`
+		MegaPineCanopy *rawMegaCanopy `json:"mega_pine_canopy"`
+		BaseCluster    *struct {
+			MayReplace []json.RawMessage `json:"may_replace"`
+			Clusters   int32             `json:"num_clusters"`
+			Radius     int32             `json:"cluster_radius"`
+		} `json:"base_cluster"`
+		FancyCanopy *struct {
+			Height int32       `json:"height"`
+			Radius int32       `json:"radius"`
+			Leaf   biome.Block `json:"leaf_block"`
+		} `json:"fancy_canopy"`
+		PoplarCanopy *struct {
+			Radius []struct {
+				Value  int32 `json:"value"`
+				Weight int32 `json:"weight"`
+			} `json:"radius"`
+			Height *intRange   `json:"height"`
+			Hole   float32     `json:"side_hole_chance"`
+			Leaf   biome.Block `json:"leaf_block"`
+			Branch biome.Block `json:"branch_block"`
+		} `json:"poplar_canopy"`
 		Canopy *struct {
 			Offset struct {
 				Min int32 `json:"min"`
@@ -255,10 +422,7 @@ func (o *Overworld) parseTree(raw json.RawMessage) (placer, error) {
 	if err := json.Unmarshal(raw, &r); err != nil {
 		return nil, err
 	}
-	if r.Trunk == nil {
-		return nil, nil
-	}
-	t := &treeFeature{o: o, mayGrowOn: parseMatcher(r.MayGrowOn), height: r.Trunk.Height}
+	t := &treeFeature{o: o, mayGrowOn: parseMatcher(r.MayGrowOn)}
 	replace := parseMatcher(r.MayReplace)
 	t.above = replace
 	t.below = replace.union(parseMatcher(r.MayGrowThrough))
@@ -267,27 +431,243 @@ func (o *Overworld) parseTree(raw json.RawMessage) (placer, error) {
 			t.baseBlocks = append(t.baseBlocks, id)
 		}
 	}
-	if r.Trunk.Modifier != nil {
-		t.modifier = *r.Trunk.Modifier
+	// Defaults are those of BDS's trunk constructors (sub_4D92160,
+	// sub_4C4E410) for fields the JSON leaves out.
+	var trunkBlock biome.Block
+	var trunkDeco *rawDecoration
+	logDeco := ""
+	switch {
+	case r.Trunk != nil:
+		t.trunkKind, trunkBlock, trunkDeco = trunkSimple, r.Trunk.Block, r.Trunk.Deco
+		t.height = r.Trunk.Height
+		if r.Trunk.Modifier != nil {
+			t.modifier = *r.Trunk.Modifier
+		}
+		if len(r.Trunk.Submerge) > 0 {
+			var s struct {
+				MaxDepth int32 `json:"max_depth"`
+			}
+			if json.Unmarshal(r.Trunk.Submerge, &s) == nil {
+				t.submerge = s.MaxDepth
+			}
+		}
+	case r.Poplar != nil:
+		p := r.Poplar
+		t.trunkKind, trunkBlock, trunkDeco, logDeco = trunkPoplar, p.Block, p.Deco, p.LogDeco
+		t.height, t.remaining, t.branches = intRange{7, 9}, intRange{4, 4}, intRange{1, 4}
+		if p.Height != nil {
+			t.height = *p.Height
+		}
+		if p.Remaining != nil {
+			t.remaining = *p.Remaining
+		}
+		if p.Branches != nil {
+			t.branches = *p.Branches
+		}
+	case r.Fancy != nil:
+		fc := r.Fancy
+		t.trunkKind, trunkBlock = trunkFancy, fc.Block
+		// Defaults from the constructor (sub_4C6F6F0).
+		t.fancy = fancyTrunk{base: 5, variance: 12, width: 1, scale: 0.618, slope: 0.381, density: 1,
+			minAltitude: 0.2, foliageAltitude: 0.3, widthScale: 1}
+		if fc.Height.Base != 0 || fc.Height.Variance != 0 {
+			t.fancy.base, t.fancy.variance, t.fancy.scale = fc.Height.Base, fc.Height.Variance, fc.Height.Scale
+		}
+		if fc.Width != nil {
+			t.fancy.width = *fc.Width
+		}
+		if fc.Branches.Slope != 0 || fc.Branches.Density != 0 {
+			t.fancy.slope, t.fancy.density, t.fancy.minAltitude = fc.Branches.Slope, fc.Branches.Density, fc.Branches.MinAltitude
+		}
+		if fc.WidthScale != nil {
+			t.fancy.widthScale = *fc.WidthScale
+		}
+		if fc.FoliageAltitude != nil {
+			t.fancy.foliageAltitude = *fc.FoliageAltitude
+		}
+	case r.Acacia != nil:
+		ac := r.Acacia
+		t.trunkKind, trunkBlock, trunkDeco = trunkAcacia, ac.Block, ac.Deco
+		// Defaults from the constructor (sub_4ADA0C0).
+		t.acacia = acaciaTrunk{width: 1, base: 5, minCanopy: 3, leanHeight: intRange{1, 4}, leanSteps: intRange{1, 4},
+			diagonal: true, branchLen: intRange{1, 5}, branchPos: intRange{1, 3}}
+		if ac.Width != nil {
+			t.acacia.width = *ac.Width
+		}
+		if ac.Height.Base != 0 || len(ac.Height.Intervals) > 0 {
+			t.acacia.base, t.acacia.intervals = ac.Height.Base, ac.Height.Intervals
+		}
+		if ac.Height.MinCanopy != nil {
+			t.acacia.minCanopy = *ac.Height.MinCanopy
+		}
+		if l := ac.Lean; l != nil {
+			if l.Diagonal != nil {
+				t.acacia.diagonal = *l.Diagonal
+			}
+			if l.Height != nil {
+				t.acacia.leanHeight = *l.Height
+			}
+			if l.Steps != nil {
+				t.acacia.leanSteps = *l.Steps
+			}
+			if l.Length != nil {
+				t.acacia.leanLength = *l.Length
+			}
+		}
+		if b := ac.Branches; b != nil {
+			if b.Chance != nil {
+				t.acacia.branchChance = *b.Chance
+			}
+			if b.Length != nil {
+				t.acacia.branchLen = *b.Length
+			}
+			if b.Position != nil {
+				t.acacia.branchPos = *b.Position
+			}
+			if b.Canopy.Acacia != nil {
+				c, err := o.parseAcaciaCanopy(b.Canopy.Acacia)
+				if err != nil {
+					return nil, err
+				}
+				t.acacia.branchCanopy = c
+			}
+		}
+	case r.Mega != nil:
+		mg := r.Mega
+		t.trunkKind, trunkBlock, trunkDeco = trunkMega, mg.Block, mg.Deco
+		// Defaults from the constructor (sub_4CB1F60).
+		t.mega = megaTrunk{width: 2, base: 5, slope: 0.5}
+		if mg.Width != nil {
+			t.mega.width = *mg.Width
+		}
+		if mg.Height.Base != 0 || len(mg.Height.Intervals) > 0 {
+			t.mega.base, t.mega.intervals = mg.Height.Base, mg.Height.Intervals
+		}
+		if b := mg.Branches; b != nil {
+			t.mega.branchLen = b.Length
+			if b.Slope != nil {
+				t.mega.slope = *b.Slope
+			}
+			if b.Interval != nil {
+				t.mega.branchInterval = *b.Interval
+			}
+			t.mega.altMin, t.mega.altMax = b.Altitude.Min, b.Altitude.Max
+			if b.Canopy.Mega != nil {
+				c, err := o.parseMegaCanopy(b.Canopy.Mega, false)
+				if err != nil {
+					return nil, err
+				}
+				t.mega.branchCanopy = c
+			}
+		}
+	case r.Fallen != nil:
+		f := r.Fallen
+		t.trunkKind, trunkBlock, trunkDeco, logDeco = trunkFallen, f.Block, f.Deco, f.LogDeco
+		// VERIFY: the JSON names of the two optional ranges (constructor
+		// fields +16 and +24) were not read from the schema; vanilla files
+		// set neither.
+		t.height, t.modifier, t.stump = intRange{5, 8}, intRange{0, 0}, intRange{1, 1}
+		if f.Length != nil {
+			t.height = *f.Length
+		}
+		if f.Modifier != nil {
+			t.modifier = *f.Modifier
+		}
+		if f.Stump != nil {
+			t.stump = *f.Stump
+		}
+	default:
+		return nil, nil
 	}
-	if len(r.Trunk.Submerge) > 0 {
-		var s struct {
-			MaxDepth int32 `json:"max_depth"`
-		}
-		if json.Unmarshal(r.Trunk.Submerge, &s) == nil {
-			t.submerge = s.MaxDepth
-		}
+	if bc := r.BaseCluster; bc != nil {
+		t.clusters, t.clusterRadius, t.clusterReplace = bc.Clusters, bc.Radius, parseMatcher(bc.MayReplace)
+	}
+	if logDeco != "" {
+		t.logDeco = &featureRef{logDeco, set}
 	}
 	var ok bool
-	if t.log, ok = o.lookupBlock(r.Trunk.Block); !ok {
-		return nil, fmt.Errorf("trunk block %s missing", r.Trunk.Block.Name)
+	if t.log, ok = o.lookupBlock(trunkBlock); !ok {
+		return nil, fmt.Errorf("trunk block %s missing", trunkBlock.Name)
 	}
 	var err error
-	if t.trunkDeco, err = o.parseDecoration(r.Trunk.Deco); err != nil {
+	if t.trunkDeco, err = o.parseDecoration(trunkDeco); err != nil {
 		return nil, err
+	}
+	if t.trunkKind == trunkFallen {
+		return t, nil
+	}
+	if t.trunkKind == trunkAcacia {
+		switch {
+		case r.AcaciaCanopy != nil:
+			c, err := o.parseAcaciaCanopy(r.AcaciaCanopy)
+			if err != nil {
+				return nil, err
+			}
+			t.canopy, t.acaciaCanopy = canopyAcacia, c
+		case r.RoofedCanopy != nil:
+			rc := r.RoofedCanopy
+			c := &roofedCanopy{height: rc.Height, outer: rc.Outer, inner: rc.Inner}
+			if rc.Core != nil {
+				c.core, c.hasCore = *rc.Core, true
+			}
+			if c.leaf, ok = o.lookupBlock(rc.Leaf); !ok {
+				return nil, fmt.Errorf("leaf block %s missing", rc.Leaf.Name)
+			}
+			t.canopy, t.roofedCanopy = canopyRoofed, c
+		case r.SpreadCanopy != nil:
+			sc := r.SpreadCanopy
+			c := &randomSpreadCanopy{height: sc.Height, radius: sc.Radius, attempts: sc.Attempts}
+			for _, e := range sc.Leaves {
+				if len(e) != 2 {
+					return nil, fmt.Errorf("leaf entry %s", e)
+				}
+				var b biome.Block
+				var wgt float32
+				if json.Unmarshal(e[0], &b) != nil || json.Unmarshal(e[1], &wgt) != nil {
+					return nil, fmt.Errorf("leaf entry %s", e)
+				}
+				id, ok := o.lookupBlock(b)
+				if !ok {
+					return nil, fmt.Errorf("leaf block %s missing", b.Name)
+				}
+				c.leaves, c.weights = append(c.leaves, id), append(c.weights, wgt)
+			}
+			t.canopy, t.spreadCanopy = canopyRandomSpread, c
+		}
+		return t, nil
+	}
+	if t.trunkKind == trunkMega {
+		var err error
+		switch {
+		case r.MegaCanopy != nil:
+			t.megaCanopy, err = o.parseMegaCanopy(r.MegaCanopy, false)
+		case r.MegaPineCanopy != nil:
+			t.megaCanopy, err = o.parseMegaCanopy(r.MegaPineCanopy, true)
+		}
+		if err != nil {
+			return nil, err
+		}
+		return t, nil
 	}
 	var leaf biome.Block
 	switch {
+	case r.FancyCanopy != nil:
+		t.canopy, leaf = canopyFancy, r.FancyCanopy.Leaf
+		t.fancyHeight, t.fancyRadius = r.FancyCanopy.Height, r.FancyCanopy.Radius
+	case r.PoplarCanopy != nil:
+		c := r.PoplarCanopy
+		t.canopy, leaf = canopyPoplar, c.Leaf
+		for _, e := range c.Radius {
+			t.radii = append(t.radii, [2]int32{e.Value, e.Weight})
+		}
+		t.canopyHeight = intRange{5, 6}
+		if c.Height != nil {
+			t.canopyHeight = *c.Height
+		}
+		t.holeChance = c.Hole
+		if t.branch, ok = o.lookupBlock(c.Branch); !ok {
+			return nil, fmt.Errorf("branch block %s missing", c.Branch.Name)
+		}
 	case r.Canopy != nil:
 		c := r.Canopy
 		t.canopy, leaf = canopySimple, c.Leaf
@@ -332,7 +712,36 @@ func (o *Overworld) parseTree(raw json.RawMessage) (placer, error) {
 
 func (t *treeFeature) place(w *featureWorld, x, y, z int32, r *rand.MT) (blockPos, bool) {
 	h := t.height.draw(r)
+	switch t.trunkKind {
+	case trunkPoplar:
+		return t.poplarTrunk(w, x, y, z, h, r)
+	case trunkFallen:
+		return t.fallenTrunk(w, x, y, z, h, r)
+	case trunkAcacia:
+		return t.acaciaTrunk(w, x, y, z, t.acacia.height(r), r)
+	case trunkMega:
+		return t.megaTrunk(w, x, y, z, t.mega.megaHeight(r), r)
+	case trunkFancy:
+		return t.fancyTrunk(w, x, y, z, t.fancy.base+r.IntN(t.fancy.variance), r)
+	}
 	return t.trunk(w, x, y, z, h, r)
+}
+
+// placeBase replaces the block under a trunk with the first base_block
+// unless it already is one (sub_D298330).
+func (t *treeFeature) placeBase(w *featureWorld, x, y, z int32) {
+	if len(t.baseBlocks) == 0 {
+		return
+	}
+	if b, ok := w.block(x, y, z); ok && !containsID(t.baseBlocks, b) {
+		w.set(x, y, z, t.baseBlocks[0])
+	}
+}
+
+// replaces reports whether a trunk or canopy may put a block where b is:
+// anything when may_replace is empty, else what it lists.
+func (t *treeFeature) replaces(b uint32, ok bool) bool {
+	return t.above.empty() || (ok && t.above.match(t.o, b))
 }
 
 // trunk is SimpleTreeTrunk::place (sub_D297980).
@@ -380,11 +789,7 @@ func (t *treeFeature) trunk(w *featureWorld, x, y, z, h int32, r *rand.MT) (bloc
 	if !t.leaves(w, x, top+1, z, r) {
 		return blockPos{}, false
 	}
-	if len(t.baseBlocks) > 0 {
-		if b, ok := w.block(x, y-1, z); ok && !containsID(t.baseBlocks, b) {
-			w.set(x, y-1, z, t.baseBlocks[0])
-		}
-	}
+	t.placeBase(w, x, y-1, z)
 	return blockPos{x, top + 1, z}, true
 }
 
@@ -453,6 +858,10 @@ func (t *treeFeature) leaves(w *featureWorld, x, y, z int32, r *rand.MT) bool {
 		return t.spruceCanopy(w, x, y, z, r)
 	case canopyPine:
 		return t.pineCanopy(w, x, y, z, r)
+	case canopyPoplar:
+		return t.poplarCanopy(w, x, y, z, r)
+	case canopyFancy:
+		return t.fancyCanopy(w, x, y, z)
 	}
 	return false
 }
@@ -606,4 +1015,40 @@ func absI(v int32) int32 {
 		return -v
 	}
 	return v
+}
+
+type rawMegaCanopy struct {
+	Height     intRange    `json:"canopy_height"`
+	BaseRadius int32       `json:"base_radius"`
+	CoreWidth  *int32      `json:"core_width"`
+	Simplify   bool        `json:"simplify_canopy"`
+	Step       float32     `json:"radius_step_modifier"`
+	Leaf       biome.Block `json:"leaf_block"`
+}
+
+func (o *Overworld) parseMegaCanopy(raw *rawMegaCanopy, pine bool) (*megaCanopy, error) {
+	c := &megaCanopy{pine: pine, height: raw.Height, baseRadius: raw.BaseRadius, simplify: raw.Simplify, step: raw.Step}
+	if raw.CoreWidth != nil {
+		c.coreWidth, c.hasCore = *raw.CoreWidth, true
+	}
+	var ok bool
+	if c.leaf, ok = o.lookupBlock(raw.Leaf); !ok {
+		return nil, fmt.Errorf("leaf block %s missing", raw.Leaf.Name)
+	}
+	return c, nil
+}
+
+type rawAcaciaCanopy struct {
+	Size     int32       `json:"canopy_size"`
+	Simplify bool        `json:"simplify_canopy"`
+	Leaf     biome.Block `json:"leaf_block"`
+}
+
+func (o *Overworld) parseAcaciaCanopy(raw *rawAcaciaCanopy) (*acaciaCanopy, error) {
+	c := &acaciaCanopy{size: raw.Size, simplify: raw.Simplify}
+	var ok bool
+	if c.leaf, ok = o.lookupBlock(raw.Leaf); !ok {
+		return nil, fmt.Errorf("leaf block %s missing", raw.Leaf.Name)
+	}
+	return c, nil
 }
