@@ -225,6 +225,18 @@ func (o *Overworld) convertJavaState(st TemplateState) (uint32, bool, bool) {
 			case "none":
 				set("wall_connection_type_"+k, "none")
 			}
+		case "attachment":
+			// Bells.
+			switch v {
+			case "floor":
+				set("attachment", "standing")
+			case "ceiling":
+				set("attachment", "hanging")
+			case "single_wall":
+				set("attachment", "side")
+			case "double_wall":
+				set("attachment", "multiple")
+			}
 		case "axis":
 			set("pillar_axis", v)
 		case "part":

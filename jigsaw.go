@@ -114,9 +114,13 @@ func (jt *jigsawTemplate) houseChestSpot() chestSpot {
 					if q[0] < 0 || q[2] < 0 || q[0] >= t.Size[0] || q[2] >= t.Size[2] {
 						break
 					}
-					if !air(q) {
+					if solid(q) || strings.Contains(name(q), "glass") || strings.Contains(name(q), "door") {
 						hit = true
 						break
+					}
+					if !air(q) {
+						// Crops, fences and the like are not walls.
+						continue
 					}
 				}
 				if !hit {
@@ -775,11 +779,24 @@ func (o *Overworld) placePiece(p *jigsawPiece, c *Chunk, chunkBox box, height fu
 	}
 }
 
+// isDwelling reports whether a houses-pool template is a building one lives
+// or works in: the pools also hold farms, animal pens, lamp posts and
+// decorations, which get no extra chest.
+func isDwelling(template string) bool {
+	name := template[strings.LastIndex(template, "/")+1:]
+	for _, s := range []string{"farm", "pen", "lamp", "decoration", "accessory", "meeting_point", "pond", "well"} {
+		if strings.Contains(name, s) {
+			return false
+		}
+	}
+	return true
+}
+
 // placeHouseChest puts the WithHouseChests chest of a house piece into the
 // chunk, if its spot is inside it.
 func (o *Overworld) placeHouseChest(p *jigsawPiece, c *Chunk, chunkBox box) {
 	i := strings.Index(p.el.template, "/houses/")
-	if i < 0 {
+	if i < 0 || !isDwelling(p.el.template) {
 		return
 	}
 	if pick := o.opts.houseChestsPick; pick != nil && !pick(p.el.template) {
