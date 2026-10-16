@@ -680,6 +680,7 @@ func (o *Overworld) decorate(chunkX, chunkZ int32, c *Chunk, base *PackedChunk, 
 	}
 	o.freeze(chunkX, chunkZ, c)
 	o.keepWater(c, base)
+	o.dropOverwrittenBlockEntities(c)
 }
 
 // keepWater marks the blocks that features put where the terrain had source
@@ -799,4 +800,18 @@ func (o *Overworld) decorateFrom(w *featureWorld, ox, oz int32, origin *PackedCh
 // Java; the plains grass and flower rules use it like Java does.
 func (o *Overworld) queryNoise(x, z float32) float32 {
 	return o.surfNoise.frozenB.Sum2(x, z)
+}
+
+// dropOverwrittenBlockEntities removes the block entities of structure
+// blocks a later feature replaced (a tree's leaves over a village bed).
+func (o *Overworld) dropOverwrittenBlockEntities(c *Chunk) {
+	kept := c.BlockEntities[:0]
+	for _, be := range c.BlockEntities {
+		b := c.Block(int(be.X&15), int(be.Y), int(be.Z&15))
+		if o.blockEntityFor(b, "", be.X, be.Y, be.Z) != nil {
+			kept = append(kept, be)
+		}
+	}
+	clear(c.BlockEntities[len(kept):])
+	c.BlockEntities = kept
 }
