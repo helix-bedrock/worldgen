@@ -134,6 +134,12 @@ type Overworld struct {
 	jigsaw    *jigsawData
 	templates sync.Map
 	villages  sync.Map
+	// city is the ancient city pools and elements; cities holds assembled
+	// cities by start chunk.
+	city   *jigsawData
+	cities sync.Map
+	// kernel is the beard kernel of terrain adjustments.
+	kernel []float32
 	// mineshafts holds assembled mineshafts by start chunk.
 	mineshafts sync.Map
 	// deepDark is the deep dark's biome ID; no mineshaft piece is built
@@ -350,9 +356,13 @@ func NewOverworld(seed int64, reg *blocks.Registry, biomeIDs map[string]uint32, 
 			o.villageType[id] = d.Village
 		}
 	}
-	if o.jigsaw, err = loadJigsawData(); err != nil {
+	if o.jigsaw, err = loadJigsawData("villages.json", reg); err != nil {
 		return nil, err
 	}
+	if o.city, err = loadJigsawData("ancient_city.json", reg); err != nil {
+		return nil, err
+	}
+	o.kernel = beardKernel()
 	features, err := o.loadFeatures(vanillaData, "data/vanilla/features")
 	if err != nil {
 		return nil, err

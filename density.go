@@ -165,6 +165,7 @@ type oreVein struct {
 // fillBlocks interpolates the grids and places stone, deepslate, ore veins,
 // aquifer fluids and air.
 func (o *Overworld) fillBlocks(chunkX, chunkZ int32, g *grids, aq *aquifer, c *Chunk) {
+	adj := o.cityAdjustments(chunkX, chunkZ)
 	for i := fillHeight << 8; i < len(c.Blocks); i++ {
 		c.Blocks[i] = uint16(o.ids.air)
 	}
@@ -176,7 +177,7 @@ func (o *Overworld) fillBlocks(chunkX, chunkZ int32, g *grids, aq *aquifer, c *C
 						for dy := range cellY {
 							x, z := i*cellXZ+dx, k*cellXZ+dz
 							y := MinY + j*cellY + dy
-							c.set(x, y, z, o.fillBlock(g, aq, i, j, k, dx, dy, dz,
+							c.set(x, y, z, o.fillBlock(g, aq, adj, i, j, k, dx, dy, dz,
 								chunkX*16+int32(x), int32(y), chunkZ*16+int32(z)))
 						}
 					}
@@ -186,7 +187,7 @@ func (o *Overworld) fillBlocks(chunkX, chunkZ int32, g *grids, aq *aquifer, c *C
 	}
 }
 
-func (o *Overworld) fillBlock(g *grids, aq *aquifer, i, j, k, dx, dy, dz int, x, y, z int32) uint32 {
+func (o *Overworld) fillBlock(g *grids, aq *aquifer, adj []beardShaver, i, j, k, dx, dy, dz int, x, y, z int32) uint32 {
 	d := squeeze(interp(&g.density, i, j, k, dx, dy, dz))
 	if y >= MinY+4 && d > 0 && interp(&g.aux[auxNoodle], i, j, k, dx, dy, dz) >= 0 {
 		t := (interp(&g.aux[auxNoodleThickness], i, j, k, dx, dy, dz) + 1) * 0.5
@@ -200,6 +201,9 @@ func (o *Overworld) fillBlock(g *grids, aq *aquifer, i, j, k, dx, dy, dz int, x,
 		a := abs32(interp(&g.aux[auxRidgeA], i, j, k, dx, dy, dz)*1.5) - th
 		b := abs32(interp(&g.aux[auxRidgeB], i, j, k, dx, dy, dz)*1.5) - th
 		d = min(max(b, a), d)
+	}
+	if adj != nil {
+		d = float32(o.adjust(adj, x, y, z) + d)
 	}
 	if !(d > 0) {
 		aq.sample(x, y, z)

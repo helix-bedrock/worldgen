@@ -16,8 +16,11 @@
 > - **Structures:** villages are placed and built (with loot chests). Dungeons (spawner, two loot
 >   chests, mossy floor), surface lava lakes and mineshafts (normal and badlands, with cave spider
 >   spawners, cobwebs, rails, torches and support pillars) are placed where BDS places them, close
->   to block for block. Everything else (ruins, shipwrecks, strongholds, ancient cities, trial
->   chambers...) is not started. Mineshaft minecarts with chests are not placed yet.
+>   to block for block. Ancient cities are placed where BDS places them, in the cave BDS carves around
+>   them, and their centre matches block for block, but the outer layout still differs and the
+>   sculk is missing. Everything else
+>   (ruins, shipwrecks, strongholds, trial chambers...) is not started. Mineshaft minecarts with
+>   chests are not placed yet.
 > - **A refinement pass comes last:** every biome and system will be compared block by block with
 >   BDS once everything is in.
 > - **Still missing:** lily pads, huge mushrooms, melons, coral crust, magma and bubble columns,
@@ -108,7 +111,8 @@ optimization that changes the world is not accepted.
 | Villages | 🟡 placed and built, layout close but not block-exact |
 | Dungeons and lava lakes | ✅ match BDS (a few differ where neighbouring chunks overlap) |
 | Mineshafts | ✅ placement matches BDS; blocks close (refined at the end) |
-| Other structures | ⬜ not started (ancient cities next) |
+| Ancient cities | 🟡 placement matches BDS; centre exact, outer layout and sculk not yet |
+| Other structures | ⬜ not started (trial chambers next) |
 | Nether and End | ⬜ not started |
 
 **The goal is to match the latest Minecraft version exactly.** After that, every time Minecraft

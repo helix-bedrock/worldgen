@@ -26,6 +26,17 @@ type jigsawData struct {
 	elements map[string]*jigsawElement
 }
 
+// blockRule is one rule of a template's block rules: a block (or one of a
+// set) turns into output with a chance, unless the world already holds a
+// block of notIn there.
+type blockRule struct {
+	block  string
+	set    map[string]bool
+	chance float32
+	notIn  map[string]bool
+	output uint32
+}
+
 type jigsawPool struct {
 	name, fallback string
 	entries        []jigsawEntry
@@ -39,6 +50,8 @@ type jigsawEntry struct {
 type jigsawElement struct {
 	id, template, feature string
 	terrainMatching       bool
+	// rules are the block rules applied as the element is placed.
+	rules []blockRule
 }
 
 // jigsawTemplate is a template prepared for placement: its blocks converted
@@ -235,14 +248,18 @@ type jigsawBlock struct {
 	pos        [3]int32
 	facing     string
 	attachment string
-	pool       string
-	finalState string
+	// name and target are the jigsaw's own name and the name it joins.
+	name, target string
+	pool         string
+	finalState   string
 }
 
-func loadJigsawData() (*jigsawData, error) {
-	raw, err := vanillaData.ReadFile("data/bds/villages.json")
+// loadJigsawData loads a jigsaw data file from data/bds (villages.json,
+// ancient_city.json). Rule outputs are looked up in reg.
+func loadJigsawData(file string, reg blockLookup) (*jigsawData, error) {
+	raw, err := vanillaData.ReadFile("data/bds/" + file)
 	if err != nil {
-		return nil, fmt.Errorf("worldgen: read village data: %w", err)
+		return nil, fmt.Errorf("worldgen: read %s: %w", file, err)
 	}
 	var doc struct {
 		Pools []struct {
@@ -257,14 +274,55 @@ func loadJigsawData() (*jigsawData, error) {
 			Template   string
 			Feature    string
 			Projection string
+			BlockRules string `json:"block_rules"`
 		}
+		BlockRules map[string][]struct {
+			Input struct {
+				Type, Block, Blocks string
+				Probability         float32
+			}
+			Location struct{ Type, Blocks string }
+			Output   string
+		} `json:"block_rules"`
+		BlockSets map[string][]string `json:"block_sets"`
 	}
 	if err := json.Unmarshal(raw, &doc); err != nil {
-		return nil, fmt.Errorf("worldgen: parse village data: %w", err)
+		return nil, fmt.Errorf("worldgen: parse %s: %w", file, err)
+	}
+	sets := map[string]map[string]bool{}
+	for name, blocks := range doc.BlockSets {
+		m := map[string]bool{}
+		for _, b := range blocks {
+			m[b] = true
+		}
+		sets[name] = m
+	}
+	rules := map[string][]blockRule{}
+	for name, rs := range doc.BlockRules {
+		for _, r := range rs {
+			out, ok := reg.Default(r.Output)
+			if !ok {
+				return nil, fmt.Errorf("worldgen: %s: rule %s outputs unknown block %s", file, name, r.Output)
+			}
+			br := blockRule{chance: r.Input.Probability, output: out}
+			switch r.Input.Type {
+			case "random_block_match":
+				br.block = r.Input.Block
+			case "random_blockset_match":
+				br.set = sets[r.Input.Blocks]
+			default:
+				return nil, fmt.Errorf("worldgen: %s: rule %s has unknown input %s", file, name, r.Input.Type)
+			}
+			if r.Location.Type == "not_blocks" {
+				br.notIn = sets[r.Location.Blocks]
+			}
+			rules[name] = append(rules[name], br)
+		}
 	}
 	d := &jigsawData{pools: map[string]*jigsawPool{}, elements: map[string]*jigsawElement{}}
 	for _, e := range doc.Elements {
-		d.elements[e.ID] = &jigsawElement{id: e.ID, template: e.Template, feature: e.Feature, terrainMatching: e.Projection == "terrain_matching"}
+		d.elements[e.ID] = &jigsawElement{id: e.ID, template: e.Template, feature: e.Feature,
+			terrainMatching: e.Projection == "terrain_matching", rules: rules[e.BlockRules]}
 	}
 	for _, p := range doc.Pools {
 		jp := &jigsawPool{name: p.Name, fallback: p.Fallback}
@@ -280,6 +338,11 @@ func loadJigsawData() (*jigsawData, error) {
 		}
 	}
 	return d, nil
+}
+
+// blockLookup finds a block's default state.
+type blockLookup interface {
+	Default(name string) (uint32, bool)
 }
 
 // template returns the prepared template of an element, nil if it has none
@@ -304,6 +367,13 @@ func (o *Overworld) template(path string) *jigsawTemplate {
 					continue
 				}
 				jb := jigsawBlock{pos: b.Pos, facing: st.Props["facing"]}
+				// Newer templates give the jigsaw's front and top as
+				// orientation (front_top).
+				if or := st.Props["orientation"]; jb.facing == "" && or != "" {
+					jb.facing, _, _ = strings.Cut(or, "_")
+				}
+				jb.name, _ = b.NBT["name"].(string)
+				jb.target, _ = b.NBT["target"].(string)
 				jb.attachment, _ = b.NBT["attachement_type"].(string)
 				if n, ok := b.NBT["name"].(string); ok && jb.attachment == "" {
 					jb.attachment = n
@@ -412,6 +482,9 @@ type jigsawPiece struct {
 	rotation int
 	bb       box
 	depth    int
+	// ground is the piece's ground level above its bottom, for terrain
+	// adjustments (ancient cities only).
+	ground int32
 }
 
 // placedJigsaws returns a piece's jigsaw blocks in world space.
@@ -762,6 +835,9 @@ func (o *Overworld) placePiece(p *jigsawPiece, c *Chunk, chunkBox box, height fu
 		}
 		lx, lz := int(x&15), int(z&15)
 		i := int(y-MinY)<<8 | lz<<4 | lx
+		if len(p.el.rules) > 0 {
+			cs = o.applyRules(p.el.rules, cs, x, y, z, uint32(c.Blocks[i]))
+		}
 		c.Blocks[i] = uint16(cs.id)
 		if d := o.blockEntityFor(cs.id, st.Name, x, y, z); d != nil {
 			be := BlockEntity{X: x, Y: y, Z: z, Data: d}
@@ -919,17 +995,19 @@ func positionSeed(seed int64, x, y, z int32) uint32 {
 }
 
 // placeStructures writes the structures that reach chunk (cx, cz) into c,
-// in BDS's order: villages, then mineshafts. raw gives undecorated terrain.
+// in BDS's order: villages, mineshafts, then ancient cities. raw gives
+// undecorated terrain.
 // VERIFY: the order of structure types (sub_C970F80 walks the registry).
 func (o *Overworld) placeStructures(cx, cz int32, c *Chunk, height func(x, z int32) int32, raw func(cx, cz int32) *PackedChunk) {
 	o.placeVillages(cx, cz, c, height)
 	o.placeMineshafts(cx, cz, c, raw)
+	o.placeCities(cx, cz, c)
 }
 
 // structuresReach reports whether a structure has a piece in chunk
 // (cx, cz).
 func (o *Overworld) structuresReach(cx, cz int32, height func(x, z int32) int32) bool {
-	return o.villagesReach(cx, cz, height) || o.mineshaftReaches(cx, cz)
+	return o.villagesReach(cx, cz, height) || o.mineshaftReaches(cx, cz) || o.citiesReach(cx, cz)
 }
 
 // villagesReach reports whether a village has a piece in chunk (cx, cz).
