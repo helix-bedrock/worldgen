@@ -337,8 +337,9 @@ func (b box) inside(c box) bool {
 	return b.x0 >= c.x0 && b.x1 <= c.x1 && b.y0 >= c.y0 && b.y1 <= c.y1 && b.z0 >= c.z0 && b.z1 <= c.z1
 }
 
-func (b box) offset(dx, dy, dz int32) box {
-	return box{b.x0 + dx, b.y0 + dy, b.z0 + dz, b.x1 + dx, b.y1 + dy, b.z1 + dz}
+// raise moves the box up by dy.
+func (b box) raise(dy int32) box {
+	return box{b.x0, b.y0 + dy, b.z0, b.x1, b.y1 + dy, b.z1}
 }
 
 // rotatePos rotates a template position by r quarter turns clockwise
@@ -473,7 +474,7 @@ func (o *Overworld) assembleJigsaw(start *jigsawPool, pos [3]int32, rotation int
 	// Ground level delta 1: the bottom layer replaces the surface block.
 	dy := height(cx, cz) - 1 - p.bb.y0
 	p.pos[1] += dy
-	p.bb = p.bb.offset(0, dy, 0)
+	p.bb = p.bb.raise(dy)
 	a := &jigsawAssembly{o: o, r: r, height: height, maxDepth: maxDepth, pieces: []*jigsawPiece{p},
 		bounds: box{cx - 80, MinY, cz - 80, cx + 80, MaxY - 1, cz + 80}}
 	queue := []*jigsawPiece{p}
@@ -554,7 +555,7 @@ func (a *jigsawAssembly) fit(p *jigsawPiece, j jigsawBlock, target [3]int32, rel
 					y = *surface - cjRelY
 				}
 				dy := y - bb.y0
-				bb = bb.offset(0, dy, 0)
+				bb = bb.raise(dy)
 				if reserve > 0 {
 					bb.y1 = bb.y0 + max(reserve+1, bb.y1-bb.y0)
 				}
@@ -917,9 +918,22 @@ func positionSeed(seed int64, x, y, z int32) uint32 {
 	return uint32(h)
 }
 
-// structuresReach reports whether a structure (a village) has a piece in
-// chunk (cx, cz).
+// placeStructures writes the structures that reach chunk (cx, cz) into c,
+// in BDS's order: villages, then mineshafts. raw gives undecorated terrain.
+// VERIFY: the order of structure types (sub_C970F80 walks the registry).
+func (o *Overworld) placeStructures(cx, cz int32, c *Chunk, height func(x, z int32) int32, raw func(cx, cz int32) *PackedChunk) {
+	o.placeVillages(cx, cz, c, height)
+	o.placeMineshafts(cx, cz, c, raw)
+}
+
+// structuresReach reports whether a structure has a piece in chunk
+// (cx, cz).
 func (o *Overworld) structuresReach(cx, cz int32, height func(x, z int32) int32) bool {
+	return o.villagesReach(cx, cz, height) || o.mineshaftReaches(cx, cz)
+}
+
+// villagesReach reports whether a village has a piece in chunk (cx, cz).
+func (o *Overworld) villagesReach(cx, cz int32, height func(x, z int32) int32) bool {
 	if o.jigsaw == nil {
 		return false
 	}
@@ -956,7 +970,7 @@ func (o *Overworld) structuredView(raw func(cx, cz int32) *PackedChunk) func(cx,
 		if p != nil && o.structuresReach(cx, cz, height) {
 			full := new(Chunk)
 			p.Unpack(full)
-			o.placeVillages(cx, cz, full, height)
+			o.placeStructures(cx, cz, full, height, raw)
 			p = Pack(full)
 		}
 		done[k] = p

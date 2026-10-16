@@ -14,8 +14,12 @@
 > - **Plants:** grass, flowers (plains, forest, flower forest, swamp, meadow), wildflowers, leaf
 >   litter, sweet berry bushes, mushrooms, shelf mushrooms and swamp trees.
 > - **Structures:** villages are placed and built (with loot chests). Dungeons (spawner, two loot
->   chests, mossy floor) and surface lava lakes are placed where BDS places them. Everything else
->   (mineshafts, ruins, shipwrecks, strongholds, ancient cities, trial chambers...) is not started.
+>   chests, mossy floor), surface lava lakes and mineshafts (normal and badlands, with cave spider
+>   spawners, cobwebs, rails, torches and support pillars) are placed where BDS places them, close
+>   to block for block. Everything else (ruins, shipwrecks, strongholds, ancient cities, trial
+>   chambers...) is not started. Mineshaft minecarts with chests are not placed yet.
+> - **A refinement pass comes last:** every biome and system will be compared block by block with
+>   BDS once everything is in.
 > - **Still missing:** lily pads, huge mushrooms, melons, coral crust, magma and bubble columns,
 >   double tall grass in swamps and more.
 > - **The Nether and the End are not started.**
@@ -103,7 +107,8 @@ optimization that changes the world is not accepted.
 | Trees | 🟡 most done (no cherry, mangrove) |
 | Villages | 🟡 placed and built, layout close but not block-exact |
 | Dungeons and lava lakes | ✅ match BDS (a few differ where neighbouring chunks overlap) |
-| Other structures | ⬜ not started (mineshafts next) |
+| Mineshafts | ✅ placement matches BDS; blocks close (refined at the end) |
+| Other structures | ⬜ not started (ancient cities next) |
 | Nether and End | ⬜ not started |
 
 **The goal is to match the latest Minecraft version exactly.** After that, every time Minecraft

@@ -9,6 +9,7 @@ package worldgen
 
 import (
 	"fmt"
+	"math"
 	"strings"
 	"sync"
 
@@ -133,6 +134,11 @@ type Overworld struct {
 	jigsaw    *jigsawData
 	templates sync.Map
 	villages  sync.Map
+	// mineshafts holds assembled mineshafts by start chunk.
+	mineshafts sync.Map
+	// deepDark is the deep dark's biome ID; no mineshaft piece is built
+	// there.
+	deepDark uint32
 	// soilPlant is soilPlants by state, for applying placements.
 	soilPlant []bool
 	// blockTags are block tags by block name, without "minecraft:".
@@ -187,6 +193,10 @@ func NewOverworld(seed int64, reg *blocks.Registry, biomeIDs map[string]uint32, 
 		return nil, fmt.Errorf("worldgen: biomes missing from the biome list: %v", miss)
 	}
 	o.biomes = biome.NewTree(entries, biomeIDs)
+	o.deepDark = math.MaxUint32
+	if id, ok := biomeIDs["deep_dark"]; ok {
+		o.deepDark = id
+	}
 	names := []struct {
 		dst  *uint32
 		name string

@@ -49,7 +49,7 @@ func (t *TerrainCache) Get(chunkX, chunkZ int32) *PackedChunk {
 			full = new(Chunk)
 		}
 		raw.Unpack(full)
-		t.gen.placeVillages(chunkX, chunkZ, full, height)
+		t.gen.placeStructures(chunkX, chunkZ, full, height, t.Raw)
 		p := Pack(full)
 		t.scratch.Put(full)
 		return p
@@ -148,4 +148,32 @@ func (l *lru[V]) get(pos [2]int32, build func() V) V {
 	e.v = build()
 	close(e.ready)
 	return e.v
+}
+
+// Spawner is a monster spawner block a structure or feature placed.
+type Spawner struct {
+	X, Y, Z int32
+	// Mob is the spawned entity, as "minecraft:zombie".
+	Mob string
+}
+
+// Spawners generates chunk (chunkX, chunkZ), terrain and features, and
+// returns its monster spawners (dungeons, mineshaft cave spiders). It is
+// meant for tools: it builds the whole chunk.
+func (t *TerrainCache) Spawners(chunkX, chunkZ int32) []Spawner {
+	c, _ := t.scratch.Get().(*Chunk)
+	if c == nil {
+		c = new(Chunk)
+	}
+	defer t.scratch.Put(c)
+	t.Generate(chunkX, chunkZ, c)
+	var out []Spawner
+	for _, be := range c.BlockEntities {
+		if id, _ := be.Data["id"].(string); id != "MobSpawner" {
+			continue
+		}
+		mob, _ := be.Data["EntityIdentifier"].(string)
+		out = append(out, Spawner{X: be.X, Y: be.Y, Z: be.Z, Mob: mob})
+	}
+	return out
 }
