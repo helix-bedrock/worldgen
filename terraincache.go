@@ -14,9 +14,10 @@ type TerrainCache struct {
 	gen *Overworld
 
 	// scratch pools full chunks to generate into before packing.
-	scratch  sync.Pool
-	terrain  lru[*PackedChunk]
-	features lru[*featureWrites]
+	scratch    sync.Pool
+	terrain    lru[*PackedChunk]
+	structured lru[*PackedChunk]
+	features   lru[*featureWrites]
 }
 
 // NewTerrainCache returns a cache holding at most size chunks of terrain,
@@ -28,12 +29,35 @@ type TerrainCache struct {
 // 2048 no faster.
 func NewTerrainCache(gen *Overworld, size int) *TerrainCache {
 	size = max(size, 64)
-	return &TerrainCache{gen: gen, terrain: newLRU[*PackedChunk](size), features: newLRU[*featureWrites](size)}
+	return &TerrainCache{gen: gen, terrain: newLRU[*PackedChunk](size), structured: newLRU[*PackedChunk](size),
+		features: newLRU[*featureWrites](size)}
 }
 
-// Get returns the undecorated chunk at (chunkX, chunkZ). The chunk is shared:
-// callers must not modify it.
+// Get returns the undecorated chunk at (chunkX, chunkZ) with the structures
+// that reach it (villages) placed: what features see, as in BDS, which
+// places structures first. The chunk is shared: callers must not modify it.
+// A chunk no structure reaches is the raw terrain itself.
 func (t *TerrainCache) Get(chunkX, chunkZ int32) *PackedChunk {
+	return t.structured.get([2]int32{chunkX, chunkZ}, func() *PackedChunk {
+		raw := t.Raw(chunkX, chunkZ)
+		height := func(x, z int32) int32 { return t.gen.surfaceHeight(t.Raw, x, z) }
+		if !t.gen.structuresReach(chunkX, chunkZ, height) {
+			return raw
+		}
+		full, _ := t.scratch.Get().(*Chunk)
+		if full == nil {
+			full = new(Chunk)
+		}
+		raw.Unpack(full)
+		t.gen.placeVillages(chunkX, chunkZ, full, height)
+		p := Pack(full)
+		t.scratch.Put(full)
+		return p
+	})
+}
+
+// Raw returns the terrain of chunk (chunkX, chunkZ) without structures.
+func (t *TerrainCache) Raw(chunkX, chunkZ int32) *PackedChunk {
 	return t.terrain.get([2]int32{chunkX, chunkZ}, func() *PackedChunk {
 		full, _ := t.scratch.Get().(*Chunk)
 		if full == nil {
@@ -65,7 +89,7 @@ func (t *TerrainCache) originFeatures(ox, oz int32) *featureWrites {
 func (t *TerrainCache) Generate(chunkX, chunkZ int32, c *Chunk) {
 	base := t.Get(chunkX, chunkZ)
 	base.Unpack(c)
-	t.gen.decorate(chunkX, chunkZ, c, base, t.originFeatures, t.Get)
+	t.gen.decorate(chunkX, chunkZ, c, base, t.originFeatures)
 }
 
 // lru is a least-recently-used cache of values made on first request.

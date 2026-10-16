@@ -673,9 +673,15 @@ func (o *Overworld) surfaceHeight(terrain func(cx, cz int32) *PackedChunk, x, z 
 		return SeaLevel + 1
 	}
 	lx, lz := int(x&15), int(z&15)
-	for y := MaxY - 1; y >= MinY; y-- {
-		if c.at((y-MinY)<<8|lz<<4|lx) != o.ids.air {
-			return int32(y + 1)
+	for sub := len(c.subs) - 1; sub >= 0; sub-- {
+		// Whole sub-chunks of air (the sky) are skipped at once.
+		if sb := &c.subs[sub]; sb.idx == nil && sb.wide == nil && uint32(sb.one) == o.ids.air {
+			continue
+		}
+		for ly := 15; ly >= 0; ly-- {
+			if c.at((sub<<4+ly)<<8|lz<<4|lx) != o.ids.air {
+				return int32(sub<<4+ly) + MinY + 1
+			}
 		}
 	}
 	return MinY
@@ -689,4 +695,51 @@ func positionSeed(seed int64, x, y, z int32) uint32 {
 	h *= 0xBF58476D1CE4E5B9
 	h ^= h >> 29
 	return uint32(h)
+}
+
+// structuresReach reports whether a structure (a village) has a piece in
+// chunk (cx, cz).
+func (o *Overworld) structuresReach(cx, cz int32, height func(x, z int32) int32) bool {
+	if o.jigsaw == nil {
+		return false
+	}
+	chunkBox := box{cx * 16, MinY, cz * 16, cx*16 + 15, MaxY - 1, cz*16 + 15}
+	r0x, r1x := floorDivRegion(cx-6, villageSpacing), floorDivRegion(cx+6, villageSpacing)
+	r0z, r1z := floorDivRegion(cz-6, villageSpacing), floorDivRegion(cz+6, villageSpacing)
+	for rx := r0x; rx <= r1x; rx++ {
+		for rz := r0z; rz <= r1z; rz++ {
+			sx, sz, _ := o.villagePick(rx, rz)
+			if v := o.villageAt(sx, sz, height); v != nil && v.bb.intersects(chunkBox) {
+				for _, p := range v.pieces {
+					if p.bb.intersects(chunkBox) {
+						return true
+					}
+				}
+			}
+		}
+	}
+	return false
+}
+
+// structuredView wraps a raw terrain source with the structures placed, for
+// Decorate without a TerrainCache. It keeps what it builds for its own
+// lifetime and is not safe for concurrent use.
+func (o *Overworld) structuredView(raw func(cx, cz int32) *PackedChunk) func(cx, cz int32) *PackedChunk {
+	done := map[[2]int32]*PackedChunk{}
+	height := func(x, z int32) int32 { return o.surfaceHeight(raw, x, z) }
+	return func(cx, cz int32) *PackedChunk {
+		k := [2]int32{cx, cz}
+		if p, ok := done[k]; ok {
+			return p
+		}
+		p := raw(cx, cz)
+		if p != nil && o.structuresReach(cx, cz, height) {
+			full := new(Chunk)
+			p.Unpack(full)
+			o.placeVillages(cx, cz, full, height)
+			p = Pack(full)
+		}
+		done[k] = p
+		return p
+	}
 }

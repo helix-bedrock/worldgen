@@ -659,20 +659,25 @@ func (w *featureWorld) biomeTags(x, y, z int32) []string {
 // of any chunk within 3 chunks, the target's own included (it may return nil for a chunk it cannot provide; features then
 // skip it). It is safe to call from many goroutines if neighbour is.
 func (o *Overworld) Decorate(chunkX, chunkZ int32, c *Chunk, neighbour func(cx, cz int32) *PackedChunk) {
-	o.decorate(chunkX, chunkZ, c, neighbour(chunkX, chunkZ), func(ox, oz int32) *featureWrites {
-		return o.originFeatures(ox, oz, neighbour)
-	}, neighbour)
+	structured := o.structuredView(neighbour)
+	base := structured(chunkX, chunkZ)
+	if base != nil && base != neighbour(chunkX, chunkZ) {
+		// Structures reach this chunk: start from the terrain with them.
+		base.Unpack(c)
+	}
+	o.decorate(chunkX, chunkZ, c, base, func(ox, oz int32) *featureWrites {
+		return o.originFeatures(ox, oz, structured)
+	})
 }
 
 // decorate applies the placements of the origins that reach chunk
 // (chunkX, chunkZ), then freezes it. An ore can start up to 35 blocks
 // east/south of its chunk's corner and 5 blocks west/north of it, so the
 // origins run from two chunks west/north to one east/south.
-func (o *Overworld) decorate(chunkX, chunkZ int32, c *Chunk, base *PackedChunk, writes func(ox, oz int32) *featureWrites, terrain func(cx, cz int32) *PackedChunk) {
+func (o *Overworld) decorate(chunkX, chunkZ int32, c *Chunk, base *PackedChunk, writes func(ox, oz int32) *featureWrites) {
 	if o.rules == nil {
 		return
 	}
-	o.placeVillages(chunkX, chunkZ, c, func(x, z int32) int32 { return o.surfaceHeight(terrain, x, z) })
 	for ox := chunkX - 2; ox <= chunkX+1; ox++ {
 		for oz := chunkZ - 2; oz <= chunkZ+1; oz++ {
 			o.applyWrites(c, base, writes(ox, oz), int(chunkX-ox+1)*4+int(chunkZ-oz+1))
@@ -687,7 +692,6 @@ func (o *Overworld) decorate(chunkX, chunkZ int32, c *Chunk, base *PackedChunk, 
 // water and that can hold water. BDS keeps the water as the block's second
 // layer; without it the client draws an air pocket around the plant.
 func (o *Overworld) keepWater(c *Chunk, base *PackedChunk) {
-	clear(c.Water[:])
 	if base == nil {
 		return
 	}

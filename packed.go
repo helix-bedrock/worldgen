@@ -1,5 +1,7 @@
 package worldgen
 
+import "maps"
+
 // PackedChunk is an undecorated chunk stored compactly for TerrainCache and
 // Decorate's neighbour reads. A sub-chunk (16x16x16) of one block, such as
 // the air above the terrain, is just that block; any other holds a palette
@@ -12,6 +14,10 @@ type PackedChunk struct {
 	biomes [4 * 4 * Height / 4]uint16
 	// biomeList holds the distinct biomes in BDS's order (see chunkBiomes).
 	biomeList []uint32
+	// water and blockEntities are those of structures placed in the
+	// terrain; nil for plain terrain.
+	water         []uint64
+	blockEntities []BlockEntity
 }
 
 type packedSub struct {
@@ -43,10 +49,19 @@ func (p *PackedChunk) Biome(x, y, z int) uint32 {
 	return uint32(p.biomes[((y-MinY)>>2)<<4|(z>>2)<<2|x>>2])
 }
 
-// Pack returns a compact copy of c. Water bits are not kept: undecorated
-// terrain has none.
+// Pack returns a compact copy of c, with its water bits and block entities
+// when it has any.
 func Pack(c *Chunk) *PackedChunk {
 	p := &PackedChunk{biomeList: chunkBiomes(c)}
+	for _, w := range c.Water {
+		if w != 0 {
+			p.water = append([]uint64(nil), c.Water[:]...)
+			break
+		}
+	}
+	if len(c.BlockEntities) > 0 {
+		p.blockEntities = append([]BlockEntity(nil), c.BlockEntities...)
+	}
 	for i, b := range c.Biomes {
 		p.biomes[i] = uint16(b)
 	}
@@ -108,7 +123,13 @@ func Pack(c *Chunk) *PackedChunk {
 // Unpack writes the chunk back into c.
 func (p *PackedChunk) Unpack(c *Chunk) {
 	clear(c.Water[:])
+	copy(c.Water[:], p.water)
 	c.BlockEntities = c.BlockEntities[:0]
+	for _, be := range p.blockEntities {
+		// Each chunk gets its own data: servers fill chests in it.
+		be.Data = maps.Clone(be.Data)
+		c.BlockEntities = append(c.BlockEntities, be)
+	}
 	for i, b := range p.biomes {
 		c.Biomes[i] = uint32(b)
 	}
