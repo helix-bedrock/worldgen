@@ -86,8 +86,15 @@ type Overworld struct {
 	features     *featureSet
 	// names is each block state's block name, for feature replace rules.
 	names []string
-	// villageBiome marks the biomes with a minecraft:village_type.
+	// villageBiome marks the biomes with a minecraft:village_type;
+	// villageType holds its type.
 	villageBiome []bool
+	villageType  []string
+	// jigsaw is the village pools and elements; templates caches prepared
+	// templates by path and villages assembled villages by start chunk.
+	jigsaw    *jigsawData
+	templates sync.Map
+	villages  sync.Map
 	// soilPlant is soilPlants by state, for applying placements.
 	soilPlant []bool
 	// blockTags are block tags by block name, without "minecraft:".
@@ -284,11 +291,16 @@ func NewOverworld(seed int64, reg *blocks.Registry, biomeIDs map[string]uint32) 
 	}
 	o.biomeTags = make([][]string, maxBiome+1)
 	o.villageBiome = make([]bool, maxBiome+1)
+	o.villageType = make([]string, maxBiome+1)
 	for name, id := range biomeIDs {
 		if d, ok := defs[name]; ok {
 			o.biomeTags[id] = d.Tags
 			o.villageBiome[id] = d.Village != ""
+			o.villageType[id] = d.Village
 		}
+	}
+	if o.jigsaw, err = loadJigsawData(); err != nil {
+		return nil, err
 	}
 	features, err := o.loadFeatures(vanillaData, "data/vanilla/features")
 	if err != nil {

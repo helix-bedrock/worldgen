@@ -20,7 +20,7 @@ func structureSeed(r *rand.MT, seed int64, rx, rz, salt int32) {
 }
 
 // floorDivRegion is chunk / spacing rounded down, as BDS computes it.
-func floorDivRegion(c, spacing int32) int32 {
+func floorDivRegion(c, spacing int32) int32 { //nolint:unparam // other structures use other spacings
 	if c < 0 {
 		c -= spacing - 1
 	}
