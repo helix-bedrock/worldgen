@@ -62,67 +62,158 @@ type chestSpot struct {
 	ok     bool
 }
 
-// houseChestSpot finds a spot for a chest in a template: an air block inside
-// the house (something above it) on a solid floor, against a wall, with air
-// in front, away from doors. The first such block in y, z, x order wins.
+// houseChestSpot finds a floor spot for a chest inside a house template:
+// air with air above, a solid floor below, walls somewhere in all four
+// directions and a roof, not next to a door. When the house has a bed the
+// spot must be beside the bed. The chest faces open air.
 func (jt *jigsawTemplate) houseChestSpot() chestSpot {
 	jt.chestOnce.Do(func() {
 		t := jt.tpl
 		names := map[[3]int32]string{}
+		var beds [][3]int32
 		for _, b := range t.Blocks {
 			n := t.Palette[b.State].Name
 			if strings.Contains(n, "chest") {
 				return
 			}
 			names[b.Pos] = n
+			if strings.HasSuffix(n, "_bed") {
+				beds = append(beds, b.Pos)
+			}
 		}
-		name := func(x, y, z int32) string {
-			if n, ok := names[[3]int32{x, y, z}]; ok {
+		name := func(p [3]int32) string {
+			if n, ok := names[p]; ok {
 				return n
 			}
 			return "minecraft:air"
 		}
-		solid := func(n string) bool {
-			return n != "minecraft:air" && n != "minecraft:jigsaw" && n != "minecraft:structure_block" &&
-				!strings.Contains(n, "door") && !strings.Contains(n, "pane") && !strings.Contains(n, "torch") &&
-				!strings.Contains(n, "bed") && !strings.Contains(n, "carpet") && !strings.Contains(n, "flower")
+		air := func(p [3]int32) bool {
+			n := name(p)
+			return n == "minecraft:air" || n == "minecraft:structure_void" || n == "minecraft:cave_air"
 		}
-		doorNear := func(x, y, z int32) bool {
+		// solid is a full block a chest may stand on or against: no glass,
+		// doors, beds, plants, crops or structure markers.
+		solid := func(p [3]int32) bool {
+			n := name(p)
+			if air(p) || n == "minecraft:jigsaw" || n == "minecraft:structure_block" || n == "minecraft:farmland" {
+				return false
+			}
+			for _, s := range []string{"door", "pane", "glass", "torch", "bed", "carpet", "flower", "wheat", "carrots", "potatoes",
+				"beetroots", "short_grass", "tall_grass", "fern", "sapling", "fence", "wall", "stairs", "slab", "trapdoor", "lantern", "bell", "path"} {
+				if strings.Contains(n, s) {
+					return false
+				}
+			}
+			return true
+		}
+		inside := func(p [3]int32) bool {
+			for _, d := range [4][2]int32{{1, 0}, {-1, 0}, {0, 1}, {0, -1}} {
+				q, hit := p, false
+				for {
+					q = [3]int32{q[0] + d[0], q[1], q[2] + d[1]}
+					if q[0] < 0 || q[2] < 0 || q[0] >= t.Size[0] || q[2] >= t.Size[2] {
+						break
+					}
+					if !air(q) {
+						hit = true
+						break
+					}
+				}
+				if !hit {
+					return false
+				}
+			}
+			for y := p[1] + 1; y < t.Size[1]; y++ {
+				if !air([3]int32{p[0], y, p[2]}) {
+					return true
+				}
+			}
+			return false
+		}
+		doorNear := func(p [3]int32) bool {
 			for dx := int32(-1); dx <= 1; dx++ {
 				for dz := int32(-1); dz <= 1; dz++ {
-					if strings.Contains(name(x+dx, y, z+dz), "door") {
+					if strings.Contains(name([3]int32{p[0] + dx, p[1], p[2] + dz}), "door") {
 						return true
 					}
 				}
 			}
 			return false
 		}
-		sides := []struct {
-			dx, dz int32
-			facing string // the chest faces away from the wall
-		}{{0, -1, "south"}, {0, 1, "north"}, {-1, 0, "east"}, {1, 0, "west"}}
+		dirs := []struct {
+			d      [2]int32
+			facing string
+		}{{[2]int32{0, -1}, "north"}, {[2]int32{0, 1}, "south"}, {[2]int32{-1, 0}, "west"}, {[2]int32{1, 0}, "east"}}
+		ok := func(p [3]int32) bool {
+			return air(p) && air([3]int32{p[0], p[1] + 1, p[2]}) && solid([3]int32{p[0], p[1] - 1, p[2]}) &&
+				!doorNear(p) && inside(p)
+		}
+		// face picks the side with open air, preferring the one away from
+		// a wall or the bed.
+		face := func(p [3]int32) string {
+			for _, d := range dirs {
+				back := [3]int32{p[0] - d.d[0], p[1], p[2] - d.d[1]}
+				if air([3]int32{p[0] + d.d[0], p[1], p[2] + d.d[1]}) && !air(back) {
+					return d.facing
+				}
+			}
+			for _, d := range dirs {
+				if air([3]int32{p[0] + d.d[0], p[1], p[2] + d.d[1]}) {
+					return d.facing
+				}
+			}
+			return "north"
+		}
+		// Beside a bed first; then, or in a house without a bed, any floor
+		// spot inside, those against a wall before the others.
+		var besideBed, floor [][3]int32
+		for _, b := range beds {
+			for _, d := range dirs {
+				besideBed = append(besideBed, [3]int32{b[0] + d.d[0], b[1], b[2] + d.d[1]})
+			}
+		}
 		for y := int32(1); y < t.Size[1]-1; y++ {
 			for z := int32(1); z < t.Size[2]-1; z++ {
 				for x := int32(1); x < t.Size[0]-1; x++ {
-					if name(x, y, z) != "minecraft:air" || !solid(name(x, y-1, z)) || doorNear(x, y, z) {
-						continue
-					}
-					roof := false
-					for yy := y + 1; yy < t.Size[1]; yy++ {
-						if solid(name(x, yy, z)) {
-							roof = true
-							break
-						}
-					}
-					if !roof {
-						continue
-					}
-					for _, s := range sides {
-						if solid(name(x+s.dx, y, z+s.dz)) && name(x-s.dx, y, z-s.dz) == "minecraft:air" {
-							jt.chest = chestSpot{pos: [3]int32{x, y, z}, facing: s.facing, ok: true}
-							return
-						}
-					}
+					floor = append(floor, [3]int32{x, y, z})
+				}
+			}
+		}
+		againstWall := func(p [3]int32) bool {
+			for _, d := range dirs {
+				if solid([3]int32{p[0] + d.d[0], p[1], p[2] + d.d[1]}) {
+					return true
+				}
+			}
+			return false
+		}
+		// Small houses may only have room diagonal to a door; a spot right
+		// beside a door is never used, so doorways stay clear.
+		beside := func(p [3]int32) bool {
+			for _, d := range dirs {
+				if strings.Contains(name([3]int32{p[0] + d.d[0], p[1], p[2] + d.d[1]}), "door") {
+					return true
+				}
+			}
+			return false
+		}
+		okNearDoor := func(p [3]int32) bool {
+			return air(p) && air([3]int32{p[0], p[1] + 1, p[2]}) && solid([3]int32{p[0], p[1] - 1, p[2]}) &&
+				!beside(p) && inside(p)
+		}
+		for _, pass := range []struct {
+			cands    []([3]int32)
+			wall     bool
+			nearDoor bool
+		}{{besideBed, false, false}, {floor, true, false}, {floor, false, false}, {floor, false, true}} {
+			for _, p := range pass.cands {
+				fits := ok(p)
+				if pass.nearDoor {
+					fits = okNearDoor(p)
+				}
+				if fits && (!pass.wall || againstWall(p)) {
+					jt.chest = chestSpot{pos: p, facing: face(p), ok: true}
+					return
 				}
 			}
 		}
@@ -561,11 +652,7 @@ func (o *Overworld) villageAt(cx, cz int32, height func(x, z int32) int32) *vill
 		rotation := int(r.IntN(4))
 		abandoned := r.Float() < 0.02
 		y := prelimSurface(o.column(cx*4, cz*4))
-		biome := o.BiomeAt(cx*16+8, y, cz*16+8)
-		kind := "plains"
-		if int(biome) < len(o.villageType) && o.villageType[biome] != "" && o.villageType[biome] != "default" {
-			kind = o.villageType[biome]
-		}
+		kind := o.villageKind(cx, cz)
 		name := "minecraft:village/" + kind + "/town_centers"
 		if abandoned {
 			name = "minecraft:village/abandoned/" + kind + "/town_centers"
@@ -858,4 +945,64 @@ func (o *Overworld) structuredView(raw func(cx, cz int32) *PackedChunk) func(cx,
 		done[k] = p
 		return p
 	}
+}
+
+// villageKind is the pool name part of a village starting in chunk
+// (cx, cz), from the start biome's village_type.
+func (o *Overworld) villageKind(cx, cz int32) string {
+	y := prelimSurface(o.column(cx*4, cz*4))
+	biome := o.BiomeAt(cx*16+8, y, cz*16+8)
+	if int(biome) >= len(o.villageType) {
+		return "plains"
+	}
+	// BDS's village types (sub_D27F680): desert, ice (snowy pools),
+	// savanna, taiga; anything else is plains.
+	switch t := o.villageType[biome]; t {
+	case "desert", "savanna", "taiga":
+		return t
+	case "ice":
+		return "snowy"
+	}
+	return "plains"
+}
+
+// NearestVillage finds the village start nearest to block (x, z), searching
+// placement regions ring by ring up to maxRings out. kind limits it to one
+// village type ("plains", "desert", "savanna", "snowy", "taiga"); empty
+// takes any. It returns the centre of the start chunk and its preliminary
+// surface height.
+func (o *Overworld) NearestVillage(x, z int32, kind string, maxRings int32) (vx, vy, vz int32, ok bool) {
+	rx0, rz0 := floorDivRegion(x>>4, villageSpacing), floorDivRegion(z>>4, villageSpacing)
+	best := int64(-1)
+	for ring := int32(0); ring <= maxRings; ring++ {
+		for rx := rx0 - ring; rx <= rx0+ring; rx++ {
+			for rz := rz0 - ring; rz <= rz0+ring; rz++ {
+				if max(abs32i(rx-rx0), abs32i(rz-rz0)) != ring {
+					continue
+				}
+				cx, cz, _ := o.villagePick(rx, rz)
+				if !o.IsVillageChunk(cx, cz) || (kind != "" && o.villageKind(cx, cz) != kind) {
+					continue
+				}
+				bx, bz := cx*16+8, cz*16+8
+				d := int64(bx-x)*int64(bx-x) + int64(bz-z)*int64(bz-z)
+				if best < 0 || d < best {
+					best, vx, vz = d, bx, bz
+					vy = prelimSurface(o.column(cx*4, cz*4))
+				}
+			}
+		}
+		// A start one ring further out can still be nearer; stop after it.
+		if best >= 0 && ring > 0 {
+			return vx, vy, vz, true
+		}
+	}
+	return vx, vy, vz, best >= 0
+}
+
+func abs32i(v int32) int32 {
+	if v < 0 {
+		return -v
+	}
+	return v
 }
