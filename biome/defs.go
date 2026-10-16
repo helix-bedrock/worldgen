@@ -24,6 +24,9 @@ type Def struct {
 	PartiallyFrozen bool
 	// Tags are the biome's minecraft:tags; feature rules pick biomes by tag.
 	Tags []string
+	// Village is the minecraft:village_type type ("default", "desert", ...),
+	// empty when villages do not generate in the biome.
+	Village string
 }
 
 // Surface is a minecraft:surface_builder. Which fields are set depends on
@@ -157,6 +160,9 @@ type rawBiome struct {
 				} `json:"steep_material_adjustment"`
 			} `json:"minecraft:mountain_parameters"`
 			PartiallyFrozen *struct{} `json:"minecraft:partially_frozen"`
+			Village         *struct {
+				Type string `json:"type"`
+			} `json:"minecraft:village_type"`
 			Tags            *struct {
 				Tags []string `json:"tags"`
 			} `json:"minecraft:tags"`
@@ -212,6 +218,9 @@ func LoadDefs(fsys fs.FS, dir string) (map[string]*Def, error) {
 		}
 		c := raw.Biome.Components
 		d := &Def{Name: name, PartiallyFrozen: c.PartiallyFrozen != nil}
+		if c.Village != nil {
+			d.Village = c.Village.Type
+		}
 		if c.Tags != nil {
 			d.Tags = c.Tags.Tags
 		}

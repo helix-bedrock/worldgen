@@ -86,6 +86,8 @@ type Overworld struct {
 	features     *featureSet
 	// names is each block state's block name, for feature replace rules.
 	names []string
+	// villageBiome marks the biomes with a minecraft:village_type.
+	villageBiome []bool
 	// soilPlant is soilPlants by state, for applying placements.
 	soilPlant []bool
 	// blockTags are block tags by block name, without "minecraft:".
@@ -281,9 +283,11 @@ func NewOverworld(seed int64, reg *blocks.Registry, biomeIDs map[string]uint32) 
 		maxBiome = max(maxBiome, id)
 	}
 	o.biomeTags = make([][]string, maxBiome+1)
+	o.villageBiome = make([]bool, maxBiome+1)
 	for name, id := range biomeIDs {
 		if d, ok := defs[name]; ok {
 			o.biomeTags[id] = d.Tags
+			o.villageBiome[id] = d.Village != ""
 		}
 	}
 	features, err := o.loadFeatures(vanillaData, "data/vanilla/features")
