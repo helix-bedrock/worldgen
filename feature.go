@@ -436,6 +436,7 @@ type featureWorld struct {
 	o         *Overworld
 	ox, oz    int32 // the origin chunk
 	slots     [16]writeList
+	entities  [16][]BlockEntity // block entities placed, by slot as slots
 	neighbour func(cx, cz int32) *PackedChunk
 	lastX     int32
 	lastZ     int32
@@ -539,6 +540,14 @@ func (w *featureWorld) set(x, y, z int32, b uint32) {
 	}
 }
 
+// setEntity records the block entity of a block the current origin placed
+// at (x, y, z), for the chunk it is in.
+func (w *featureWorld) setEntity(be BlockEntity) {
+	if sx, sz := be.X>>4-w.ox+1, be.Z>>4-w.oz+1; uint32(sx) < 4 && uint32(sz) < 4 {
+		w.entities[sx*4+sz] = append(w.entities[sx*4+sz], be)
+	}
+}
+
 // writeList is an origin's placements in one chunk, in placement order: the
 // Chunk index and the state of each.
 type writeList struct {
@@ -553,9 +562,10 @@ type writeList struct {
 type featureWrites struct {
 	off [17]int32 // slot i holds pos/blk[off[i]:off[i+1]]
 	// uses counts the chunks that took these placements (TerrainCache).
-	uses atomic.Int32
-	pos  []uint32
-	blk  []uint16
+	uses     atomic.Int32
+	pos      []uint32
+	blk      []uint16
+	entities [16][]BlockEntity // by slot; nil for most origins
 }
 
 // originFeatures runs the rules of origin chunk (ox, oz). It returns nil
@@ -580,6 +590,7 @@ func (o *Overworld) originFeatures(ox, oz int32, neighbour func(cx, cz int32) *P
 		fw.blk = append(fw.blk, w.slots[i].blk...)
 	}
 	fw.off[16] = int32(n)
+	fw.entities = w.entities
 	return fw
 }
 
@@ -600,6 +611,9 @@ func (o *Overworld) applyWrites(c *Chunk, base *PackedChunk, fw *featureWrites, 
 		}
 		c.Blocks[i] = b
 	}
+	// A later origin may replace the block; dropOverwrittenBlockEntities
+	// then removes its entity.
+	c.BlockEntities = append(c.BlockEntities, fw.entities[slot]...)
 }
 
 // heightmap is the y above the highest block of a column that is fully
@@ -736,6 +750,7 @@ func chunkBiomes(c *Chunk) []uint32 {
 // holds.
 func (o *Overworld) decorateFrom(w *featureWorld, ox, oz int32, origin *PackedChunk) {
 	pop := populationSeed(o.seed, ox, oz)
+	o.lakesAndDungeons(w, ox, oz, pop)
 	bs := origin.biomeList
 	single := len(bs) == 1
 	var rule, feat rand.MT

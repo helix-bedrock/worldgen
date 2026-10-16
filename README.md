@@ -13,8 +13,9 @@
 >   mangrove trees are not done yet.
 > - **Plants:** grass, flowers (plains, forest, flower forest, swamp, meadow), wildflowers, leaf
 >   litter, sweet berry bushes, mushrooms, shelf mushrooms and swamp trees.
-> - **Structures:** villages are placed and built (with loot chests). Everything else (ruins,
->   shipwrecks, mineshafts, strongholds, ancient cities, trial chambers...) is not started.
+> - **Structures:** villages are placed and built (with loot chests). Dungeons (spawner, two loot
+>   chests, mossy floor) and surface lava lakes are placed where BDS places them. Everything else
+>   (mineshafts, ruins, shipwrecks, strongholds, ancient cities, trial chambers...) is not started.
 > - **Still missing:** lily pads, huge mushrooms, melons, coral crust, magma and bubble columns,
 >   double tall grass in swamps and more.
 > - **The Nether and the End are not started.**
@@ -101,7 +102,8 @@ optimization that changes the world is not accepted.
 | Plants and flowers | 🟡 most done (no lily pads, huge mushrooms, melons) |
 | Trees | 🟡 most done (no cherry, mangrove) |
 | Villages | 🟡 placed and built, layout close but not block-exact |
-| Other structures | ⬜ not started |
+| Dungeons and lava lakes | ✅ match BDS (a few differ where neighbouring chunks overlap) |
+| Other structures | ⬜ not started (mineshafts next) |
 | Nether and End | ⬜ not started |
 
 **The goal is to match the latest Minecraft version exactly.** After that, every time Minecraft
