@@ -48,6 +48,86 @@ type jigsawTemplate struct {
 	jigsaws []jigsawBlock
 	once    [4]sync.Once
 	conv    [4][]convertedState
+
+	// chest is the spot WithHouseChests puts a chest in, computed once.
+	chestOnce sync.Once
+	chest     chestSpot
+}
+
+// chestSpot is where an extra chest goes in a house template, in template
+// space; ok is false when the house has a chest or no room for one.
+type chestSpot struct {
+	pos    [3]int32
+	facing string
+	ok     bool
+}
+
+// houseChestSpot finds a spot for a chest in a template: an air block inside
+// the house (something above it) on a solid floor, against a wall, with air
+// in front, away from doors. The first such block in y, z, x order wins.
+func (jt *jigsawTemplate) houseChestSpot() chestSpot {
+	jt.chestOnce.Do(func() {
+		t := jt.tpl
+		names := map[[3]int32]string{}
+		for _, b := range t.Blocks {
+			n := t.Palette[b.State].Name
+			if strings.Contains(n, "chest") {
+				return
+			}
+			names[b.Pos] = n
+		}
+		name := func(x, y, z int32) string {
+			if n, ok := names[[3]int32{x, y, z}]; ok {
+				return n
+			}
+			return "minecraft:air"
+		}
+		solid := func(n string) bool {
+			return n != "minecraft:air" && n != "minecraft:jigsaw" && n != "minecraft:structure_block" &&
+				!strings.Contains(n, "door") && !strings.Contains(n, "pane") && !strings.Contains(n, "torch") &&
+				!strings.Contains(n, "bed") && !strings.Contains(n, "carpet") && !strings.Contains(n, "flower")
+		}
+		doorNear := func(x, y, z int32) bool {
+			for dx := int32(-1); dx <= 1; dx++ {
+				for dz := int32(-1); dz <= 1; dz++ {
+					if strings.Contains(name(x+dx, y, z+dz), "door") {
+						return true
+					}
+				}
+			}
+			return false
+		}
+		sides := []struct {
+			dx, dz int32
+			facing string // the chest faces away from the wall
+		}{{0, -1, "south"}, {0, 1, "north"}, {-1, 0, "east"}, {1, 0, "west"}}
+		for y := int32(1); y < t.Size[1]-1; y++ {
+			for z := int32(1); z < t.Size[2]-1; z++ {
+				for x := int32(1); x < t.Size[0]-1; x++ {
+					if name(x, y, z) != "minecraft:air" || !solid(name(x, y-1, z)) || doorNear(x, y, z) {
+						continue
+					}
+					roof := false
+					for yy := y + 1; yy < t.Size[1]; yy++ {
+						if solid(name(x, yy, z)) {
+							roof = true
+							break
+						}
+					}
+					if !roof {
+						continue
+					}
+					for _, s := range sides {
+						if solid(name(x+s.dx, y, z+s.dz)) && name(x-s.dx, y, z-s.dz) == "minecraft:air" {
+							jt.chest = chestSpot{pos: [3]int32{x, y, z}, facing: s.facing, ok: true}
+							return
+						}
+					}
+				}
+			}
+		}
+	})
+	return jt.chest
 }
 
 type convertedState struct {
@@ -527,6 +607,9 @@ func (o *Overworld) placeVillages(cx, cz int32, c *Chunk, height func(x, z int32
 			for _, p := range v.pieces {
 				if p.bb.intersects(chunkBox) {
 					o.placePiece(p, c, chunkBox, height)
+					if o.opts.houseChests {
+						o.placeHouseChest(p, c, chunkBox)
+					}
 				}
 			}
 		}
@@ -603,6 +686,39 @@ func (o *Overworld) placePiece(p *jigsawPiece, c *Chunk, chunkBox box, height fu
 			c.Water[i>>6] &^= 1 << (i & 63)
 		}
 	}
+}
+
+// placeHouseChest puts the WithHouseChests chest of a house piece into the
+// chunk, if its spot is inside it.
+func (o *Overworld) placeHouseChest(p *jigsawPiece, c *Chunk, chunkBox box) {
+	i := strings.Index(p.el.template, "/houses/")
+	if i < 0 {
+		return
+	}
+	if pick := o.opts.houseChestsPick; pick != nil && !pick(p.el.template) {
+		return
+	}
+	spot := p.tpl.houseChestSpot()
+	if !spot.ok {
+		return
+	}
+	rp := rotatePos(spot.pos, p.rotation)
+	x, y, z := rp[0]+p.pos[0], rp[1]+p.pos[1], rp[2]+p.pos[2]
+	if !chunkBox.contains([3]int32{x, y, z}) {
+		return
+	}
+	cs, _, ok := o.convertJavaState(TemplateState{Name: "minecraft:chest", Props: map[string]string{"facing": rotateFacing(spot.facing, p.rotation)}})
+	if !ok {
+		return
+	}
+	idx := int(y-MinY)<<8 | int(z&15)<<4 | int(x&15)
+	c.Blocks[idx] = uint16(cs)
+	kind := strings.TrimPrefix(p.el.template[:i], "village/")
+	d := o.blockEntityFor(cs, "minecraft:chest", x, y, z)
+	be := BlockEntity{X: x, Y: y, Z: z, Data: d, LootTable: "loot_tables/chests/village/village_" + kind + "_house.json"}
+	d["LootTable"] = be.LootTable
+	d["LootTableSeed"] = int32(positionSeed(o.seed, x, y, z))
+	c.BlockEntities = append(c.BlockEntities, be)
 }
 
 // parseFinalState converts a jigsaw block's final_state ("minecraft:x[a=b]").

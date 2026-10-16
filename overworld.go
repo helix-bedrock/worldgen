@@ -79,7 +79,29 @@ func (c *Chunk) set(x, y, z int, s uint32) {
 
 // Overworld generates overworld chunks for one world seed. GenerateChunk may
 // be called from many goroutines at once.
+// Option changes how an Overworld generates. Without options it matches BDS.
+type Option func(*options)
+
+type options struct {
+	houseChests     bool
+	houseChestsPick func(house string) bool
+}
+
+// WithHouseChests gives village houses that have no chest in vanilla a
+// chest, with its village's house loot table ("loot_tables/chests/village/
+// village_<type>_house.json"). pick chooses the houses: it gets the house's
+// template name ("village/plains/houses/plains_small_house_1") and returns
+// true for those that get a chest; nil picks every house. Houses that have
+// a chest in vanilla keep only that one, and farms, pens and other pieces
+// with no inside get none. This departs from BDS, which leaves most houses
+// without a chest. It may be called from many goroutines at once.
+func WithHouseChests(pick func(house string) bool) Option {
+	return func(o *options) { o.houseChests, o.houseChestsPick = true, pick }
+}
+
 type Overworld struct {
+	opts options
+
 	// overlays pools featureWorld overlay arrays (about 500 KB each).
 	overlays sync.Pool
 
@@ -147,11 +169,14 @@ var terracottaColours = [16]string{
 // NewOverworld builds the noise for a seed. reg must contain the vanilla
 // blocks the generator places; biomeIDs maps biome names (no "minecraft:"
 // prefix) to numeric IDs, as from biome.LoadIDs.
-func NewOverworld(seed int64, reg *blocks.Registry, biomeIDs map[string]uint32) (*Overworld, error) {
+func NewOverworld(seed int64, reg *blocks.Registry, biomeIDs map[string]uint32, opts ...Option) (*Overworld, error) {
 	if reg.Len() > 1<<16 {
 		return nil, fmt.Errorf("worldgen: %d block states do not fit the 16-bit chunk storage", reg.Len())
 	}
 	o := &Overworld{seed: seed, reg: reg, shape: terrain.NewShape()}
+	for _, opt := range opts {
+		opt(&o.opts)
+	}
 	entries := biome.Entries()
 	for name, id := range biomeIDs {
 		if id >= 1<<16 {
