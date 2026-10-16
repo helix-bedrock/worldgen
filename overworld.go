@@ -77,8 +77,6 @@ func (c *Chunk) set(x, y, z int, s uint32) {
 	c.Blocks[(y-MinY)<<8|z<<4|x] = uint16(s)
 }
 
-// Overworld generates overworld chunks for one world seed. GenerateChunk may
-// be called from many goroutines at once.
 // Option changes how an Overworld generates. Without options it matches BDS.
 type Option func(*options)
 
@@ -94,11 +92,13 @@ type options struct {
 // true for those that get a chest; nil picks every house. Houses that have
 // a chest in vanilla keep only that one, and farms, pens and other pieces
 // with no inside get none. This departs from BDS, which leaves most houses
-// without a chest. It may be called from many goroutines at once.
+// without a chest. pick may be called from many goroutines at once.
 func WithHouseChests(pick func(house string) bool) Option {
 	return func(o *options) { o.houseChests, o.houseChestsPick = true, pick }
 }
 
+// Overworld generates overworld chunks for one world seed. GenerateChunk may
+// be called from many goroutines at once.
 type Overworld struct {
 	opts options
 
