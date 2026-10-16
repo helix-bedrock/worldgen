@@ -15,7 +15,7 @@ import "github.com/helix-bedrock/worldgen/rand"
 //                           depth only its fallback, tried
 //   fit        sub_D2B1D00  free-space boxes kept per nesting level
 //   rules      sub_D1BE660  block rules with a Java random per block
-// The start draws continue the placement random, as for villages (VERIFY).
+// The start draws from the start chunk's population random (VERIFY).
 
 const (
 	citySalt       = 20083232
@@ -68,6 +68,11 @@ func (o *Overworld) cityAt(rx, rz int32) *city {
 	var r rand.MT
 	cx, cz := o.cityPick(rx, rz, &r)
 	if o.city != nil && o.BiomeAt(cx*16, cityAnchorY+1, cz*16) == o.deepDark {
+		// The start is built with the start chunk's population random: of
+		// the seedings tried against BDS's city at chunk (-14, -113) it is
+		// the only one that gets every depth-1 piece right (VERIFY: the
+		// caller of sub_4E3E5B0).
+		r.Seed(populationSeed(o.seed, cx, cz))
 		c = o.assembleCity(cx, cz, &r)
 	}
 	v, _ := o.cities.LoadOrStore(key, c)

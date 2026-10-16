@@ -16,13 +16,14 @@
 > - **Structures:** villages are placed and built (with loot chests). Dungeons (spawner, two loot
 >   chests, mossy floor), surface lava lakes and mineshafts (normal and badlands, with cave spider
 >   spawners, cobwebs, rails, torches and support pillars) are placed where BDS places them, close
->   to block for block. Ancient cities are placed where BDS places them, in the cave BDS carves around
->   them, and their centre matches block for block, but the outer layout still differs and the
->   sculk is missing. Everything else
+>   to block for block. Ancient cities are placed and laid out where BDS puts them, in the cave BDS
+>   carves around them (checked in game against a vanilla world), but their sculk (on the city
+>   and in the caves around it) is not placed yet. Everything else
 >   (ruins, shipwrecks, strongholds, trial chambers...) is not started. Mineshaft minecarts with
 >   chests are not placed yet.
 > - **A refinement pass comes last:** every biome and system will be compared block by block with
 >   BDS once everything is in.
+> - **Chest loot:** structure chests carry their loot table, but chests are still empty in game.
 > - **Still missing:** lily pads, huge mushrooms, melons, coral crust, magma and bubble columns,
 >   double tall grass in swamps and more.
 > - **The Nether and the End are not started.**
@@ -111,7 +112,7 @@ optimization that changes the world is not accepted.
 | Villages | 🟡 placed and built, layout close but not block-exact |
 | Dungeons and lava lakes | ✅ match BDS (a few differ where neighbouring chunks overlap) |
 | Mineshafts | ✅ placement matches BDS; blocks close (refined at the end) |
-| Ancient cities | 🟡 placement matches BDS; centre exact, outer layout and sculk not yet |
+| Ancient cities | 🟡 placement, layout and cave match BDS; sculk not yet |
 | Other structures | ⬜ not started (trial chambers next) |
 | Nether and End | ⬜ not started |
 
