@@ -109,11 +109,14 @@ BDS generated from the same seed. The marks mean:
 | Ancient cities, with the cave around them and their sculk | Close |
 | Mineshaft minecarts with chests | Not yet |
 | Ocean ruins, shipwrecks, ocean monuments, buried treasure | Not yet |
-| Desert and jungle temples, witch huts, igloos | Not yet |
+| Desert pyramids (with the TNT trap and the suspicious sand cellar) | Close |
+| Jungle temples (traps, dispensers, lever puzzle) | Exact (tree leaves can poke inside; fixed in refinement) |
+| Witch huts (cauldron with a random potion) | Close |
+| Igloos (half with a basement) | Close |
 | Pillager outposts, woodland mansions | Not yet |
 | Strongholds, trial chambers, trail ruins, ruined portals | Not yet |
 
-Structure chests carry their loot table, but the loot is not filled in yet, so chests are empty in
+Structure chests, dispensers and suspicious sand carry their loot table, but the loot is not filled in yet, so chests are empty in
 game.
 
 ## Other dimensions

@@ -129,6 +129,8 @@ type Overworld struct {
 	// villageType holds its type.
 	villageBiome []bool
 	villageType  []string
+	// scatterKind is each biome's scattered feature kind (scattered.go).
+	scatterKind []uint8
 	// jigsaw is the village pools and elements; templates caches prepared
 	// templates by path and villages assembled villages by start chunk.
 	jigsaw    *jigsawData
@@ -349,6 +351,12 @@ func NewOverworld(seed int64, reg *blocks.Registry, biomeIDs map[string]uint32, 
 	o.biomeTags = make([][]string, maxBiome+1)
 	o.villageBiome = make([]bool, maxBiome+1)
 	o.villageType = make([]string, maxBiome+1)
+	o.scatterKind = make([]uint8, maxBiome+1)
+	for name, kind := range scatterBiomes {
+		if id, ok := biomeIDs[name]; ok {
+			o.scatterKind[id] = kind
+		}
+	}
 	for name, id := range biomeIDs {
 		if d, ok := defs[name]; ok {
 			o.biomeTags[id] = d.Tags

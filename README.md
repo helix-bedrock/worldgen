@@ -109,7 +109,8 @@ The full list of what is and is not generated is in [STATUS.md](STATUS.md).
 | Dungeons and lava lakes | ✅ match BDS (a few differ where neighbouring chunks overlap) |
 | Mineshafts | ✅ placement matches BDS; blocks close (refined at the end) |
 | Ancient cities | 🟡 placement, layout and cave match BDS near the centre; sculk placed |
-| Other structures | ⬜ not started (trial chambers next) |
+| Desert pyramids, jungle temples, witch huts, igloos | ✅ placement matches BDS; jungle temple blocks match BDS; the others close |
+| Other structures | ⬜ not started |
 | Nether and End | ⬜ not started |
 
 **The goal is to match the latest Minecraft version exactly.** After that, every time Minecraft

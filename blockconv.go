@@ -77,6 +77,7 @@ var blockEntityIDs = map[string]string{
 	"minecraft:standing_sign": "Sign", "minecraft:wall_sign": "Sign", "minecraft:standing_banner": "Banner",
 	"minecraft:wall_banner": "Banner", "minecraft:skeleton_skull": "Skull", "minecraft:decorated_pot": "DecoratedPot",
 	"minecraft:chiseled_bookshelf": "ChiseledBookshelf", "minecraft:unpowered_comparator": "Comparator",
+	"minecraft:suspicious_sand": "BrushableBlock", "minecraft:suspicious_gravel": "BrushableBlock",
 }
 
 // bedColors are Bedrock's colour indexes for bed block entities.
