@@ -6,33 +6,21 @@
 >
 > Status as of 2026-10-17:
 >
-> - **The base world matches BDS:** terrain, biomes, surface, caves, aquifers, ores and most ocean
->   decorations. Biomes are stored per block with BDS's jagged edges, as BDS stores them.
-> - **Cave biomes:** lush caves have their moss, clay pools, cave vines and glow berries, dripleaves,
->   azaleas, spore blossoms and vines (close to BDS, not block-exact yet; azalea roots not yet).
->   Dripstone caves have dripstone blocks, pointed dripstone and large dripstone. The deep dark has
->   its sculk, sculk veins, sensors and shriekers, and glow lichen grows in caves everywhere.
->   Amethyst geodes match BDS block for block. Sulfur cave spikes are not placed yet.
-> - **Bedrock floor:** the bottom layer of bedrock is never replaced by any later step.
-> - **Trees:** oak, birch, spruce, pine, jungle, fancy (big) oak, giant jungle and giant spruce/pine,
->   acacia, dark oak, pale oak, azalea, fallen logs and the dappled forest's poplars. Cherry and
->   mangrove trees are not done yet.
-> - **Plants:** grass, flowers (plains, forest, flower forest, swamp, meadow), wildflowers, leaf
->   litter, sweet berry bushes, mushrooms, shelf mushrooms and swamp trees.
-> - **Structures:** villages are placed and built (with loot chests). Dungeons (spawner, two loot
->   chests, mossy floor), surface lava lakes and mineshafts (normal and badlands, with cave spider
->   spawners, cobwebs, rails, torches and support pillars) are placed where BDS places them, close
->   to block for block. Ancient cities are placed and laid out where BDS puts them, in the cave BDS
->   carves around them (checked in game against a vanilla world), with their sculk patches. Everything else
->   (ruins, shipwrecks, strongholds, trial chambers...) is not started. Mineshaft minecarts with
->   chests are not placed yet.
-> - **A refinement pass comes last:** every biome and system will be compared block by block with
->   BDS once everything is in.
-> - **Chest loot:** structure chests carry their loot table, but chests are still empty in game.
-> - **Still missing:** lily pads, huge mushrooms, melons, coral crust, magma and bubble columns,
->   double tall grass in swamps and more.
+> - **The base Overworld matches BDS:** terrain, all biomes, surface layers, caves and canyons,
+>   underground water and lava, ores and stone patches, and an unbroken bedrock floor.
+> - **Caves:** lush caves, dripstone caves, the deep dark's sculk (with sensors and shriekers), glow
+>   lichen and amethyst geodes. Sulfur cave spikes are not placed yet.
+> - **Trees and plants:** most trees (cherry and mangrove are missing), grass and ferns, flowers in
+>   every flower biome, sunflowers, wildflowers, pink petals, leaf litter, sweet berries, pumpkins,
+>   sugar cane, mushrooms, bamboo and lily pads. Cactus, dead bushes and melons are not placed yet.
+> - **Oceans:** seagrass, kelp, coral reefs and icebergs.
+> - **Structures:** villages, mineshafts, dungeons and ancient cities. Other structures are not
+>   started, and chests are still empty in game.
 > - **The Nether and the End are not started.**
 > - **The API is not stable.** Names and behaviour change between commits.
+>
+> **[STATUS.md](STATUS.md) lists everything that is generated and everything that is missing.**
+> Most parts are close to BDS but not block for block yet; a refinement pass comes last.
 >
 > Bug reports and ideas are welcome, but do not depend on it yet.
 
@@ -108,17 +96,19 @@ optimization that changes the world is not accepted.
 
 ## Roadmap
 
+The full list of what is and is not generated is in [STATUS.md](STATUS.md).
+
 | Part | State |
 |---|---|
 | Terrain, biomes, surface, caves, aquifers, ores | ✅ done |
-| Ocean decorations, freezing | ✅ done |
-| Cave decorations | 🟡 lush caves close to BDS; dripstone, sculk, sulfur, glow lichen, geodes next |
-| Plants and flowers | 🟡 most done (no lily pads, huge mushrooms, melons) |
+| Ocean decorations, freezing | 🟡 seagrass, kelp, coral reefs, icebergs and freezing done; coral crust, magma and bubble columns next |
+| Cave decorations | 🟡 lush, dripstone, deep dark sculk and glow lichen close to BDS; geodes exact; sulfur spikes next |
+| Plants and flowers | 🟡 most done (no cactus, dead bushes, melons, huge mushrooms) |
 | Trees | 🟡 most done (no cherry, mangrove) |
 | Villages | 🟡 placed and built, layout close but not block-exact |
 | Dungeons and lava lakes | ✅ match BDS (a few differ where neighbouring chunks overlap) |
 | Mineshafts | ✅ placement matches BDS; blocks close (refined at the end) |
-| Ancient cities | 🟡 placement, layout and cave match BDS; sculk not yet |
+| Ancient cities | 🟡 placement, layout and cave match BDS near the centre; sculk placed |
 | Other structures | ⬜ not started (trial chambers next) |
 | Nether and End | ⬜ not started |
 
