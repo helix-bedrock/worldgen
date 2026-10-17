@@ -198,6 +198,12 @@ func (o *Overworld) parseFeature(typ string, raw json.RawMessage, set *featureSe
 		return o.parseTree(raw, set)
 	case "minecraft:horizontal_tree_decoration_feature":
 		return o.parseHorizontalDecoration(raw)
+	case "minecraft:snap_to_surface_feature":
+		return o.parseSnapToSurface(raw, set)
+	case "minecraft:vegetation_patch_feature":
+		return o.parseVegetationPatch(raw, set)
+	case "minecraft:growing_plant_feature":
+		return o.parseGrowingPlant(raw)
 	}
 	return nil, nil
 }
@@ -539,8 +545,11 @@ type singleBlockFeature struct {
 	block uint32
 	// soil is set when the block must stand on soil: a plant with
 	// enforce_placement_rules or enforce_survivability_rules.
-	soil       bool
-	sand       bool
+	soil bool
+	sand bool
+	// hangs is set for blocks that need a sturdy block above (spore
+	// blossom).
+	hangs      bool
 	mayReplace blockMatcher
 	minAttach  int
 	// hasAttach is set when the feature has may_attach_to.
@@ -597,6 +606,8 @@ func (o *Overworld) parseSingleBlock(raw json.RawMessage) (placer, error) {
 			f.sand = true
 		case soilPlants[name]:
 			f.soil = true
+		case name == "minecraft:spore_blossom":
+			f.hangs = true
 		}
 	}
 	if r.Attach != nil {
@@ -684,6 +695,11 @@ func (f *singleBlockFeature) place(w *featureWorld, x, y, z int32, r *rand.MT) (
 			return blockPos{}, false
 		}
 		if f.sand && !w.o.hasBlockTag(below, "sand") && !strings.HasSuffix(w.o.blockName(below), "terracotta") && !w.o.hasBlockTag(below, "dirt") {
+			return blockPos{}, false
+		}
+	}
+	if f.hangs {
+		if above, ok := w.block(x, y+1, z); !ok || !w.o.sturdyFace(above, faceDown) {
 			return blockPos{}, false
 		}
 	}

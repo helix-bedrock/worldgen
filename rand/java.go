@@ -30,6 +30,7 @@ func (j *Java) Float() float32 {
 // BlockSeed is Java's Mth.getSeed for a block position, the seed of the
 // random a structure block rule draws from at that block.
 func BlockSeed(x, y, z int32) int64 {
-	l := int64(x)*3129871 ^ int64(z)*116129781 ^ int64(y)
+	// x*3129871 wraps as a 32-bit product, as in Java and BDS.
+	l := int64(x*3129871) ^ int64(z)*116129781 ^ int64(y)
 	return (l*l*42317861 + l*11) >> 16
 }

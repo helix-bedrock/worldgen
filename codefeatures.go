@@ -32,6 +32,9 @@ func (o *Overworld) builtinFeatures(set *featureSet) {
 	soil := []uint32{id("minecraft:mycelium"), id("minecraft:podzol")}
 	add("minecraft:brown_mushroom_feature", &mushroomFeature{block: id("minecraft:brown_mushroom"), count: 1, soil: soil})
 	add("minecraft:red_mushroom_feature", &mushroomFeature{block: id("minecraft:red_mushroom"), count: 1, soil: soil})
+	add("minecraft:moss_vegetation_feature", o.newMossVegetation(id))
+	add("minecraft:dripleaf_feature", o.newDripleaf(id, set))
+	add("minecraft:vines_single_face_feature", &vinesSingleFaceFeature{vine: id("minecraft:vine"), invisibleBedrock: id("minecraft:invisible_bedrock")})
 	add("minecraft:wildflowers_feature", o.newFlowerBed("minecraft:wildflowers"))
 	add("minecraft:leaf_litter_feature", o.newFlowerBed("minecraft:leaf_litter"))
 	for name, kind := range map[string]flowerKind{"flower_forest": flowersFlowerForest, "forest": flowersForest,

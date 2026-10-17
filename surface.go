@@ -350,7 +350,7 @@ func (o *Overworld) surface(chunkX, chunkZ int32, c *Chunk, mt *rand.MT) {
 				ySample: surfaceNoiseY, noise: depthNoise[x+16*z], top: top,
 				start: floors[(x>>2)*4+z>>2], end: Height - 1,
 			}
-			b := c.Biomes[int(min(hm, Height-1)>>2)<<4|(z>>2)<<2|x>>2]
+			b := uint32(c.Biomes[int(min(hm, Height-1))<<8|z<<4|x])
 			if int(b) < len(o.surfaces) && o.surfaces[b] != nil {
 				o.buildSurface(c, mt, &col, o.surfaces[b])
 			}
@@ -383,14 +383,14 @@ func (o *Overworld) subsurface(c *Chunk, x0, z0 int32) {
 					o.gradientSurface(c, &col, o.subsurfaces[b])
 				}
 			}
-			start, cur := int32(0), c.Biomes[(z>>2)<<2|x>>2]
-			for cell := int32(1); cell <= top>>2; cell++ {
-				b := c.Biomes[int(cell)<<4|(z>>2)<<2|x>>2]
+			start, cur := int32(0), uint32(c.Biomes[z<<4|x])
+			for y := int32(1); y <= top; y++ {
+				b := uint32(c.Biomes[int(y)<<8|z<<4|x])
 				if b == cur {
 					continue
 				}
-				run(cur, start, cell*4)
-				start, cur = cell*4, b
+				run(cur, start, y)
+				start, cur = y, b
 			}
 			run(cur, start, top+1)
 		}

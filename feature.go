@@ -654,6 +654,16 @@ func (w *featureWorld) aboveTopSolid(x, z int32) int32 {
 	return MinY
 }
 
+// biome returns the biome at a position, or ^0 outside the chunks and the
+// world height (BDS's block target gives no biome there).
+func (w *featureWorld) biome(x, y, z int32) uint32 {
+	c := w.chunk(x, z)
+	if c == nil || y < MinY || y >= MaxY {
+		return ^uint32(0)
+	}
+	return c.Biome(int(x&15), int(y), int(z&15))
+}
+
 // biomeTags returns the tags of the biome at a position.
 func (w *featureWorld) biomeTags(x, y, z int32) []string {
 	c := w.chunk(x, z)
@@ -735,12 +745,23 @@ func waterloggable(name string) bool {
 }
 
 // chunkBiomes lists the distinct biomes of a chunk in BDS's order: sub-chunk
-// by sub-chunk from the bottom, in order of first appearance.
+// by sub-chunk from the bottom, in order of first appearance in each
+// sub-chunk's palette, which BDS builds in x, z, y order (sub_C74F340).
 func chunkBiomes(c *Chunk) []uint32 {
 	var out []uint32
-	for _, b := range c.Biomes {
-		if !slices.Contains(out, b) {
-			out = append(out, b)
+	for s := 0; s < Height/16; s++ {
+		sub := c.Biomes[s<<12 : (s+1)<<12]
+		last := ^uint32(0)
+		for x := range 16 {
+			for z := range 16 {
+				for y := range 16 {
+					b := uint32(sub[y<<8|z<<4|x])
+					if b != last && !slices.Contains(out, b) {
+						out = append(out, b)
+					}
+					last = b
+				}
+			}
 		}
 	}
 	return out

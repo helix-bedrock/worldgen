@@ -80,6 +80,11 @@ func (o *Overworld) lookupBlock(b biome.Block) (uint32, bool) {
 	if id, ok := o.reg.Lookup(b.Name, b.States); ok {
 		return id, true
 	}
+	if st, ok := upgradedStates(b.States); ok {
+		if id, ok := o.reg.Lookup(b.Name, st); ok {
+			return id, true
+		}
+	}
 	if n := upgradedName(b); n != b.Name {
 		return o.reg.Default(n)
 	}
@@ -262,4 +267,24 @@ func (w *featureWorld) airNextTo(x, y, z int32) bool {
 		}
 	}
 	return false
+}
+
+// legacyDirections names the old integer direction state (0 south, 1 west,
+// 2 north, 3 east) as minecraft:cardinal_direction, which replaced it.
+var legacyDirections = [4]string{"south", "west", "north", "east"}
+
+// upgradedStates rewrites old states data files still use (the integer
+// direction of dripleaves) to their current form.
+func upgradedStates(st map[string]any) (map[string]any, bool) {
+	d, ok := st["direction"].(float64)
+	if !ok || d < 0 || d > 3 {
+		return nil, false
+	}
+	out := make(map[string]any, len(st))
+	for k, v := range st {
+		out[k] = v
+	}
+	delete(out, "direction")
+	out["minecraft:cardinal_direction"] = legacyDirections[int(d)]
+	return out, true
 }

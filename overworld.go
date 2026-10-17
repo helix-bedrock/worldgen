@@ -30,11 +30,11 @@ const (
 
 // Chunk is the generator output for one 16x16 column. Blocks holds registry
 // indices (16 bits, which halves the memory of cached chunks; NewOverworld
-// refuses larger registries), index (y-MinY)<<8 | z<<4 | x. Biomes holds one biome ID per 4x4x4
-// cell, index ((y-MinY)>>2)<<4 | (z>>2)<<2 | x>>2.
+// refuses larger registries), index (y-MinY)<<8 | z<<4 | x. Biomes holds one biome ID per
+// block, same index: BDS stores biomes per block (see fillBiomes).
 type Chunk struct {
 	Blocks [16 * 16 * Height]uint16
-	Biomes [4 * 4 * Height / 4]uint32
+	Biomes [16 * 16 * Height]uint16
 	// Water has one bit per block, same index as Blocks: set where the
 	// block also holds source water (BDS's second block layer), as kelp,
 	// seagrass and coral fans placed in the sea do.
@@ -66,7 +66,7 @@ func (c *Chunk) Waterlogged(x, y, z int) bool {
 
 // Biome returns the biome ID at local (x, z) and world y.
 func (c *Chunk) Biome(x, y, z int) uint32 {
-	return c.Biomes[((y-MinY)>>2)<<4|(z>>2)<<2|x>>2]
+	return uint32(c.Biomes[(y-MinY)<<8|z<<4|x])
 }
 
 // Block returns the state index at local (x, z) and world y.
@@ -393,7 +393,7 @@ func (o *Overworld) GenerateChunk(chunkX, chunkZ int32, c *Chunk) {
 	o.fillBlocks(chunkX, chunkZ, g, aq, c)
 	mt := rand.NewMT(rand.ChunkSeed(chunkX, chunkZ))
 	o.bedrockFloor(mt, c)
-	o.fillBiomes(&cols, c)
+	o.fillBiomes(chunkX, chunkZ, c)
 	o.surface(chunkX, chunkZ, c, mt)
 	for _, cv := range o.carvers {
 		cv.carve(o, c, aq, chunkX, chunkZ)

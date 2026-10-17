@@ -7,7 +7,11 @@
 > Status as of 2026-10-16:
 >
 > - **The base world matches BDS:** terrain, biomes, surface, caves, aquifers, ores and most ocean
->   decorations.
+>   decorations. Biomes are stored per block with BDS's jagged edges, as BDS stores them.
+> - **Cave biomes:** lush caves have their moss, clay pools, cave vines and glow berries, dripleaves,
+>   azaleas, spore blossoms and vines (close to BDS, not block-exact yet; azalea roots not yet).
+>   Dripstone caves, the deep dark's sculk, sulfur cave spikes, glow lichen and amethyst geodes are
+>   not placed yet.
 > - **Trees:** oak, birch, spruce, pine, jungle, fancy (big) oak, giant jungle and giant spruce/pine,
 >   acacia, dark oak, pale oak, azalea, fallen logs and the dappled forest's poplars. Cherry and
 >   mangrove trees are not done yet.
@@ -107,6 +111,7 @@ optimization that changes the world is not accepted.
 |---|---|
 | Terrain, biomes, surface, caves, aquifers, ores | ✅ done |
 | Ocean decorations, freezing | ✅ done |
+| Cave decorations | 🟡 lush caves close to BDS; dripstone, sculk, sulfur, glow lichen, geodes next |
 | Plants and flowers | 🟡 most done (no lily pads, huge mushrooms, melons) |
 | Trees | 🟡 most done (no cherry, mangrove) |
 | Villages | 🟡 placed and built, layout close but not block-exact |

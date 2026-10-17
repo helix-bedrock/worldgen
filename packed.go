@@ -11,7 +11,7 @@ import "maps"
 // read from many goroutines.
 type PackedChunk struct {
 	subs   [Height / 16]packedSub
-	biomes [4 * 4 * Height / 4]uint16
+	biomes [Height / 16]packedSub
 	// biomeList holds the distinct biomes in BDS's order (see chunkBiomes).
 	biomeList []uint32
 	// water and blockEntities are those of structures placed in the
@@ -29,14 +29,7 @@ type packedSub struct {
 
 // at returns the state at Chunk index i.
 func (p *PackedChunk) at(i int) uint32 {
-	s := &p.subs[i>>12]
-	if s.idx != nil {
-		return uint32(s.palette[s.idx[i&4095]])
-	}
-	if s.wide != nil {
-		return uint32(s.wide[i&4095])
-	}
-	return uint32(s.one)
+	return uint32(p.subs[i>>12].at(i))
 }
 
 // Block returns the state index at local (x, z) and world y.
@@ -46,7 +39,19 @@ func (p *PackedChunk) Block(x, y, z int) uint32 {
 
 // Biome returns the biome ID at local (x, z) and world y.
 func (p *PackedChunk) Biome(x, y, z int) uint32 {
-	return uint32(p.biomes[((y-MinY)>>2)<<4|(z>>2)<<2|x>>2])
+	i := (y-MinY)<<8 | z<<4 | x
+	return uint32(p.biomes[i>>12].at(i))
+}
+
+// at returns the value at Chunk index i of a sub-chunk.
+func (s *packedSub) at(i int) uint16 {
+	if s.idx != nil {
+		return s.palette[s.idx[i&4095]]
+	}
+	if s.wide != nil {
+		return s.wide[i&4095]
+	}
+	return s.one
 }
 
 // Pack returns a compact copy of c, with its water bits and block entities
@@ -62,16 +67,20 @@ func Pack(c *Chunk) *PackedChunk {
 	if len(c.BlockEntities) > 0 {
 		p.blockEntities = append([]BlockEntity(nil), c.BlockEntities...)
 	}
-	for i, b := range c.Biomes {
-		p.biomes[i] = uint16(b)
-	}
+	packSubs(&p.subs, c.Blocks[:])
+	packSubs(&p.biomes, c.Biomes[:])
+	return p
+}
+
+// packSubs packs src (Chunk index order) into one packedSub per sub-chunk.
+func packSubs(subs *[Height / 16]packedSub, src []uint16) {
 	var single [Height / 16]bool
 	mixed := 0
-	for s := range p.subs {
-		blocks := c.Blocks[s<<12 : (s+1)<<12]
+	for s := range subs {
+		vals := src[s<<12 : (s+1)<<12]
 		single[s] = true
-		for _, b := range blocks {
-			if b != blocks[0] {
+		for _, b := range vals {
+			if b != vals[0] {
 				single[s] = false
 				mixed++
 				break
@@ -81,17 +90,17 @@ func Pack(c *Chunk) *PackedChunk {
 	// The index arrays of all sub-chunks share one allocation.
 	slab := make([]uint8, mixed<<12)
 	var pal [256]uint16
-	for s := range p.subs {
-		blocks := c.Blocks[s<<12 : (s+1)<<12]
+	for s := range subs {
+		vals := src[s<<12 : (s+1)<<12]
 		if single[s] {
-			p.subs[s].one = blocks[0]
+			subs[s].one = vals[0]
 			continue
 		}
 		idx := slab[:4096:4096]
-		pal[0] = blocks[0]
-		n, last, lastIdx := 1, blocks[0], uint8(0)
+		pal[0] = vals[0]
+		n, last, lastIdx := 1, vals[0], uint8(0)
 		ok := true
-		for j, b := range blocks {
+		for j, b := range vals {
 			if b != last {
 				k := 0
 				for k < n && pal[k] != b {
@@ -110,14 +119,34 @@ func Pack(c *Chunk) *PackedChunk {
 			idx[j] = lastIdx
 		}
 		if !ok {
-			p.subs[s].wide = append([]uint16(nil), blocks...)
+			subs[s].wide = append([]uint16(nil), vals...)
 			continue
 		}
 		slab = slab[4096:]
-		p.subs[s].palette = append([]uint16(nil), pal[:n]...)
-		p.subs[s].idx = idx
+		subs[s].palette = append([]uint16(nil), pal[:n]...)
+		subs[s].idx = idx
 	}
-	return p
+}
+
+// unpackSubs writes packed sub-chunks back into dst (Chunk index order).
+func unpackSubs(subs *[Height / 16]packedSub, dst []uint16) {
+	for s := range subs {
+		sub := &subs[s]
+		d := dst[s<<12 : (s+1)<<12]
+		switch {
+		case sub.idx != nil:
+			for j, k := range sub.idx {
+				d[j] = sub.palette[k]
+			}
+		case sub.wide != nil:
+			copy(d, sub.wide)
+		default:
+			b := sub.one
+			for j := range d {
+				d[j] = b
+			}
+		}
+	}
 }
 
 // Unpack writes the chunk back into c.
@@ -130,24 +159,6 @@ func (p *PackedChunk) Unpack(c *Chunk) {
 		be.Data = maps.Clone(be.Data)
 		c.BlockEntities = append(c.BlockEntities, be)
 	}
-	for i, b := range p.biomes {
-		c.Biomes[i] = uint32(b)
-	}
-	for s := range p.subs {
-		sub := &p.subs[s]
-		dst := c.Blocks[s<<12 : (s+1)<<12]
-		switch {
-		case sub.idx != nil:
-			for j, k := range sub.idx {
-				dst[j] = sub.palette[k]
-			}
-		case sub.wide != nil:
-			copy(dst, sub.wide)
-		default:
-			b := sub.one
-			for j := range dst {
-				dst[j] = b
-			}
-		}
-	}
+	unpackSubs(&p.subs, c.Blocks[:])
+	unpackSubs(&p.biomes, c.Biomes[:])
 }
