@@ -105,9 +105,10 @@ func (o *Overworld) withProp(b uint32, prop string, v any) uint32 {
 // ceiling and places a feature there (SnapToSurfaceFeature, sub_D313660
 // with the column scan sub_D313B20 / sub_D2D3770).
 type snapToSurfaceFeature struct {
-	feat    featureRef
-	rng     int32
-	ceiling bool
+	feat       featureRef
+	rng        int32
+	ceiling    bool
+	horizontal bool
 	// allowAir, allowNonAir and allowWater are allow_air_placement (default
 	// true), allow_non_air_placement and allow_underwater_placement
 	// (default false), from the constructor sub_4F66A10.
@@ -134,9 +135,11 @@ func (o *Overworld) parseSnapToSurface(raw json.RawMessage, set *featureSet) (pl
 	case "ceiling":
 		f.ceiling = true
 	case "floor", "":
+	case "random_horizontal":
+		f.horizontal = true
 	default:
-		// random and random_horizontal draw directions the runtime does not
-		// model yet; no vanilla cave feature uses them.
+		// random draws a vertical direction the runtime does not model
+		// yet; no vanilla feature uses it.
 		return nil, nil
 	}
 	return f, nil
@@ -154,21 +157,61 @@ func (f *snapToSurfaceFeature) place(w *featureWorld, x, y, z int32, r *rand.MT)
 	if !ok {
 		return blockPos{}, false
 	}
-	solid := b != o.ids.air && !o.waterMaterial(b)
-	// From air the scan heads toward the surface; from inside the ground
-	// it heads away from it, to the open block next to it.
-	up := f.ceiling != solid
-	face := faceDown
-	if up {
-		face = faceUp
+	var p blockPos
+	if f.horizontal {
+		// The four horizontal faces in a shuffled order, tried until one
+		// finds a surface: north, east, south, west, the first two
+		// swapped on an even draw, then index 2 and 3 swapped with a drawn
+		// earlier index unless the draw lands on themselves.
+		dirs := [4]int{faceNorth, faceEast, faceSouth, faceWest}
+		if r.Uint32()&1 == 0 {
+			dirs[0], dirs[1] = dirs[1], dirs[0]
+		}
+		if i := r.Uint32() % 3; i != 2 {
+			dirs[2], dirs[i] = dirs[i], dirs[2]
+		}
+		if i := r.Uint32() & 3; i != 3 {
+			dirs[3], dirs[i] = dirs[i], dirs[3]
+		}
+		for _, d := range dirs {
+			if p, ok = f.scan(w, x, y, z, d); ok {
+				break
+			}
+		}
+	} else {
+		// From air the scan heads toward the surface; from inside the
+		// ground it heads away from it, to the open block next to it.
+		face := faceDown
+		if f.ceiling != (b != o.ids.air && !o.waterMaterial(b)) {
+			face = faceUp
+		}
+		p, ok = f.scan(w, x, y, z, face)
 	}
-	dy := faceDY[face]
+	if !ok {
+		return blockPos{}, false
+	}
+	return f.feat.place(w, p[0], p[1], p[2], r)
+}
+
+// faceStep is the block step toward each face.
+var faceStep = [6][3]int32{{0, -1, 0}, {0, 1, 0}, {0, 0, -1}, {0, 0, 1}, {-1, 0, 0}, {1, 0, 0}}
+
+// scan walks from (x, y, z) toward face (sub_D313B20 with the column scan
+// sub_D2D3770) and returns the open block next to the surface it finds.
+func (f *snapToSurfaceFeature) scan(w *featureWorld, x, y, z int32, face int) (blockPos, bool) {
+	o := w.o
+	b, ok := w.block(x, y, z)
+	if !ok {
+		return blockPos{}, false
+	}
+	solid := b != o.ids.air && !o.waterMaterial(b)
+	st := faceStep[face]
 	// The scan only runs on through blocks of the start's biome (the
 	// wrapper lambda sub_D2DE640 compares the block target's biome, slot
 	// 25).
 	startBiome := w.biome(x, y, z)
-	cont := func(py int32, b uint32) bool {
-		if w.biome(x, py, z) != startBiome {
+	cont := func(p blockPos, b uint32) bool {
+		if w.biome(p[0], p[1], p[2]) != startBiome {
 			return false
 		}
 		if solid {
@@ -185,26 +228,26 @@ func (f *snapToSurfaceFeature) place(w *featureWorld, x, y, z int32, r *rand.MT)
 		}
 		return o.sturdyFace(b, face^1)
 	}
-	if !cont(y, b) {
+	if !cont(blockPos{x, y, z}, b) {
 		return blockPos{}, false
 	}
-	py := y + dy
+	p := blockPos{x + st[0], y + st[1], z + st[2]}
 	var i int32
 	for i < f.rng-1 {
-		b, ok := w.block(x, py, z)
-		if !ok || !cont(py, b) {
+		b, ok := w.block(p[0], p[1], p[2])
+		if !ok || !cont(p, b) {
 			break
 		}
-		py += dy
+		p = blockPos{p[0] + st[0], p[1] + st[1], p[2] + st[2]}
 		i++
 	}
-	if b, ok := w.block(x, py, z); !ok || !surface(b) {
+	if b, ok := w.block(p[0], p[1], p[2]); !ok || !surface(b) {
 		return blockPos{}, false
 	}
 	if solid {
 		i++
 	}
-	return f.feat.place(w, x, y+dy*i, z, r)
+	return blockPos{x + st[0]*i, y + st[1]*i, z + st[2]*i}, true
 }
 
 // vegetationPatchFeature lays a patch of ground blocks on a floor or

@@ -472,7 +472,7 @@ func (b *msBuild) boxGet(x, y, z int32) uint32 {
 }
 
 func (b *msBuild) set(x, y, z int32, s uint32) {
-	if !b.cbox.contains([3]int32{x, y, z}) {
+	if !b.cbox.contains([3]int32{x, y, z}) || b.o.floorBedrock(uint32(b.c.Blocks[(y-MinY)<<8|(z&15)<<4|x&15]), y) {
 		return
 	}
 	b.c.set(int(x&15), int(y), int(z&15), s)

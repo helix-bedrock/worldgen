@@ -4,14 +4,16 @@
 > **This is early and not finished.** It is under active, heavy development, and it will take a
 > while before it is complete.
 >
-> Status as of 2026-10-16:
+> Status as of 2026-10-17:
 >
 > - **The base world matches BDS:** terrain, biomes, surface, caves, aquifers, ores and most ocean
 >   decorations. Biomes are stored per block with BDS's jagged edges, as BDS stores them.
 > - **Cave biomes:** lush caves have their moss, clay pools, cave vines and glow berries, dripleaves,
 >   azaleas, spore blossoms and vines (close to BDS, not block-exact yet; azalea roots not yet).
->   Dripstone caves, the deep dark's sculk, sulfur cave spikes, glow lichen and amethyst geodes are
->   not placed yet.
+>   Dripstone caves have dripstone blocks, pointed dripstone and large dripstone. The deep dark has
+>   its sculk, sculk veins, sensors and shriekers, and glow lichen grows in caves everywhere.
+>   Amethyst geodes match BDS block for block. Sulfur cave spikes are not placed yet.
+> - **Bedrock floor:** the bottom layer of bedrock is never replaced by any later step.
 > - **Trees:** oak, birch, spruce, pine, jungle, fancy (big) oak, giant jungle and giant spruce/pine,
 >   acacia, dark oak, pale oak, azalea, fallen logs and the dappled forest's poplars. Cherry and
 >   mangrove trees are not done yet.
@@ -21,8 +23,7 @@
 >   chests, mossy floor), surface lava lakes and mineshafts (normal and badlands, with cave spider
 >   spawners, cobwebs, rails, torches and support pillars) are placed where BDS places them, close
 >   to block for block. Ancient cities are placed and laid out where BDS puts them, in the cave BDS
->   carves around them (checked in game against a vanilla world), but their sculk (on the city
->   and in the caves around it) is not placed yet. Everything else
+>   carves around them (checked in game against a vanilla world), with their sculk patches. Everything else
 >   (ruins, shipwrecks, strongholds, trial chambers...) is not started. Mineshaft minecarts with
 >   chests are not placed yet.
 > - **A refinement pass comes last:** every biome and system will be compared block by block with

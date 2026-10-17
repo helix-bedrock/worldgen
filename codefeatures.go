@@ -33,6 +33,13 @@ func (o *Overworld) builtinFeatures(set *featureSet) {
 	add("minecraft:brown_mushroom_feature", &mushroomFeature{block: id("minecraft:brown_mushroom"), count: 1, soil: soil})
 	add("minecraft:red_mushroom_feature", &mushroomFeature{block: id("minecraft:red_mushroom"), count: 1, soil: soil})
 	add("minecraft:moss_vegetation_feature", o.newMossVegetation(id))
+	drip := speleothemBlocks{base: id("minecraft:dripstone_block"), tip: id("minecraft:pointed_dripstone"),
+		replace: []uint32{o.ids.dirt, o.ids.coarseDirt, o.ids.stone, id("minecraft:tuff"), o.ids.deepslate},
+		tips:    []uint32{id("minecraft:pointed_dripstone"), id("minecraft:sulfur_spike")}}
+	add("minecraft:pointed_dripstone_feature", &pointedFeature{drip})
+	add("minecraft:dripstone_cluster_feature", &clusterFeature{speleothemBlocks: drip,
+		stone: []uint32{o.ids.stone, o.ids.deepslate, id("minecraft:tuff")}})
+	add("minecraft:large_dripstone_feature", &largeFeature{drip})
 	add("minecraft:dripleaf_feature", o.newDripleaf(id, set))
 	add("minecraft:vines_single_face_feature", &vinesSingleFaceFeature{vine: id("minecraft:vine"), invisibleBedrock: id("minecraft:invisible_bedrock")})
 	add("minecraft:wildflowers_feature", o.newFlowerBed("minecraft:wildflowers"))

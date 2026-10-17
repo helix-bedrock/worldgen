@@ -78,6 +78,9 @@ type featureRule struct {
 	iterations int32
 	// iterMolang, when set, computes the iterations per chunk.
 	iterMolang molang
+	// drawOnly rules have a feature the runtime does not build yet: they
+	// only evaluate iterMolang, for its math.random draws.
+	drawOnly bool
 	// scatter chance: either a fraction num/den, or a percent.
 	num, den int32
 	percent  float32
@@ -160,13 +163,10 @@ func (o *Overworld) loadFeatureRules(fsys fs.FS, dir string, defs map[string]*bi
 		if pass < 0 {
 			continue
 		}
-		feat, ok := features.get(r.Description.PlacesFeature)
-		if !ok {
-			continue
-		}
+		feat, known := features.get(r.Description.PlacesFeature)
 		rule := &featureRule{id: r.Description.Identifier, hash: ruleHash(r.Description.Identifier), pass: pass, feature: feat, order: defaultOrder}
 		if it, ok := constInt(r.Distribution.Iterations); ok {
-			if it <= 0 {
+			if it <= 0 || !known {
 				continue
 			}
 			rule.iterations = it
@@ -180,6 +180,10 @@ func (o *Overworld) loadFeatureRules(fsys fs.FS, dir string, defs map[string]*bi
 				continue
 			}
 			rule.iterMolang = m
+			// A rule whose feature is not built yet still evaluates its
+			// iterations in BDS, and math.random there draws from the
+			// population random the later rules share; keep it to draw.
+			rule.drawOnly = !known
 		}
 		if len(r.Distribution.Scatter) > 0 {
 			var frac struct{ Numerator, Denominator int32 }
@@ -203,6 +207,7 @@ func (o *Overworld) loadFeatureRules(fsys fs.FS, dir string, defs map[string]*bi
 			rule.percent = 100
 		}
 		if r.Distribution.Order != "" {
+			var ok bool
 			rule.order, ok = coordinateOrders[r.Distribution.Order]
 			if !ok {
 				continue
@@ -210,6 +215,7 @@ func (o *Overworld) loadFeatureRules(fsys fs.FS, dir string, defs map[string]*bi
 		}
 		good := true
 		for i, a := range []json.RawMessage{r.Distribution.X, r.Distribution.Y, r.Distribution.Z} {
+			var ok bool
 			if rule.axes[i], ok = parseAxis(a); !ok {
 				good = false
 			}
@@ -441,6 +447,13 @@ type featureWorld struct {
 	lastX     int32
 	lastZ     int32
 	lastChunk *PackedChunk
+	// pop is the current origin's population random (see decorateFrom).
+	pop *rand.MT
+	// shuffle stands for the thread-local random BDS seeds from the OS for
+	// multiface direction shuffles; it is seeded per origin so output stays
+	// reproducible (see shuffleRandom).
+	shuffle   rand.MT
+	shuffleOK bool
 
 	// overlay holds the current origin's placements, one array per chunk
 	// column they touch (a map lookup per block read was most of the
@@ -517,10 +530,23 @@ func (w *featureWorld) block(x, y, z int32) (uint32, bool) {
 	return c.at(i), true
 }
 
+// shuffleRandom returns the current origin's stand-in for BDS's
+// thread-local random.
+func (w *featureWorld) shuffleRandom() *rand.MT {
+	if !w.shuffleOK {
+		w.shuffle.Seed(populationSeed(w.o.seed, w.ox, w.oz) ^ 0x9E3779B9)
+		w.shuffleOK = true
+	}
+	return &w.shuffle
+}
+
 // set places a block for the current origin, and into the target chunk if
 // it is inside it.
 func (w *featureWorld) set(x, y, z int32, b uint32) {
 	if y < MinY || y >= MaxY {
+		return
+	}
+	if cur, ok := w.block(x, y, z); ok && w.o.floorBedrock(cur, y) {
 		return
 	}
 	oi := int(y-MinY)<<8 | int(z&15)<<4 | int(x&15)
@@ -738,7 +764,8 @@ func (o *Overworld) keepWater(c *Chunk, base *PackedChunk) {
 // can-contain-liquid flag, whose table was not read.
 func waterloggable(name string) bool {
 	switch name {
-	case "minecraft:seagrass", "minecraft:kelp", "minecraft:sea_pickle", "minecraft:glow_lichen", "minecraft:chest":
+	case "minecraft:seagrass", "minecraft:kelp", "minecraft:sea_pickle", "minecraft:glow_lichen", "minecraft:chest",
+		"minecraft:pointed_dripstone", "minecraft:sculk_vein":
 		return true
 	}
 	return strings.HasSuffix(name, "_coral_fan") || strings.HasSuffix(name, "_coral_wall_fan")
@@ -771,7 +798,14 @@ func chunkBiomes(c *Chunk) []uint32 {
 // holds.
 func (o *Overworld) decorateFrom(w *featureWorld, ox, oz int32, origin *PackedChunk) {
 	pop := populationSeed(o.seed, ox, oz)
-	o.lakesAndDungeons(w, ox, oz, pop)
+	// One population random runs the lakes and dungeons and then
+	// math.random in the rules' Molang (it is the random BDS passes to the
+	// rule loop, sub_C7544E0).
+	popMT := rand.NewMT(pop)
+	w.pop = popMT
+	w.shuffleOK = false
+	o.lakesAndDungeons(w, ox, oz, popMT)
+	o.cityFeatures(w, ox, oz, pop)
 	bs := origin.biomeList
 	single := len(bs) == 1
 	var rule, feat rand.MT
@@ -800,8 +834,11 @@ func (o *Overworld) decorateFrom(w *featureWorld, ox, oz int32, origin *PackedCh
 					}
 				}
 				if r.iterMolang != nil {
-					env := &molangEnv{originX: float32(ox * 16), originZ: float32(oz * 16), noise: o.queryNoise}
+					env := &molangEnv{originX: float32(ox * 16), originZ: float32(oz * 16), noise: o.queryNoise, random: popMT.Float}
 					n = int32(math.Round(float64(r.iterMolang.eval(env))))
+				}
+				if r.drawOnly {
+					continue
 				}
 				// The feature random is a second generator with the same seed.
 				feat.Seed(seed)

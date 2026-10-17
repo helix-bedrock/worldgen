@@ -3,6 +3,8 @@
 // and Xoroshiro128++ used to seed noise and for positional randomness.
 package rand
 
+import "math"
+
 const (
 	mtN       = 624
 	mtM       = 397
@@ -24,6 +26,11 @@ type MT struct {
 	index   int // next output
 	inited  int // seed words filled in
 	twisted int // words twisted in the current round
+	// gauss is the second value of the last Gaussian pair, kept for the
+	// next call while haveGauss is set (Bedrock's Random keeps it next to
+	// the state and clears it when reseeded).
+	gauss     float32
+	haveGauss bool
 }
 
 // NewMT returns a Mersenne Twister seeded with seed.
@@ -37,6 +44,7 @@ func NewMT(seed uint32) *MT {
 func (m *MT) Seed(seed uint32) {
 	m.state[0] = seed
 	m.index, m.inited, m.twisted = 0, 1, 0
+	m.gauss, m.haveGauss = 0, false
 }
 
 // Uint32 returns the next raw 32-bit output.
@@ -115,4 +123,33 @@ func (m *MT) Float() float32 {
 // every world.
 func ChunkSeed(chunkX, chunkZ int32) uint32 {
 	return uint32(341872712*chunkX + 132899541*chunkZ)
+}
+
+// GaussianFloat returns a normally distributed float32 the way Bedrock's
+// Random does (the polar method in float, two values per pair, the second
+// kept for the next call).
+func (m *MT) GaussianFloat() float32 {
+	if m.haveGauss {
+		m.haveGauss = false
+		return m.gauss
+	}
+	var x, y, s float32
+	for {
+		x = float32(float64(2*m.Float()) - 1)
+		y = float32(float64(2*m.Float()) - 1)
+		s = float32(float32(x*x) + float32(y*y))
+		if s < 1 && s != 0 {
+			break
+		}
+	}
+	f := float32(float32(math.Log(float64(s))) * -2)
+	mult := float32(math.Sqrt(float64(float32(f / s))))
+	m.gauss, m.haveGauss = float32(y*mult), true
+	return float32(x * mult)
+}
+
+// Float64 returns a value in [0, 1) as Bedrock's nextDouble does: one raw
+// output scaled by 2^-32, in double precision.
+func (m *MT) Float64() float64 {
+	return float64(m.Uint32()) * (1.0 / 4294967296.0)
 }

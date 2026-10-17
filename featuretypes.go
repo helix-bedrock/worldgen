@@ -204,6 +204,21 @@ func (o *Overworld) parseFeature(typ string, raw json.RawMessage, set *featureSe
 		return o.parseVegetationPatch(raw, set)
 	case "minecraft:growing_plant_feature":
 		return o.parseGrowingPlant(raw)
+	case "minecraft:sculk_patch_feature":
+		return o.parseSculkPatch(raw)
+	case "minecraft:geode_feature":
+		return o.parseGeode(raw)
+	case "minecraft:multiface_feature":
+		return o.parseMultiface(raw)
+	case "minecraft:surface_relative_threshold_feature":
+		var r struct {
+			Feature string `json:"feature_to_place"`
+			Min     int32  `json:"minimum_distance_below_surface"`
+		}
+		if err := json.Unmarshal(raw, &r); err != nil {
+			return nil, err
+		}
+		return &surfaceThresholdFeature{feat: featureRef{r.Feature, set}, min: r.Min}, nil
 	}
 	return nil, nil
 }
@@ -400,6 +415,9 @@ func (f *scatterFeature) place(w *featureWorld, x, y, z int32, r *rand.MT) (bloc
 		}
 	}
 	env := &molangEnv{biomeTags: w.biomeTags(x, y, z)}
+	if w.pop != nil {
+		env.random = w.pop.Float
+	}
 	if f.den > 0 {
 		if f.num != f.den && r.IntN(f.den) >= f.num {
 			return blockPos{}, false

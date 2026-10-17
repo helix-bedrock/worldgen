@@ -302,14 +302,39 @@ func (o *Overworld) applyRules(rules []blockRule, cs convertedState, x, y, z int
 
 // placeCities writes the pieces of ancient cities that reach chunk
 // (cx, cz) into c.
-// TODO: the sculk patches of the sculk elements (sculk_patch_feature_
-// ancient_city) and the beard_box terrain adaptation around the pieces.
+// Feature elements are placed during decoration (cityFeatures).
+// TODO: the beard_box terrain adaptation around the pieces.
 func (o *Overworld) placeCities(cx, cz int32, c *Chunk) {
 	chunkBox := box{cx * 16, MinY, cz * 16, cx*16 + 15, MaxY - 1, cz*16 + 15}
 	o.forCityPieces(cx, cz, func(p *jigsawPiece) bool {
 		if p.el.feature == "" {
 			o.placePiece(p, c, chunkBox, nil)
 		}
+		return true
+	})
+}
+
+// cityFeatures places the feature elements of city pieces in origin chunk
+// (ox, oz) (the sculk patches, FeaturePoolElement place sub_D232280) at
+// each piece's position, in piece order. BDS hands them the random of the
+// structure post-process, a Mersenne Twister seeded with the chunk's
+// population seed (WorldGenerator::postProcessStructureFeatures).
+// VERIFY: BDS 1.26.52 runs this step outside sub_517CD10; its exact place
+// in the decoration order was not read.
+func (o *Overworld) cityFeatures(w *featureWorld, ox, oz int32, pop uint32) {
+	var r *rand.MT
+	o.forCityPieces(ox, oz, func(p *jigsawPiece) bool {
+		if p.el.feature == "" || p.pos[0]>>4 != ox || p.pos[2]>>4 != oz {
+			return true
+		}
+		f, ok := o.features.get(p.el.feature)
+		if !ok {
+			return true
+		}
+		if r == nil {
+			r = rand.NewMT(pop)
+		}
+		f.place(w, p.pos[0], p.pos[1], p.pos[2], r)
 		return true
 	})
 }

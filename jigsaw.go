@@ -838,6 +838,9 @@ func (o *Overworld) placePiece(p *jigsawPiece, c *Chunk, chunkBox box, height fu
 		if len(p.el.rules) > 0 {
 			cs = o.applyRules(p.el.rules, cs, x, y, z, uint32(c.Blocks[i]))
 		}
+		if o.floorBedrock(uint32(c.Blocks[i]), y) {
+			continue
+		}
 		c.Blocks[i] = uint16(cs.id)
 		if d := o.blockEntityFor(cs.id, st.Name, x, y, z); d != nil {
 			be := BlockEntity{X: x, Y: y, Z: z, Data: d}
@@ -893,6 +896,9 @@ func (o *Overworld) placeHouseChest(p *jigsawPiece, c *Chunk, chunkBox box) {
 		return
 	}
 	idx := int(y-MinY)<<8 | int(z&15)<<4 | int(x&15)
+	if o.floorBedrock(uint32(c.Blocks[idx]), y) {
+		return
+	}
 	c.Blocks[idx] = uint16(cs)
 	kind := strings.TrimPrefix(p.el.template[:i], "village/")
 	d := o.blockEntityFor(cs, "minecraft:chest", x, y, z)

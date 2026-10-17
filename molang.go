@@ -22,6 +22,11 @@ type molangEnv struct {
 	originX, originZ float32
 	// noise is query.noise(x, z).
 	noise func(x, z float32) float32
+	// random is math.random's source: BDS's rule context draws nextFloat
+	// from the chunk's population random (the lambda sub_C839AE0 set up in
+	// sub_C81D6D0), which scatter features share through their copied
+	// context.
+	random func() float32
 }
 
 type molangVar uint8
@@ -49,6 +54,15 @@ func (c molangCall) eval(env *molangEnv) float32 {
 		return float32(math.Ceil(float64(c.args[0].eval(env))))
 	case "math.floor":
 		return float32(math.Floor(float64(c.args[0].eval(env))))
+	case "math.random":
+		lo, hi := c.args[0].eval(env), c.args[1].eval(env)
+		var f float32
+		if env.random != nil {
+			f = env.random()
+		}
+		// VERIFY: assumed low + (high - low) * f; the op 33 handler was not
+		// read.
+		return lo + (hi-lo)*f
 	case "query.noise":
 		if env.noise == nil {
 			return 0
@@ -271,7 +285,7 @@ func (p *molangParser) unary() (molang, error) {
 	if p.eat("variable.originz") {
 		return varOriginZ, nil
 	}
-	for fn, n := range map[string]int{"math.ceil": 1, "math.floor": 1, "query.noise": 2} {
+	for fn, n := range map[string]int{"math.ceil": 1, "math.floor": 1, "math.random": 2, "query.noise": 2} {
 		if !p.eat(fn + "(") {
 			continue
 		}

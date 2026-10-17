@@ -12,9 +12,7 @@ import (
 
 // lakesAndDungeons runs the lava lake and dungeon attempts of origin chunk
 // (ox, oz), whose population seed is pop.
-func (o *Overworld) lakesAndDungeons(w *featureWorld, ox, oz int32, pop uint32) {
-	var r rand.MT
-	r.Seed(pop)
+func (o *Overworld) lakesAndDungeons(w *featureWorld, ox, oz int32, r *rand.MT) {
 	x0, z0 := ox*16, oz*16
 	if r.IntN(8) == 0 {
 		x := r.IntN(9)
@@ -23,7 +21,7 @@ func (o *Overworld) lakesAndDungeons(w *featureWorld, ox, oz int32, pop uint32) 
 		// Lava lakes only from three below sea level, and above sea level
 		// on one try in ten.
 		if y >= SeaLevel-3 && (y <= SeaLevel || r.IntN(10) == 0) {
-			o.lake(w, x0+x+3, y, z0+z+3, &r, o.ids.lava, o.ids.stone)
+			o.lake(w, x0+x+3, y, z0+z+3, r, o.ids.lava, o.ids.stone)
 		}
 	}
 	// Four deep dungeons between y -58 and -1, then ten from y 0 up.
@@ -31,13 +29,13 @@ func (o *Overworld) lakesAndDungeons(w *featureWorld, ox, oz int32, pop uint32) 
 		x := r.IntN(16)
 		y := r.IntN(-(MinY + 6)) + MinY + 6
 		z := r.IntN(16)
-		o.monsterRoom(w, x0+8+x, y, z0+8+z, &r)
+		o.monsterRoom(w, x0+8+x, y, z0+8+z, r)
 	}
 	for range 10 {
 		x := r.IntN(16)
 		y := r.IntN(MaxY)
 		z := r.IntN(16)
-		o.monsterRoom(w, x0+8+x, y, z0+8+z, &r)
+		o.monsterRoom(w, x0+8+x, y, z0+8+z, r)
 	}
 }
 

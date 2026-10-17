@@ -401,6 +401,13 @@ func (o *Overworld) GenerateChunk(chunkX, chunkZ int32, c *Chunk) {
 	o.canyons(c, aq, chunkX, chunkZ)
 }
 
+// floorBedrock reports whether b at height y is part of the bedrock floor.
+// Hard rule: once the floor is drawn, no later step (structures, features,
+// carvers) replaces it, so the border to the void is always whole.
+func (o *Overworld) floorBedrock(b uint32, y int32) bool {
+	return y < MinY+5 && b == o.ids.bedrock
+}
+
 // bedrockFloor draws 2-5 bedrock blocks per column from the chunk's
 // Mersenne Twister, x outer and z inner.
 func (o *Overworld) bedrockFloor(mt *rand.MT, c *Chunk) {
