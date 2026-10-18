@@ -149,6 +149,10 @@ type Overworld struct {
 	treasureBiome []bool
 	// monuments holds each ocean monument start's layout by start chunk.
 	monuments sync.Map
+	// outpostBiome is the pillager outpost biome set; outposts holds each
+	// outpost start's pieces by start chunk.
+	outpostBiome []bool
+	outposts     sync.Map
 	// jigsaw is the village pools and elements; templates caches prepared
 	// templates by path and villages assembled villages by start chunk.
 	jigsaw    *jigsawData

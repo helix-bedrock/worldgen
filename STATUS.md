@@ -116,7 +116,8 @@ BDS generated from the same seed. The marks mean:
 | Jungle temples (traps, dispensers, lever puzzle) | Exact (tree leaves can poke inside; fixed in refinement) |
 | Witch huts (cauldron with a random potion) | Close |
 | Igloos (half with a basement) | Close |
-| Pillager outposts, woodland mansions | Not yet |
+| Pillager outposts (watchtower, overgrown overlay, feature pieces, chest; no pillagers) | Close (not yet compared with BDS) |
+| Woodland mansions | Not yet |
 | Strongholds, trial chambers, trail ruins, ruined portals | Not yet |
 
 Structure chests, dispensers and suspicious sand carry their loot table, but the loot is not filled in yet, so chests are empty in

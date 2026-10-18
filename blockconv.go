@@ -110,6 +110,12 @@ func (o *Overworld) blockEntityFor(id uint32, javaName string, x, y, z int32) ma
 		color := strings.TrimSuffix(strings.TrimPrefix(javaName, "minecraft:"), "_bed")
 		d["color"] = bedColors[color]
 	}
+	// Outpost templates name the ominous banner illager_captain_wall_banner;
+	// Bedrock keeps it as a banner of type 1 (illager_captain).
+	// VERIFY: against a BDS outpost's banner block entity.
+	if beID == "Banner" && strings.Contains(javaName, "illager_captain") {
+		d["Type"] = int32(1)
+	}
 	return d
 }
 

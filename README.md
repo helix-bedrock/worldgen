@@ -15,7 +15,7 @@
 >   sugar cane, mushrooms, bamboo and lily pads. Cactus, dead bushes and melons are not placed yet.
 > - **Oceans:** seagrass, kelp, coral reefs and icebergs.
 > - **Structures:** villages, mineshafts, dungeons, ancient cities, desert pyramids, jungle temples,
->   witch huts, igloos, ocean ruins, shipwrecks, buried treasure and ocean monuments. Other structures are not started, and chests are still
+>   witch huts, igloos, ocean ruins, shipwrecks, buried treasure, ocean monuments and pillager outposts. Other structures are not started, and chests are still
 >   empty in game.
 > - **The Nether and the End are not started.**
 > - **The API is not stable.** Names and behaviour change between commits.
@@ -114,6 +114,7 @@ The full list of what is and is not generated is in [STATUS.md](STATUS.md).
 | Ocean ruins (warm and cold, large ones with clusters) | 🟡 written from BDS; not yet compared with BDS |
 | Shipwrecks (ocean and beached, random woods, chests) | 🟡 written from BDS; not yet compared with BDS |
 | Buried treasure, ocean monuments (all room types, sponge rooms, gold core) | 🟡 written from BDS; not yet compared with BDS |
+| Pillager outposts (watchtower, overgrown overlay, cages, tents, logs, targets) | 🟡 written from BDS; not yet compared with BDS |
 | Other structures | ⬜ not started |
 | Nether and End | ⬜ not started |
 

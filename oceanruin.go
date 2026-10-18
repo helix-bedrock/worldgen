@@ -152,6 +152,7 @@ func (o *Overworld) initOceanStructures(biomeIDs map[string]uint32, n uint32) er
 	o.monumentDeep, o.monumentWater = set(monumentDeep), set(monumentWater)
 	o.shipBiome, o.shipBeach = set(shipBiomes), set(shipBeaches)
 	o.treasureBiome = set(treasureBiomes)
+	o.outpostBiome = set(outpostBiomes)
 	h, err := loadLiquidHolders()
 	if err != nil {
 		return err
