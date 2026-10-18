@@ -1007,21 +1007,27 @@ func positionSeed(seed int64, x, y, z int32) uint32 {
 }
 
 // placeStructures writes the structures that reach chunk (cx, cz) into c,
-// in BDS's order: villages, mineshafts, ancient cities, then scattered
-// features. raw gives undecorated terrain.
+// in BDS's order: villages, mineshafts, ancient cities, scattered
+// features, ocean monuments, ocean ruins, shipwrecks, then buried
+// treasure. raw gives undecorated terrain.
 // VERIFY: the order of structure types (sub_C970F80 walks the registry).
 func (o *Overworld) placeStructures(cx, cz int32, c *Chunk, height func(x, z int32) int32, raw func(cx, cz int32) *PackedChunk) {
 	o.placeVillages(cx, cz, c, height)
 	o.placeMineshafts(cx, cz, c, raw)
 	o.placeCities(cx, cz, c)
 	o.placeScattered(cx, cz, c, raw)
+	o.placeMonuments(cx, cz, c)
+	o.placeRuins(cx, cz, c, raw)
+	o.placeShips(cx, cz, c, raw)
+	o.placeTreasure(cx, cz, c, raw(cx, cz))
 }
 
 // structuresReach reports whether a structure has a piece in chunk
 // (cx, cz).
 func (o *Overworld) structuresReach(cx, cz int32, height func(x, z int32) int32) bool {
 	return o.villagesReach(cx, cz, height) || o.mineshaftReaches(cx, cz) || o.citiesReach(cx, cz) ||
-		o.scatteredReaches(cx, cz)
+		o.scatteredReaches(cx, cz) || o.ruinReaches(cx, cz) ||
+		o.shipReaches(cx, cz) || o.isTreasureChunk(cx, cz) || o.monumentReaches(cx, cz)
 }
 
 // villagesReach reports whether a village has a piece in chunk (cx, cz).

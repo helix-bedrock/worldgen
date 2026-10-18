@@ -371,7 +371,11 @@ func (b *scBuild) fillMoss(x0, y0, z0, x1, y1, z1 int32) {
 // to the first other block (no lower than the second block above the
 // world's bottom), which turns from grass to dirt.
 func (b *scBuild) fillDown(s uint32, x, y, z int32) {
-	wx, wy, wz := b.x0+x, b.y0+y, b.z0+z
+	b.fillDownWorld(s, b.x0+x, b.y0+y, b.z0+z)
+}
+
+// fillDownWorld is fillDown at a world position.
+func (b *scBuild) fillDownWorld(s uint32, wx, wy, wz int32) {
 	if !b.cbox.contains([3]int32{wx, wy, wz}) {
 		return
 	}

@@ -1,6 +1,8 @@
 package worldgen
 
 import (
+	"strings"
+
 	"github.com/helix-bedrock/worldgen/rand"
 )
 
@@ -286,15 +288,23 @@ func (w *featureWorld) seaFloor(x, y, z int32) int32 {
 }
 
 // supportsWaterPlant is seagrass' and kelp's placement rule for the block
-// below (SeagrassBlock::mayPlace, sub_CF4DAB0): a solid block that is not
-// magma or soul sand. Fences, also excluded in BDS, never generate under
-// water.
+// below (SeagrassBlock::mayPlace, sub_CF4DAB0): not magma or soul sand, and
+// a top face that can hold it, so not a fence, a bottom slab or lower
+// stairs (shipwrecks put those under water).
+// VERIFY: BDS asks each block class for a sturdy top face; this takes the
+// states that are solid or whose collision covers the top face.
 func (o *Overworld) supportsWaterPlant(b uint32) bool {
-	switch o.blockName(b) {
+	name := o.blockName(b)
+	switch name {
 	case "minecraft:magma", "minecraft:soul_sand":
 		return false
 	}
-	return o.solidMaterial(b)
+	// No trapdoor holds it, not even one in the top half (lead, in game).
+	// VERIFY: against BDS's exclusion list xmmword_F613C98.
+	if strings.HasSuffix(name, "trapdoor") {
+		return false
+	}
+	return o.solidMaterial(b) && (int(b) >= len(o.topSupport) || o.topSupport[b])
 }
 
 // temperatureAtBlock is the biome temperature at a block, as features see it

@@ -4,7 +4,7 @@
 > **This is early and not finished.** It is under active, heavy development, and it will take a
 > while before it is complete.
 >
-> Status as of 2026-10-17:
+> Status as of 2026-10-18:
 >
 > - **The base Overworld matches BDS:** terrain, all biomes, surface layers, caves and canyons,
 >   underground water and lava, ores and stone patches, and an unbroken bedrock floor.
@@ -14,8 +14,9 @@
 >   every flower biome, sunflowers, wildflowers, pink petals, leaf litter, sweet berries, pumpkins,
 >   sugar cane, mushrooms, bamboo and lily pads. Cactus, dead bushes and melons are not placed yet.
 > - **Oceans:** seagrass, kelp, coral reefs and icebergs.
-> - **Structures:** villages, mineshafts, dungeons and ancient cities. Other structures are not
->   started, and chests are still empty in game.
+> - **Structures:** villages, mineshafts, dungeons, ancient cities, desert pyramids, jungle temples,
+>   witch huts, igloos, ocean ruins, shipwrecks, buried treasure and ocean monuments. Other structures are not started, and chests are still
+>   empty in game.
 > - **The Nether and the End are not started.**
 > - **The API is not stable.** Names and behaviour change between commits.
 >
@@ -110,6 +111,9 @@ The full list of what is and is not generated is in [STATUS.md](STATUS.md).
 | Mineshafts | ✅ placement matches BDS; blocks close (refined at the end) |
 | Ancient cities | 🟡 placement, layout and cave match BDS near the centre; sculk placed |
 | Desert pyramids, jungle temples, witch huts, igloos | ✅ placement matches BDS; jungle temple blocks match BDS; the others close |
+| Ocean ruins (warm and cold, large ones with clusters) | 🟡 written from BDS; not yet compared with BDS |
+| Shipwrecks (ocean and beached, random woods, chests) | 🟡 written from BDS; not yet compared with BDS |
+| Buried treasure, ocean monuments (all room types, sponge rooms, gold core) | 🟡 written from BDS; not yet compared with BDS |
 | Other structures | ⬜ not started |
 | Nether and End | ⬜ not started |
 

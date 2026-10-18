@@ -131,6 +131,24 @@ type Overworld struct {
 	villageType  []string
 	// scatterKind is each biome's scattered feature kind (scattered.go).
 	scatterKind []uint8
+	// ruinBiome is each biome's ocean ruin settings; monumentDeep and
+	// monumentWater the monument biome sets; holdsLiquid the blocks that
+	// can be waterlogged (oceanruin.go).
+	ruinBiome                   []ruinBiome
+	monumentDeep, monumentWater []bool
+	holdsLiquid                 map[string]bool
+	// topSupport marks the states whose top face holds plants.
+	topSupport []bool
+	// ruins holds each ruin start's pieces by start chunk.
+	ruins sync.Map
+	// shipBiome and shipBeach are the shipwreck biome sets; ships holds
+	// each shipwreck start's layout by start chunk (shipwreck.go).
+	shipBiome, shipBeach []bool
+	ships                sync.Map
+	// treasureBiome is the buried treasure biome set.
+	treasureBiome []bool
+	// monuments holds each ocean monument start's layout by start chunk.
+	monuments sync.Map
 	// jigsaw is the village pools and elements; templates caches prepared
 	// templates by path and villages assembled villages by start chunk.
 	jigsaw    *jigsawData
@@ -356,6 +374,9 @@ func NewOverworld(seed int64, reg *blocks.Registry, biomeIDs map[string]uint32, 
 		if id, ok := biomeIDs[name]; ok {
 			o.scatterKind[id] = kind
 		}
+	}
+	if err := o.initOceanStructures(biomeIDs, maxBiome+1); err != nil {
+		return nil, err
 	}
 	for name, id := range biomeIDs {
 		if d, ok := defs[name]; ok {

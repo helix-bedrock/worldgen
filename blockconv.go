@@ -127,6 +127,21 @@ var (
 // Java template state and whether it is waterlogged.
 func (o *Overworld) convertJavaState(st TemplateState) (uint32, bool, bool) {
 	name := strings.TrimPrefix(st.Name, "minecraft:")
+	// Older templates (the shipwrecks) still use Java's pre-1.13 names,
+	// with the wood in a variant property.
+	if v := st.Props["variant"]; v != "" {
+		switch name {
+		case "planks":
+			name = v + "_planks"
+		case "wooden_slab":
+			name = v + "_slab"
+		case "double_wooden_slab":
+			name = v + "_double_slab"
+		}
+	}
+	if name == "fence" {
+		name = "oak_fence"
+	}
 	target, ok := javaBlockNames[name]
 	if !ok {
 		target = name

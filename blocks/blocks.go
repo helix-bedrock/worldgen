@@ -177,6 +177,13 @@ func (r *Registry) Tags(name string) []string { return r.tags[name] }
 // Len returns the number of states.
 func (r *Registry) Len() int { return len(r.states) }
 
+// ByHash returns the index of the state with a BDS block state hash
+// (blockStateHash in BDS's exports).
+func (r *Registry) ByHash(h uint32) (uint32, bool) {
+	i, ok := r.byHash[h]
+	return i, ok
+}
+
 // State returns state i. The bool is false if i is out of range.
 func (r *Registry) State(i uint32) (State, bool) {
 	if int(i) >= len(r.states) {

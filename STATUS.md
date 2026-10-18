@@ -1,6 +1,6 @@
 # What worldgen generates
 
-Status as of 2026-10-17. This page lists everything worldgen places today and what is still
+Status as of 2026-10-18. This page lists everything worldgen places today and what is still
 missing, so you know what to expect in a world. Only the **Overworld** is generated so far.
 
 Every part is built from the Bedrock Dedicated Server (BDS 1.26.52) and compared with chunks that
@@ -108,7 +108,10 @@ BDS generated from the same seed. The marks mean:
 | Mineshafts (normal and badlands; cobwebs, rails, torches, cave spider spawners) | Close |
 | Ancient cities, with the cave around them and their sculk | Close |
 | Mineshaft minecarts with chests | Not yet |
-| Ocean ruins, shipwrecks, ocean monuments, buried treasure | Not yet |
+| Ocean ruins (warm and cold, large ones with clusters of small ones, chests) | Close (not yet compared with BDS; no suspicious sand or gravel yet) |
+| Shipwrecks (ocean and beached, random wood pairs, supply, map and treasure chests) | Close (not yet compared with BDS) |
+| Buried treasure (chest under beaches) | Close (not yet compared with BDS) |
+| Ocean monuments (room graph, all room types, wings, penthouse, sponge rooms, gold core; no guardians) | Close (not yet compared with BDS) |
 | Desert pyramids (with the TNT trap and the suspicious sand cellar) | Close |
 | Jungle temples (traps, dispensers, lever puzzle) | Exact (tree leaves can poke inside; fixed in refinement) |
 | Witch huts (cauldron with a random potion) | Close |
