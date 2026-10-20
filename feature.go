@@ -768,7 +768,7 @@ func (o *Overworld) keepWater(c *Chunk, base *PackedChunk) {
 func waterloggable(name string) bool {
 	switch name {
 	case "minecraft:seagrass", "minecraft:kelp", "minecraft:sea_pickle", "minecraft:glow_lichen", "minecraft:chest",
-		"minecraft:pointed_dripstone", "minecraft:sculk_vein":
+		"minecraft:pointed_dripstone", "minecraft:sculk_vein", "minecraft:mangrove_roots", "minecraft:mangrove_propagule":
 		return true
 	}
 	return strings.HasSuffix(name, "_coral_fan") || strings.HasSuffix(name, "_coral_wall_fan")

@@ -203,6 +203,8 @@ const (
 	trunkFancy
 	trunkMega
 	trunkAcacia
+	trunkCherry
+	trunkMangrove
 )
 
 // treeFeature is a tree: a trunk and, except for fallen trees, a canopy.
@@ -248,6 +250,8 @@ type treeFeature struct {
 	baseRadius int32
 	// acacia trunk and its canopies
 	acacia       acaciaTrunk
+	cherry       cherryTrunk
+	mangrove     *mangroveTree
 	acaciaCanopy *acaciaCanopy
 	roofedCanopy *roofedCanopy
 	spreadCanopy *randomSpreadCanopy
@@ -354,6 +358,8 @@ func (o *Overworld) parseTree(raw json.RawMessage, set *featureSet) (placer, err
 			} `json:"branches"`
 		} `json:"acacia_trunk"`
 		AcaciaCanopy *rawAcaciaCanopy `json:"acacia_canopy"`
+		Cherry       *rawCherryTrunk  `json:"cherry_trunk"`
+		CherryCanopy *rawCherryCanopy `json:"cherry_canopy"`
 		RoofedCanopy *struct {
 			Height int32       `json:"canopy_height"`
 			Core   *int32      `json:"core_width"`
@@ -430,6 +436,12 @@ func (o *Overworld) parseTree(raw json.RawMessage, set *featureSet) (placer, err
 		if id, ok := o.lookupBlock(b); ok {
 			t.baseBlocks = append(t.baseBlocks, id)
 		}
+	}
+	if ok, err := o.parseMangrove(raw, t); err != nil || ok {
+		if !ok {
+			return nil, err
+		}
+		return t, nil
 	}
 	// Defaults are those of BDS's trunk constructors (sub_4D92160,
 	// sub_4C4E410) for fields the JSON leaves out.
@@ -532,6 +544,17 @@ func (o *Overworld) parseTree(raw json.RawMessage, set *featureSet) (placer, err
 				t.acacia.branchCanopy = c
 			}
 		}
+	case r.Cherry != nil:
+		ch := r.Cherry
+		t.trunkKind, trunkBlock = trunkCherry, ch.Block
+		b := ch.Branches
+		t.cherry = cherryTrunk{base: ch.Height.Base, intervals: ch.Height.Intervals,
+			weights: [3]int32{b.Weights.One, b.Weights.Two, b.Weights.WithTrunk},
+			length:  b.Length, start: b.Start, end: b.End}
+		t.cherry.canopy = o.parseCherryCanopy(r.CherryCanopy)
+		if t.cherry.canopy == nil {
+			t.cherry.canopy = o.parseCherryCanopy(b.Canopy.Cherry)
+		}
 	case r.Mega != nil:
 		mg := r.Mega
 		t.trunkKind, trunkBlock, trunkDeco = trunkMega, mg.Block, mg.Deco
@@ -593,7 +616,7 @@ func (o *Overworld) parseTree(raw json.RawMessage, set *featureSet) (placer, err
 	if t.trunkDeco, err = o.parseDecoration(trunkDeco); err != nil {
 		return nil, err
 	}
-	if t.trunkKind == trunkFallen {
+	if t.trunkKind == trunkFallen || t.trunkKind == trunkCherry {
 		return t, nil
 	}
 	if t.trunkKind == trunkAcacia {
@@ -719,6 +742,10 @@ func (t *treeFeature) place(w *featureWorld, x, y, z int32, r *rand.MT) (blockPo
 		return t.fallenTrunk(w, x, y, z, h, r)
 	case trunkAcacia:
 		return t.acaciaTrunk(w, x, y, z, t.acacia.height(r), r)
+	case trunkCherry:
+		return t.cherryTrunk(w, x, y, z, t.cherry.height(r), r)
+	case trunkMangrove:
+		return t.mangrovePlace(w, x, y, z, r)
 	case trunkMega:
 		return t.megaTrunk(w, x, y, z, t.mega.megaHeight(r), r)
 	case trunkFancy:

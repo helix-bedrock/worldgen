@@ -46,6 +46,7 @@ func (o *Overworld) builtinFeatures(set *featureSet) {
 	add("minecraft:vines_single_face_feature", &vinesSingleFaceFeature{vine: id("minecraft:vine"), invisibleBedrock: id("minecraft:invisible_bedrock")})
 	add("minecraft:wildflowers_feature", o.newFlowerBed("minecraft:wildflowers"))
 	add("minecraft:leaf_litter_feature", o.newFlowerBed("minecraft:leaf_litter"))
+	add("minecraft:pink_petals_feature", o.newFlowerBed("minecraft:pink_petals"))
 	for name, kind := range map[string]flowerKind{"flower_forest": flowersFlowerForest, "forest": flowersForest,
 		"overworld": flowersOverworld, "plains": flowersPlains, "swamp": flowersSwamp} {
 		add("minecraft:legacy:"+name+"_flower_feature", o.newLegacyFlower(kind, id))
@@ -55,6 +56,13 @@ func (o *Overworld) builtinFeatures(set *featureSet) {
 		id("minecraft:short_grass"), id("minecraft:tall_grass")}})
 	add("minecraft:sweet_berry_bush_feature", o.newSweetBerry())
 	add("minecraft:desert_well_feature", o.newDesertWell())
+	add("minecraft:huge_mushroom_feature", o.newHugeMushroom())
+	add("minecraft:forest_rock_feature", &blockBlobFeature{block: id("minecraft:mossy_cobblestone")})
+	add("minecraft:legacy:forest_rock_feature", &legacyForestRockFeature{rock: featureRef{"minecraft:forest_rock_feature", set}})
+	spike := o.newIceSpike()
+	add("minecraft:ice_spike_feature", spike)
+	add("minecraft:ice_patch_feature", &icePatchFeature{spike: spike, radius: 4})
+	add("minecraft:grass_disc_feature", &grassDiscFeature{grass: o.ids.grass, dirt: o.ids.dirt, mud: id("minecraft:mud"), radius: 5})
 
 	grass := func(typ string) uint32 {
 		b, _ := o.reg.Lookup("minecraft:seagrass", map[string]any{"sea_grass_type": typ})
@@ -494,4 +502,37 @@ func (f *pickleFeature) place(w *featureWorld, x, y, z int32, r *rand.MT) (block
 func drawDiff(r *rand.MT, mask uint32) int32 {
 	a := int32(r.Uint32() & mask)
 	return a - int32(r.Uint32()&mask)
+}
+
+// grassDiscFeature is BDS's DiscFeature (place sub_49A0E50), registered as
+// minecraft:grass_disc_feature: a disc of grass blocks, radius 2 to
+// radius-1, through the dirt-tagged blocks two above to two below the
+// origin; grass with something on top becomes dirt.
+// VERIFY: the third accepted block (qword_F619630) is taken as mud.
+type grassDiscFeature struct {
+	grass, dirt, mud uint32
+	radius           int32
+}
+
+func (f *grassDiscFeature) place(w *featureWorld, x, y, z int32, r *rand.MT) (blockPos, bool) {
+	n := r.IntN(f.radius-2) + 2
+	for bx := x - n; bx <= x+n; bx++ {
+		for bz := z - n; bz <= z+n; bz++ {
+			if (bx-x)*(bx-x)+(bz-z)*(bz-z) > n*n {
+				continue
+			}
+			for by := y - 2; by <= y+2; by++ {
+				b, ok := w.block(bx, by, bz)
+				if !ok || !(b == f.grass || b == f.mud || w.o.hasBlockTag(b, "dirt")) {
+					continue
+				}
+				put := f.grass
+				if above, ok := w.block(bx, by+1, bz); !ok || above != w.o.ids.air {
+					put = f.dirt
+				}
+				w.set(bx, by, bz, put)
+			}
+		}
+	}
+	return blockPos{x, y, z}, true
 }

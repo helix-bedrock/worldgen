@@ -1,6 +1,6 @@
 # What worldgen generates
 
-Status as of 2026-10-19. This page lists everything worldgen places today and what is still
+Status as of 2026-10-20. This page lists everything worldgen places today and what is still
 missing, so you know what to expect in a world. Only the **Overworld** is generated so far.
 
 Every part is built from the Bedrock Dedicated Server (BDS 1.26.52) and compared with chunks that
@@ -56,8 +56,8 @@ BDS generated from the same seed. The marks mean:
 | Big (fancy) oak, giant jungle, giant spruce and pine | Close |
 | Fallen logs and the dappled forest's poplars | Close |
 | Swamp trees | Close |
-| Cherry trees | Not yet |
-| Mangrove trees (and their roots) | Not yet |
+| Cherry trees (with pink petals underneath) | Close (block counts within a few % of BDS) |
+| Mangrove trees (roots, muddy roots, moss carpet, hanging propagules, vines) | Close (about a third as many trees as BDS; fixed in refinement) |
 
 ## Plants and flowers
 
@@ -76,9 +76,10 @@ BDS generated from the same seed. The marks mean:
 | Dead bushes | Not yet |
 | Melons | Not yet |
 | Bamboo in regular jungles | Not yet |
-| Huge mushrooms, and the extra mushroom patches in taiga, mega taiga and swamp | Not yet |
+| Huge mushrooms in mushroom fields, dark forests and swamps | Close (mushroom fields and dark forests match BDS block for block) |
 | Firefly bushes | Not yet |
-| Mangrove swamp grass and dead bushes | Not yet |
+| Mangrove swamp grass patches | Close |
+| Mangrove swamp dead bushes | Not yet |
 
 ## Oceans and water
 
@@ -94,8 +95,8 @@ BDS generated from the same seed. The marks mean:
 
 | What | Status |
 | --- | --- |
-| Forest rocks (mossy cobblestone boulders in giant taigas) | Not yet |
-| Ice spikes and their ice patches | Not yet |
+| Forest rocks (mossy cobblestone boulders in giant taigas) | Close (counts match BDS) |
+| Ice spikes and their ice patches | Close (counts within 2% of BDS) |
 | Fossils (desert and swamp; deepslate fossils with diamond ore) | Close (not yet checked in game) |
 | Desert wells (with suspicious sand) | Close (checked in game) |
 | Emerald ore in mountain surfaces | Not yet |

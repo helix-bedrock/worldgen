@@ -4,15 +4,17 @@
 > **This is early and not finished.** It is under active, heavy development, and it will take a
 > while before it is complete.
 >
-> Status as of 2026-10-19:
+> Status as of 2026-10-20:
 >
 > - **The base Overworld matches BDS:** terrain, all biomes, surface layers, caves and canyons,
 >   underground water and lava, ores and stone patches, and an unbroken bedrock floor.
 > - **Caves:** lush caves, dripstone caves, the deep dark's sculk (with sensors and shriekers), glow
 >   lichen and amethyst geodes. Sulfur cave spikes are not placed yet.
-> - **Trees and plants:** most trees (cherry and mangrove are missing), grass and ferns, flowers in
->   every flower biome, sunflowers, wildflowers, pink petals, leaf litter, sweet berries, pumpkins,
->   sugar cane, mushrooms, bamboo and lily pads. Cactus, dead bushes and melons are not placed yet.
+> - **Trees and plants:** every tree, including cherry and mangrove, huge mushrooms, grass and
+>   ferns, flowers in every flower biome, sunflowers, wildflowers, pink petals, leaf litter, sweet
+>   berries, pumpkins, sugar cane, mushrooms, bamboo and lily pads. Cactus, dead bushes and melons
+>   are not placed yet.
+> - **Biome features:** ice spikes, forest rocks in giant taigas and grass patches in mangrove swamps.
 > - **Oceans:** seagrass, kelp, coral reefs and icebergs.
 > - **Structures:** villages, mineshafts, dungeons, ancient cities, desert pyramids, jungle temples,
 >   witch huts, igloos, ocean ruins, shipwrecks, buried treasure, ocean monuments, pillager outposts,
