@@ -590,6 +590,14 @@ func (o *Overworld) newMossVegetation(id func(string) uint32) *mossVegetationFea
 	return f
 }
 
+// newPaleMossVegetation is the pale garden's VegetationFeature (list built at
+// sub_49BC9C0): pale moss carpet 25, short grass 25, tall grass 10.
+func (o *Overworld) newPaleMossVegetation(id func(string) uint32) *mossVegetationFeature {
+	f := &mossVegetationFeature{double: map[uint32]bool{id("minecraft:tall_grass"): true}}
+	f.plants = []weightedBlock{{id("minecraft:pale_moss_carpet"), 25}, {id("minecraft:short_grass"), 25}, {id("minecraft:tall_grass"), 10}}
+	return f
+}
+
 func (f *mossVegetationFeature) place(w *featureWorld, x, y, z int32, r *rand.MT) (blockPos, bool) {
 	o := w.o
 	plant := pickWeighted(r, f.plants, func(b weightedBlock) float32 { return b.weight }).block
@@ -612,7 +620,7 @@ func (f *mossVegetationFeature) place(w *featureWorld, x, y, z int32, r *rand.MT
 // VERIFY: written from the blocks' vanilla rules, not read from BDS.
 func (o *Overworld) plantSurvives(plant, below uint32) bool {
 	switch o.blockName(plant) {
-	case "minecraft:moss_carpet":
+	case "minecraft:moss_carpet", "minecraft:pale_moss_carpet":
 		return below != o.ids.air
 	case "minecraft:azalea", "minecraft:flowering_azalea":
 		return o.hasBlockTag(below, "dirt") || o.blockName(below) == "minecraft:clay" || o.blockName(below) == "minecraft:moss_block"

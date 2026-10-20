@@ -12,8 +12,8 @@
 >   lichen and amethyst geodes. Sulfur cave spikes are not placed yet.
 > - **Trees and plants:** every tree, including cherry and mangrove, huge mushrooms, grass and
 >   ferns, flowers in every flower biome, sunflowers, wildflowers, pink petals, leaf litter, sweet
->   berries, pumpkins, sugar cane, mushrooms, bamboo and lily pads. Cactus, dead bushes and melons
->   are not placed yet.
+>   berries, pumpkins, sugar cane, mushrooms, bamboo, lily pads, cactus, dead bushes, melons, vines,
+>   firefly bushes, dry grass, red shrubs, lilacs, rose bushes and peonies.
 > - **Biome features:** ice spikes, forest rocks in giant taigas and grass patches in mangrove swamps.
 > - **Oceans:** seagrass, kelp, coral reefs and icebergs.
 > - **Structures:** villages, mineshafts, dungeons, ancient cities, desert pyramids, jungle temples,
@@ -108,8 +108,8 @@ The full list of what is and is not generated is in [STATUS.md](STATUS.md).
 | Terrain, biomes, surface, caves, aquifers, ores | ✅ done |
 | Ocean decorations, freezing | 🟡 seagrass, kelp, coral reefs, icebergs and freezing done; coral crust, magma and bubble columns next |
 | Cave decorations | 🟡 lush, dripstone, deep dark sculk and glow lichen close to BDS; geodes exact; sulfur spikes next |
-| Plants and flowers | 🟡 most done (no cactus, dead bushes, melons, huge mushrooms) |
-| Trees | 🟡 most done (no cherry, mangrove) |
+| Plants and flowers | 🟡 all placed, close to BDS |
+| Trees | 🟡 all placed; mangroves too sparse |
 | Villages | 🟡 placed and built, layout close but not block-exact |
 | Dungeons and lava lakes | ✅ match BDS (a few differ where neighbouring chunks overlap) |
 | Mineshafts | ✅ placement matches BDS; blocks close (refined at the end) |

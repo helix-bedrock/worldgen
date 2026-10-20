@@ -632,10 +632,12 @@ func (o *Overworld) applyWrites(c *Chunk, base *PackedChunk, fw *featureWrites, 
 	from, to := fw.off[slot], fw.off[slot+1]
 	for k := from; k < to; k++ {
 		i, b := fw.pos[k], fw.blk[k]
-		// A plant an earlier origin placed here stays: this origin cannot
-		// see it, but in BDS the feature would have found the spot taken.
-		// Without this, half of a large fern could be replaced by a fern.
-		if cur := c.Blocks[i]; o.soilPlant[b] && o.soilPlant[cur] && base != nil && base.at(int(i)) != uint32(cur) {
+		// A block an earlier origin placed here stays when this origin puts a
+		// plant on it: this origin cannot see it, but in BDS the plant feature
+		// would have found the spot taken. Without this, half of a large fern
+		// could be replaced by a fern, or a flower could take the bottom log of
+		// a tree.
+		if cur := c.Blocks[i]; o.soilPlant[b] && uint32(cur) != o.ids.air && base != nil && base.at(int(i)) != uint32(cur) {
 			continue
 		}
 		c.Blocks[i] = b

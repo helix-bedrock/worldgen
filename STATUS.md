@@ -66,20 +66,24 @@ BDS generated from the same seed. The marks mean:
 | Short grass, tall grass, ferns and large ferns | Close |
 | Flowers in plains, forest, flower forest, swamp, meadow, savanna and jungle | Close |
 | Sunflowers and other tall flowers | Close |
-| Wildflowers, pink petals, leaf litter, eyeblossoms, bushes, dry grass | Close |
-| Pale moss in the pale garden | Close |
+| Wildflowers, pink petals, leaf litter, bushes | Close |
+| Dry grass in deserts and badlands | Close |
+| Eyeblossoms in the pale garden | Close (always placed closed; BDS opens them when the chunk is made at night) |
+| Pale moss and pale moss carpets in the pale garden | Close |
 | Sweet berry bushes, pumpkins, sugar cane | Close |
 | Brown and red mushrooms (the scattered ones), shelf mushrooms | Close |
-| Bamboo in bamboo jungles | Close |
-| Lily pads in swamps | Close |
-| Cactus | Not yet |
-| Dead bushes | Not yet |
-| Melons | Not yet |
-| Bamboo in regular jungles | Not yet |
+| Bamboo in bamboo and regular jungles, with podzol patches | Close |
+| Lily pads in swamps and mangrove swamps | Close |
+| Cactus and cactus flowers | Close (desert count matches BDS) |
+| Dead bushes (deserts, badlands, swamps, mangrove swamps, giant taigas) | Close |
+| Melons in jungles | Close |
+| Vines in jungles | Close (about 85% of BDS's count; follows the jungle tree difference) |
 | Huge mushrooms in mushroom fields, dark forests and swamps | Close (mushroom fields and dark forests match BDS block for block) |
-| Firefly bushes | Not yet |
+| Firefly bushes | Close |
+| Lilacs, rose bushes and peonies in forests and flower forests | Close |
+| Red shrubs in the dappled forest | Close |
+| Azalea trees with roots and hanging roots above lush caves | Close |
 | Mangrove swamp grass patches | Close |
-| Mangrove swamp dead bushes | Not yet |
 
 ## Oceans and water
 

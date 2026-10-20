@@ -580,6 +580,9 @@ type singleBlockFeature struct {
 	// rotated holds the block turned to each direction 0-3 when it auto
 	// rotates toward the side it attaches to (cocoa).
 	rotated []uint32
+	// choices is set when places_block is a weighted list of more than one
+	// block.
+	choices []weightedBlock
 }
 
 // rotationSides maps the direction state 0-3 to the attach side that holds
@@ -609,20 +612,38 @@ func (o *Overworld) parseSingleBlock(raw json.RawMessage) (placer, error) {
 		return nil, err
 	}
 	var b biome.Block
+	var choices []weightedBlock
 	if err := json.Unmarshal(r.Places, &b); err != nil {
-		// Weighted block lists draw randomness the runtime does not model
-		// yet.
-		return nil, nil //nolint:nilerr // skipped, not an error
+		var list []struct {
+			Block  biome.Block `json:"block"`
+			Weight int32       `json:"weight"`
+		}
+		if json.Unmarshal(r.Places, &list) != nil || len(list) == 0 {
+			return nil, nil //nolint:nilerr // skipped, not an error
+		}
+		for _, e := range list {
+			id, ok := o.lookupBlock(e.Block)
+			if !ok {
+				return nil, nil
+			}
+			choices = append(choices, weightedBlock{id, float32(e.Weight)})
+		}
+		b = list[0].Block
 	}
 	id, ok := o.lookupBlock(b)
 	if !ok {
 		return nil, nil
 	}
 	f := &singleBlockFeature{block: id, mayReplace: parseMatcher(r.MayReplace)}
+	if len(choices) > 1 {
+		f.choices = choices
+	}
 	if r.Placement || r.Survive {
 		// Use the resolved name: data files may use old names (tallgrass).
 		switch name := o.blockName(id); {
-		case name == "minecraft:deadbush":
+		case name == "minecraft:deadbush", name == "minecraft:short_dry_grass", name == "minecraft:tall_dry_grass":
+			// Dry grass takes the dead bush's ground (ShortDryGrassBlock's
+			// mayPlaceOn, sub_CF1FB20).
 			f.sand = true
 		case soilPlants[name]:
 			f.soil = true
@@ -683,7 +704,7 @@ func init() {
 	for _, n := range strings.Fields(`large_fern tall_grass short_grass fern sunflower lilac rose_bush peony poppy dandelion
 blue_orchid allium azure_bluet red_tulip orange_tulip white_tulip pink_tulip oxeye_daisy cornflower lily_of_the_valley
 torchflower sweet_berry_bush bush firefly_bush wildflowers pink_petals leaf_litter open_eyeblossom closed_eyeblossom
-cactus_flower short_dry_grass tall_dry_grass`) {
+cactus_flower short_dry_grass tall_dry_grass red_shrub`) {
 		soilPlants["minecraft:"+n] = true
 	}
 }
@@ -694,7 +715,22 @@ func (f *singleBlockFeature) place(w *featureWorld, x, y, z int32, r *rand.MT) (
 	// BDS picks the block from its places_block list with one draw, even
 	// when the list has a single entry (sub_D30BC80: nextInt of the summed
 	// weights, before the attach and replace checks).
-	r.Uint32()
+	block := f.block
+	if f.choices == nil {
+		r.Uint32()
+	} else {
+		var total int32
+		for _, c := range f.choices {
+			total += int32(c.weight)
+		}
+		v := r.IntN(total)
+		for _, c := range f.choices {
+			if v -= int32(c.weight); v < 0 {
+				block = c.block
+				break
+			}
+		}
+	}
 	cur, ok := w.block(x, y, z)
 	if !ok {
 		return blockPos{}, false
@@ -714,7 +750,7 @@ func (f *singleBlockFeature) place(w *featureWorld, x, y, z int32, r *rand.MT) (
 		if f.soil && !w.o.hasBlockTag(below, "dirt") {
 			return blockPos{}, false
 		}
-		if f.sand && !w.o.hasBlockTag(below, "sand") && !strings.HasSuffix(w.o.blockName(below), "terracotta") && !w.o.hasBlockTag(below, "dirt") {
+		if f.sand && !w.o.deadBushSoil(below) {
 			return blockPos{}, false
 		}
 	}
@@ -749,7 +785,6 @@ func (f *singleBlockFeature) place(w *featureWorld, x, y, z int32, r *rand.MT) (
 			return blockPos{}, false
 		}
 	}
-	block := f.block
 	for d, side := range rotationSides {
 		if len(f.rotated) != 4 || !f.hasSide[side] {
 			continue

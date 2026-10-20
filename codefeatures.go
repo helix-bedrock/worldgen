@@ -35,6 +35,7 @@ func (o *Overworld) builtinFeatures(set *featureSet) {
 	add("minecraft:brown_mushroom_feature", &mushroomFeature{block: id("minecraft:brown_mushroom"), count: 1, soil: soil})
 	add("minecraft:red_mushroom_feature", &mushroomFeature{block: id("minecraft:red_mushroom"), count: 1, soil: soil})
 	add("minecraft:moss_vegetation_feature", o.newMossVegetation(id))
+	add("minecraft:pale_moss_vegetation_feature", o.newPaleMossVegetation(id))
 	drip := speleothemBlocks{base: id("minecraft:dripstone_block"), tip: id("minecraft:pointed_dripstone"),
 		replace: []uint32{o.ids.dirt, o.ids.coarseDirt, o.ids.stone, id("minecraft:tuff"), o.ids.deepslate},
 		tips:    []uint32{id("minecraft:pointed_dripstone"), id("minecraft:sulfur_spike")}}
@@ -43,7 +44,9 @@ func (o *Overworld) builtinFeatures(set *featureSet) {
 		stone: []uint32{o.ids.stone, o.ids.deepslate, id("minecraft:tuff")}})
 	add("minecraft:large_dripstone_feature", &largeFeature{drip})
 	add("minecraft:dripleaf_feature", o.newDripleaf(id, set))
-	add("minecraft:vines_single_face_feature", &vinesSingleFaceFeature{vine: id("minecraft:vine"), invisibleBedrock: id("minecraft:invisible_bedrock")})
+	singleVine := &vinesSingleFaceFeature{vine: id("minecraft:vine"), invisibleBedrock: id("minecraft:invisible_bedrock")}
+	add("minecraft:vines_single_face_feature", singleVine)
+	add("minecraft:vines_feature", &vinesFeature{single: singleVine})
 	add("minecraft:wildflowers_feature", o.newFlowerBed("minecraft:wildflowers"))
 	add("minecraft:leaf_litter_feature", o.newFlowerBed("minecraft:leaf_litter"))
 	add("minecraft:pink_petals_feature", o.newFlowerBed("minecraft:pink_petals"))
@@ -63,6 +66,28 @@ func (o *Overworld) builtinFeatures(set *featureSet) {
 	add("minecraft:ice_spike_feature", spike)
 	add("minecraft:ice_patch_feature", &icePatchFeature{spike: spike, radius: 4})
 	add("minecraft:grass_disc_feature", &grassDiscFeature{grass: o.ids.grass, dirt: o.ids.dirt, mud: id("minecraft:mud"), radius: 5})
+	add("minecraft:waterlily_feature", &waterlilyFeature{lily: id("minecraft:waterlily")})
+	add("minecraft:melon_feature", &melonFeature{melon: id("minecraft:melon_block")})
+	add("minecraft:cactus_feature", &cactusFeature{cactus: id("minecraft:cactus"), flower: id("minecraft:cactus_flower"), flowers: true})
+	add("minecraft:bamboo_feature", o.newBamboo())
+	add("minecraft:podzol_area_feature", &podzolAreaFeature{podzol: id("minecraft:podzol"), dirt: o.ids.dirt})
+	// Registered only with the new-world check that also turns on cactus
+	// flowers.
+	add("minecraft:firefly_bush_cluster_feature", &fireflyBushFeature{bush: id("minecraft:firefly_bush")})
+	add("minecraft:firefly_bush_water_cluster_feature", &fireflyBushFeature{bush: id("minecraft:firefly_bush"), water: true})
+	foliage := [3]uint32{id("minecraft:lilac"), id("minecraft:rose_bush"), id("minecraft:peony")}
+	add("minecraft:legacy:flower_forest_foliage_feature", &forestFoliageFeature{fewer: 1, plants: foliage})
+	add("minecraft:legacy:forest_foliage_feature", &forestFoliageFeature{fewer: 3, plants: foliage})
+	add("minecraft:eyeblossom_feature", &eyeblossomFeature{flower: id("minecraft:closed_eyeblossom")})
+	roots := &rootSystemFeature{tree: featureRef{"minecraft:azalea_tree_feature", set}, hanging: id("minecraft:hanging_roots"),
+		roots: id("minecraft:dirt_with_roots"), replace: map[string]bool{}}
+	// The root list (off_F329F10).
+	for _, n := range []string{"clay", "moss_block", "sand", "gravel", "dirt", "podzol", "dirt_with_roots", "grass_block", "mycelium",
+		"stone", "deepslate", "tuff", "cave_vines", "cave_vines_head_with_berries", "moss_carpet", "short_grass", "fern"} {
+		roots.replace["minecraft:"+n] = true
+	}
+	add("minecraft:azalea_root_system_feature", roots)
+	add("minecraft:dead_bush_feature", &deadBushFeature{bush: id("minecraft:deadbush")})
 
 	grass := func(typ string) uint32 {
 		b, _ := o.reg.Lookup("minecraft:seagrass", map[string]any{"sea_grass_type": typ})
