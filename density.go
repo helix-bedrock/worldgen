@@ -165,11 +165,12 @@ type oreVein struct {
 // fillBlocks interpolates the grids and places stone, deepslate, ore veins,
 // aquifer fluids and air.
 func (o *Overworld) fillBlocks(chunkX, chunkZ int32, g *grids, aq *aquifer, c *Chunk) {
-	o.fillBlocksAdj(chunkX, chunkZ, g, aq, c, o.buryBoxes(chunkX, chunkZ))
+	o.fillBlocksAdj(chunkX, chunkZ, g, aq, c, o.buryBoxes(chunkX, chunkZ), append(o.villageBeards(chunkX, chunkZ), o.dataJigsawBeards(chunkX, chunkZ)...))
 }
 
-// fillBlocksAdj is fillBlocks with the given buried structure boxes.
-func (o *Overworld) fillBlocksAdj(chunkX, chunkZ int32, g *grids, aq *aquifer, c *Chunk, bury []box) {
+// fillBlocksAdj is fillBlocks with the given buried structure boxes and
+// village beards.
+func (o *Overworld) fillBlocksAdj(chunkX, chunkZ int32, g *grids, aq *aquifer, c *Chunk, bury []box, beards []beardBox) {
 	adj := o.cityAdjustments(chunkX, chunkZ)
 	for i := fillHeight << 8; i < len(c.Blocks); i++ {
 		c.Blocks[i] = uint16(o.ids.air)
@@ -182,7 +183,7 @@ func (o *Overworld) fillBlocksAdj(chunkX, chunkZ int32, g *grids, aq *aquifer, c
 						for dy := range cellY {
 							x, z := i*cellXZ+dx, k*cellXZ+dz
 							y := MinY + j*cellY + dy
-							c.set(x, y, z, o.fillBlock(g, aq, adj, bury, i, j, k, dx, dy, dz,
+							c.set(x, y, z, o.fillBlock(g, aq, adj, beards, bury, i, j, k, dx, dy, dz,
 								chunkX*16+int32(x), int32(y), chunkZ*16+int32(z)))
 						}
 					}
@@ -192,7 +193,7 @@ func (o *Overworld) fillBlocksAdj(chunkX, chunkZ int32, g *grids, aq *aquifer, c
 	}
 }
 
-func (o *Overworld) fillBlock(g *grids, aq *aquifer, adj []beardShaver, bury []box, i, j, k, dx, dy, dz int, x, y, z int32) uint32 {
+func (o *Overworld) fillBlock(g *grids, aq *aquifer, adj []beardShaver, beards []beardBox, bury []box, i, j, k, dx, dy, dz int, x, y, z int32) uint32 {
 	d := squeeze(interp(&g.density, i, j, k, dx, dy, dz))
 	if y >= MinY+4 && d > 0 && interp(&g.aux[auxNoodle], i, j, k, dx, dy, dz) >= 0 {
 		t := (interp(&g.aux[auxNoodleThickness], i, j, k, dx, dy, dz) + 1) * 0.5
@@ -207,10 +208,10 @@ func (o *Overworld) fillBlock(g *grids, aq *aquifer, adj []beardShaver, bury []b
 		b := abs32(interp(&g.aux[auxRidgeB], i, j, k, dx, dy, dz)*1.5) - th
 		d = min(max(b, a), d)
 	}
-	if adj != nil || bury != nil {
+	if adj != nil || beards != nil || bury != nil {
 		var s float32
-		if adj != nil {
-			s = o.adjust(adj, x, y, z)
+		if adj != nil || beards != nil {
+			s = o.adjust(adj, beards, x, y, z)
 		}
 		// Bury fills only where the terrain is not solid so far.
 		if bury != nil && !(float32(d+s) > 0) {

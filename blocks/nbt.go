@@ -31,10 +31,19 @@ const maxDepth = 64
 // maxLen bounds any single length field (strings, lists, arrays).
 const maxLen = 1 << 24
 
-// nbtReader reads big-endian NBT, the format Endstone writes its palette in.
+// nbtReader reads big-endian NBT, the format Endstone writes its palette in,
+// or little-endian NBT (Bedrock .mcstructure files) when le is set.
 type nbtReader struct {
 	r   io.Reader
 	buf [8]byte
+	le  bool
+}
+
+func (d *nbtReader) order() binary.ByteOrder {
+	if d.le {
+		return binary.LittleEndian
+	}
+	return binary.BigEndian
 }
 
 func (d *nbtReader) read(n int) ([]byte, error) {
@@ -57,7 +66,7 @@ func (d *nbtReader) i16() (int16, error) {
 	if err != nil {
 		return 0, err
 	}
-	return int16(binary.BigEndian.Uint16(b)), nil
+	return int16(d.order().Uint16(b)), nil
 }
 
 func (d *nbtReader) i32() (int32, error) {
@@ -65,7 +74,7 @@ func (d *nbtReader) i32() (int32, error) {
 	if err != nil {
 		return 0, err
 	}
-	return int32(binary.BigEndian.Uint32(b)), nil
+	return int32(d.order().Uint32(b)), nil
 }
 
 func (d *nbtReader) i64() (int64, error) {
@@ -73,7 +82,7 @@ func (d *nbtReader) i64() (int64, error) {
 	if err != nil {
 		return 0, err
 	}
-	return int64(binary.BigEndian.Uint64(b)), nil
+	return int64(d.order().Uint64(b)), nil
 }
 
 func (d *nbtReader) length() (int, error) {
@@ -214,4 +223,10 @@ func (d *nbtReader) payload(t uint8, depth int) (any, error) {
 // arrays are skipped (nil).
 func ReadNBT(r io.Reader) (map[string]any, error) {
 	return (&nbtReader{r: r}).root()
+}
+
+// ReadNBTLittle reads a little-endian NBT root compound (Bedrock files such
+// as .mcstructure templates), with the same value types as ReadNBT.
+func ReadNBTLittle(r io.Reader) (map[string]any, error) {
+	return (&nbtReader{r: r, le: true}).root()
 }

@@ -544,7 +544,7 @@ type jigsawPiece struct {
 	bb       box
 	depth    int
 	// ground is the piece's ground level above its bottom, for terrain
-	// adjustments (ancient cities only).
+	// adjustments.
 	ground int32
 
 	cappedOnce sync.Once
@@ -613,6 +613,7 @@ func (o *Overworld) assembleJigsaw(start *jigsawPool, pos [3]int32, rotation int
 	dy := height(cx, cz) - 1 - p.bb.y0
 	p.pos[1] += dy
 	p.bb = p.bb.raise(dy)
+	p.ground = 1
 	a := &jigsawAssembly{o: o, r: r, height: height, maxDepth: maxDepth, pieces: []*jigsawPiece{p},
 		bounds: box{cx - 80, MinY, cz - 80, cx + 80, MaxY - 1, cz + 80}}
 	queue := []*jigsawPiece{p}
@@ -703,6 +704,9 @@ func (a *jigsawAssembly) fit(p *jigsawPiece, j jigsawBlock, target [3]int32, rel
 				cand.pos = [3]int32{off[0], off[1] + dy, off[2]}
 				cand.bb = bb
 				cand.depth = p.depth + 1
+				// The joining jigsaw's height in the piece is its ground
+				// (sub_D2B4120).
+				cand.ground = cjRelY
 				a.pieces = append(a.pieces, cand)
 				return cand
 			}
@@ -775,9 +779,13 @@ type village struct {
 	bb     box
 }
 
-// villageAt assembles the village starting in chunk (cx, cz), if any.
-// height must give the surface height of any column.
-func (o *Overworld) villageAt(cx, cz int32, height func(x, z int32) int32) *village {
+// villageAt assembles the village starting in chunk (cx, cz), if any. Its
+// heights come from the terrain fill without structures, as BDS's come from
+// the generator's height map before any structure adjusts the terrain
+// (sub_D2ACD80); the village's own beards then reshape the terrain.
+// VERIFY: whether BDS's height map includes adjustments of structures
+// assembled earlier.
+func (o *Overworld) villageAt(cx, cz int32) *village {
 	if v, ok := o.villages.Load([2]int32{cx, cz}); ok {
 		vv, _ := v.(*village)
 		return vv
@@ -800,7 +808,7 @@ func (o *Overworld) villageAt(cx, cz int32, height func(x, z int32) int32) *vill
 		if abandoned {
 			name = "minecraft:village/abandoned/" + kind + "/town_centers"
 		}
-		pieces := o.assembleJigsaw(o.jigsaw.pools[name], [3]int32{cx * 16, y, cz * 16}, rotation, 6, &r, height)
+		pieces := o.assembleJigsaw(o.jigsaw.pools[name], [3]int32{cx * 16, y, cz * 16}, rotation, 6, &r, o.surfaceNoStructures)
 		if len(pieces) > 0 {
 			vil = &village{pieces: pieces, bb: pieces[0].bb}
 			for _, p := range pieces[1:] {
@@ -830,7 +838,7 @@ func (o *Overworld) placeVillages(cx, cz int32, c *Chunk, height func(x, z int32
 			if !ok {
 				continue
 			}
-			v := o.villageAt(sx, sz, height)
+			v := o.villageAt(sx, sz)
 			if v == nil || !v.bb.intersects(chunkBox) {
 				continue
 			}
@@ -1130,14 +1138,14 @@ func (o *Overworld) placeStructures(cx, cz int32, c *Chunk, height func(x, z int
 // structuresReach reports whether a structure has a piece in chunk
 // (cx, cz).
 func (o *Overworld) structuresReach(cx, cz int32, height func(x, z int32) int32, raw func(cx, cz int32) *PackedChunk) bool {
-	return o.dataJigsawsReach(cx, cz) || o.villagesReach(cx, cz, height) || o.mineshaftReaches(cx, cz) || o.strongholdReaches(cx, cz) || o.citiesReach(cx, cz) ||
+	return o.dataJigsawsReach(cx, cz) || o.villagesReach(cx, cz) || o.mineshaftReaches(cx, cz) || o.strongholdReaches(cx, cz) || o.citiesReach(cx, cz) ||
 		o.scatteredReaches(cx, cz) || o.ruinReaches(cx, cz) ||
 		o.shipReaches(cx, cz) || o.isTreasureChunk(cx, cz) || o.monumentReaches(cx, cz) ||
 		o.outpostReaches(cx, cz) || o.portalReaches(cx, cz) || o.mansionReaches(cx, cz, raw)
 }
 
 // villagesReach reports whether a village has a piece in chunk (cx, cz).
-func (o *Overworld) villagesReach(cx, cz int32, height func(x, z int32) int32) bool {
+func (o *Overworld) villagesReach(cx, cz int32) bool {
 	if o.jigsaw == nil {
 		return false
 	}
@@ -1147,7 +1155,7 @@ func (o *Overworld) villagesReach(cx, cz int32, height func(x, z int32) int32) b
 	for rx := r0x; rx <= r1x; rx++ {
 		for rz := r0z; rz <= r1z; rz++ {
 			sx, sz, _ := o.villagePick(rx, rz)
-			if v := o.villageAt(sx, sz, height); v != nil && v.bb.intersects(chunkBox) {
+			if v := o.villageAt(sx, sz); v != nil && v.bb.intersects(chunkBox) {
 				for _, p := range v.pieces {
 					if p.bb.intersects(chunkBox) {
 						return true

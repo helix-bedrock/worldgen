@@ -176,6 +176,8 @@ type Overworld struct {
 	// cities by start chunk.
 	city   *jigsawData
 	cities sync.Map
+	// plainHeights caches surfaceNoStructures height maps by chunk.
+	plainHeights lru[*[256]int16]
 	// kernel is the beard kernel of terrain adjustments.
 	kernel []float32
 	// mineshafts holds assembled mineshafts by start chunk.
@@ -225,7 +227,7 @@ func NewOverworld(seed int64, reg *blocks.Registry, biomeIDs map[string]uint32, 
 	if reg.Len() > 1<<16 {
 		return nil, fmt.Errorf("worldgen: %d block states do not fit the 16-bit chunk storage", reg.Len())
 	}
-	o := &Overworld{seed: seed, reg: reg, shape: terrain.NewShape()}
+	o := &Overworld{seed: seed, reg: reg, shape: terrain.NewShape(), plainHeights: newLRU[*[256]int16](1024)}
 	for _, opt := range opts {
 		opt(&o.opts)
 	}
@@ -414,7 +416,7 @@ func NewOverworld(seed int64, reg *blocks.Registry, biomeIDs map[string]uint32, 
 		return nil, err
 	}
 	o.kernel = beardKernel()
-	for _, load := range []func() (*djDef, error){o.loadTrailRuins, o.loadTrialChambers} {
+	for _, load := range []func() (*djDef, error){o.loadTrailRuins, o.loadTrialChambers, o.loadAbandonedCamps} {
 		d, err := load()
 		if err != nil {
 			return nil, err

@@ -200,12 +200,17 @@ func (o *Overworld) convertJavaState(st TemplateState) (uint32, bool, bool) {
 				}
 			}
 		case "stone":
-			// BDS keeps these three and leaves other variants plain stone
+			// BDS keeps these and leaves other variants plain stone
 			// (sub_D276010).
 			switch v {
 			case "granite", "diorite", "andesite":
 				name = v
+			case "smooth_andesite":
+				name = "polished_andesite"
 			}
+		case "stonebrick":
+			name = map[string]string{"stonebrick": "stone_bricks", "mossy_stonebrick": "mossy_stone_bricks",
+				"cracked_stonebrick": "cracked_stone_bricks", "chiseled_stonebrick": "chiseled_stone_bricks"}[v]
 		case "monster_egg":
 			name = map[string]string{"stone": "infested_stone", "cobblestone": "infested_cobblestone",
 				"stone_brick": "infested_stone_bricks", "mossy_brick": "infested_mossy_stone_bricks",

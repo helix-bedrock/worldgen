@@ -1,6 +1,8 @@
 package worldgen
 
 import (
+	"slices"
+
 	"github.com/helix-bedrock/worldgen/rand"
 )
 
@@ -21,7 +23,7 @@ func (o *Overworld) lakesAndDungeons(w *featureWorld, ox, oz int32, r *rand.MT) 
 		// Lava lakes only from three below sea level, and above sea level
 		// on one try in ten.
 		if y >= SeaLevel-3 && (y <= SeaLevel || r.IntN(10) == 0) {
-			o.lake(w, x0+x+3, y, z0+z+3, r, o.ids.lava, o.ids.stone)
+			o.lake(w, x0+x+3, y, z0+z+3, r, o.ids.lava, o.ids.stone, nil)
 		}
 	}
 	// Four deep dungeons between y -58 and -1, then ten from y 0 up.
@@ -39,6 +41,17 @@ func (o *Overworld) lakesAndDungeons(w *featureWorld, ox, oz int32, r *rand.MT) 
 	}
 }
 
+// lakeFeature is a code-registered LakeFeature (sulfur_pool: water ringed by
+// sulfur, failing next to sulfur spikes).
+type lakeFeature struct {
+	liquid, border uint32
+	avoid          []string
+}
+
+func (f *lakeFeature) place(w *featureWorld, x, y, z int32, r *rand.MT) (blockPos, bool) {
+	return blockPos{x, y, z}, w.o.lake(w, x, y, z, r, f.liquid, f.border, f.avoid)
+}
+
 // liquidMaterial reports whether a block is water or lava.
 func (o *Overworld) liquidMaterial(b uint32) bool {
 	switch b {
@@ -53,8 +66,9 @@ func (o *Overworld) liquidMaterial(b uint32) bool {
 // bottom 4 layers liquid, the rest air, ringed by border below the
 // waterline and on half the spots above it. The box sits 4 below the first
 // non-air block at or under y. It fails when the edge would let liquid out
-// or touch other liquid above the waterline.
-func (o *Overworld) lake(w *featureWorld, x, y, z int32, r *rand.MT, liquid, border uint32) bool {
+// or touch other liquid above the waterline, or when an edge block is one
+// of avoid (block names, any state).
+func (o *Overworld) lake(w *featureWorld, x, y, z int32, r *rand.MT, liquid, border uint32, avoid []string) bool {
 	if y <= MinY+4 {
 		return false
 	}
@@ -120,7 +134,10 @@ func (o *Overworld) lake(w *featureWorld, x, y, z int32, r *rand.MT, liquid, bor
 				if j >= 4 && o.liquidMaterial(b) {
 					return false
 				}
-				if j < 4 && !o.solidMaterial(b) && b != liquid {
+				if j < 4 && !o.solidMaterial(b) && o.blockName(b) != o.blockName(liquid) {
+					return false
+				}
+				if slices.Contains(avoid, o.blockName(b)) {
 					return false
 				}
 			}
@@ -140,16 +157,15 @@ func (o *Overworld) lake(w *featureWorld, x, y, z int32, r *rand.MT, liquid, bor
 			}
 		}
 	}
-	// Dirt under the air part that sees the sky turns to grass.
-	// VERIFY: BDS tests a block list (xmmword_F613CE0) that was not read;
-	// the dirt tag is assumed.
+	// Dirt and coarse dirt (xmmword_F613CE0) under the air part that sees
+	// the sky turn to grass.
 	for i := int32(0); i < 16; i++ {
 		for k := int32(0); k < 16; k++ {
 			for j := int32(4); j < 8; j++ {
 				if !at(i, j, k) {
 					continue
 				}
-				if b, ok := w.block(x+i, y+j-1, z+k); ok && o.hasBlockTag(b, "dirt") && w.seesSky(x+i, y+j, z+k) {
+				if b, ok := w.block(x+i, y+j-1, z+k); ok && (b == o.ids.dirt || b == o.ids.coarseDirt) && w.seesSky(x+i, y+j, z+k) {
 					w.set(x+i, y+j-1, z+k, o.ids.grass)
 				}
 			}

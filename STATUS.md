@@ -45,8 +45,10 @@ BDS generated from the same seed. The marks mean:
 | Deep dark: sculk, sculk veins, sculk sensors, sculk shriekers, sculk catalysts | Close |
 | Glow lichen in caves everywhere | Close |
 | Amethyst geodes (smooth basalt, calcite, amethyst, budding amethyst, buds and clusters) | Exact |
-| Sulfur caves: the biome, its floor and sulfur pools | Close |
-| Sulfur caves: sulfur spikes and spike clusters | Not yet |
+| Sulfur caves: the biome and its floor | Close |
+| Sulfur caves: sulfur pools with potent sulfur | Close (both pools of the BDS compare area found; one sits a block higher where the terrain differs) |
+| Sulfur caves: sulfur spikes and spike clusters | Close (positions match BDS) |
+| Sulfur caves: sulfur spring trails (a sulfur column up to a sulfur spring on the surface) | Close (rare: none in the BDS compare area, none in ours) |
 
 ## Trees
 
@@ -94,7 +96,7 @@ BDS generated from the same seed. The marks mean:
 | Coral crust (dead coral crusts and outcroppings with live coral on them) | Close (the dead coral colour is random in BDS, see below) |
 | Sea anemones (live coral and fans on shallow warm ocean floors) | Close |
 | Magma blocks under water, with bubble columns above them | Close |
-| Water and lava springs in cliffs | Not yet |
+| Water and lava springs in cliffs | Close (match BDS where the terrain matches) |
 
 BDS picks the colour of each coral crust template's dead coral from a random seeded with the time
 since the server started, so two BDS runs of the same seed disagree. worldgen picks it from the
@@ -108,13 +110,12 @@ world seed and the template instead, so the same seed always gives the same colo
 | Ice spikes and their ice patches | Close (counts within 2% of BDS) |
 | Fossils (desert and swamp; deepslate fossils with diamond ore) | Close (not yet checked in game) |
 | Desert wells (with suspicious sand) | Close (checked in game) |
-| Emerald ore in mountain surfaces | Not yet |
 
 ## Structures
 
 | What | Status |
 | --- | --- |
-| Villages (all biome types, with loot chests) | Close |
+| Villages (all biome types, with loot chests; ground raised and cut under the houses as BDS does) | Close (placement matches BDS) |
 | Mineshafts (normal and badlands; cobwebs, rails, torches, cave spider spawners; fences joined to their walls) | Close |
 | Ancient cities, with the cave around them and their sculk | Close |
 | Mineshaft minecarts with chests | Not yet |
@@ -125,12 +126,13 @@ world seed and the template instead, so the same seed always gives the same colo
 | Desert pyramids (with the TNT trap and the suspicious sand cellar) | Close |
 | Jungle temples (traps, dispensers, lever puzzle) | Exact (tree leaves can poke inside; fixed in refinement) |
 | Witch huts (cauldron with a random potion) | Close |
-| Igloos (half with a basement) | Close |
-| Pillager outposts (watchtower, overgrown overlay, feature pieces, chest; no pillagers) | Close (not yet compared with BDS) |
+| Igloos (half with a basement: trapdoor, ladder, stone brick cells) | Exact (compared with BDS) |
+| Pillager outposts (watchtower, overgrown overlay, feature pieces, chest; no pillagers) | Close (one of two compared outposts exact; the other 1 block high) |
 | Ruined portals (buried and on the surface, netherrack spread, aging) | Close (not yet compared with BDS) |
 | Woodland mansions (all floors and rooms, roofs, foundation, entrance steps, joined windows) | Close (checked in game) |
 | Strongholds (all rooms, library, portal room with silverfish spawner, joined fences and bars) | Close (checked in game) |
 | Trail ruins (buried under a mound, with suspicious gravel) | Close (placement matches BDS) |
+| Abandoned camps (all 18 biome kinds, tents and campsites; the trees are not placed yet) | Close (two camps match BDS) |
 | Trial chambers (all chamber kinds, copper bulb aging, buried shell; spawners and vaults have no mob or loot data yet) | Close (placement matches BDS; checked in game) |
 
 Structure chests, dispensers and suspicious sand carry their loot table, but the loot is not filled in yet, so chests are empty in

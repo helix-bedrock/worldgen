@@ -214,6 +214,8 @@ func (o *Overworld) parseFeature(typ string, raw json.RawMessage, set *featureSe
 		return o.parseFossil(raw)
 	case "minecraft:partially_exposed_blob_feature":
 		return o.parsePartiallyExposedBlob(raw)
+	case "minecraft:structure_template_feature":
+		return o.parseStructureTemplate(raw)
 	case "minecraft:surface_relative_threshold_feature":
 		var r struct {
 			Feature string `json:"feature_to_place"`
@@ -464,31 +466,58 @@ type searchFeature struct {
 	required int32
 }
 
+// searchOrder is the loop order of each search axis (sub_D305930 and its
+// helpers sub_D3064E0, sub_D306A20): outer, middle and inner axis, each with
+// its step. The outer axis is the search axis.
+var searchOrder = map[string][3][2]int32{
+	"-x": {{0, -1}, {1, 1}, {2, -1}},
+	"+x": {{0, 1}, {1, 1}, {2, 1}},
+	"-y": {{1, -1}, {2, 1}, {0, -1}},
+	"+y": {{1, 1}, {2, 1}, {0, 1}},
+	"-z": {{2, -1}, {1, 1}, {0, 1}},
+	"+z": {{2, 1}, {1, 1}, {0, -1}},
+}
+
 func (f *searchFeature) place(w *featureWorld, x, y, z int32, r *rand.MT) (blockPos, bool) {
-	ax, dir := 1, int32(1)
-	if len(f.axis) == 2 {
-		ax = map[byte]int{'x': 0, 'y': 1, 'z': 2}[f.axis[1]]
-		if f.axis[0] == '-' {
-			dir = -1
-		}
+	order, ok := searchOrder[f.axis]
+	if !ok {
+		order = searchOrder["+y"]
 	}
-	lo, hi := f.min[ax], f.max[ax]
-	start, end := lo, hi
-	if dir < 0 {
-		start, end = hi, lo
+	// BDS stages the placements and keeps them only once the required
+	// count is reached; vanilla always requires one, so the first success
+	// is kept directly.
+	origin := [3]int32{x, y, z}
+	from := func(a [2]int32) (int32, int32) {
+		if a[1] < 0 {
+			return f.max[a[0]], f.min[a[0]]
+		}
+		return f.min[a[0]], f.max[a[0]]
 	}
 	got := int32(0)
-	for v := start; ; v += dir {
-		// Only one-dimensional search volumes are used by vanilla data.
-		pos := [3]int32{x + f.min[0], y + f.min[1], z + f.min[2]}
-		pos[ax] = [3]int32{x, y, z}[ax] + v
-		if _, ok := f.feat.place(w, pos[0], pos[1], pos[2], r); ok {
-			got++
-			if got >= f.required {
-				return blockPos{x, y, z}, true
+	var pos [3]int32
+	o0, o1 := from(order[0])
+	for v0 := o0; ; v0 += order[0][1] {
+		m0, m1 := from(order[1])
+		for v1 := m0; ; v1 += order[1][1] {
+			i0, i1 := from(order[2])
+			for v2 := i0; ; v2 += order[2][1] {
+				pos[order[0][0]] = origin[order[0][0]] + v0
+				pos[order[1][0]] = origin[order[1][0]] + v1
+				pos[order[2][0]] = origin[order[2][0]] + v2
+				if _, ok := f.feat.place(w, pos[0], pos[1], pos[2], r); ok {
+					if got++; got >= f.required {
+						return blockPos{x, y, z}, true
+					}
+				}
+				if v2 == i1 {
+					break
+				}
+			}
+			if v1 == m1 {
+				break
 			}
 		}
-		if v == end {
+		if v0 == o1 {
 			break
 		}
 	}

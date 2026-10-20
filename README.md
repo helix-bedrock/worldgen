@@ -9,7 +9,8 @@
 > - **The base Overworld matches BDS:** terrain, all biomes, surface layers, caves and canyons,
 >   underground water and lava, ores and stone patches, and an unbroken bedrock floor.
 > - **Caves:** lush caves, dripstone caves, the deep dark's sculk (with sensors and shriekers), glow
->   lichen and amethyst geodes. Sulfur cave spikes are not placed yet.
+>   lichen, amethyst geodes, water and lava springs, and the sulfur caves' spikes, pools and
+>   surface springs.
 > - **Trees and plants:** every tree, including cherry and mangrove, huge mushrooms, grass and
 >   ferns, flowers in every flower biome, sunflowers, wildflowers, pink petals, leaf litter, sweet
 >   berries, pumpkins, sugar cane, mushrooms, bamboo, lily pads, cactus, dead bushes, melons, vines,
@@ -19,8 +20,8 @@
 >   bubble columns.
 > - **Structures:** villages, mineshafts, dungeons, ancient cities, desert pyramids, jungle temples,
 >   witch huts, igloos, ocean ruins, shipwrecks, buried treasure, ocean monuments, pillager outposts,
->   ruined portals, woodland mansions, strongholds, trail ruins, trial chambers, fossils and desert
->   wells. Chests are still empty in game.
+>   ruined portals, woodland mansions, strongholds, trail ruins, trial chambers, abandoned camps, fossils
+>   and desert wells. Chests are still empty in game.
 > - **The Nether and the End are not started.**
 > - **The API is not stable.** Names and behaviour change between commits.
 >
@@ -108,7 +109,7 @@ The full list of what is and is not generated is in [STATUS.md](STATUS.md).
 |---|---|
 | Terrain, biomes, surface, caves, aquifers, ores | ✅ done |
 | Ocean decorations, freezing | 🟡 all placed, close to BDS |
-| Cave decorations | 🟡 lush, dripstone, deep dark sculk and glow lichen close to BDS; geodes exact; sulfur spikes next |
+| Cave decorations | 🟡 lush, dripstone, deep dark sculk, glow lichen and sulfur caves close to BDS; geodes exact; springs match |
 | Plants and flowers | 🟡 all placed, close to BDS |
 | Trees | 🟡 all placed; mangroves too sparse |
 | Villages | 🟡 placed and built, layout close but not block-exact |

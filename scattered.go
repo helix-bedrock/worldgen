@@ -3,6 +3,7 @@ package worldgen
 import (
 	"cmp"
 	"slices"
+	"strings"
 
 	"github.com/helix-bedrock/worldgen/rand"
 )
@@ -996,6 +997,58 @@ var ScatteredKinds = []string{"desert_pyramid", "jungle_temple", "swamp_hut", "i
 // it. It generates the start chunk's terrain for the height. It is safe for
 // concurrent use.
 func (o *Overworld) NearestScattered(x, z int32, kind string, maxRegions int32) (Scattered, bool) {
+	for _, c := range o.scatterCandidates(x, z, maxRegions) {
+		k := o.scatteredAt(c[0], c[1])
+		if k == scatterNone || kind != "" && ScatteredKinds[k-1] != kind {
+			continue
+		}
+		var ch Chunk
+		o.GenerateChunk(c[0], c[1], &ch)
+		size := scatterSize[k]
+		return Scattered{Kind: ScatteredKinds[k-1], X: c[0]*16 + size[0]/2, Y: o.scatteredY(k, c[0], c[1], Pack(&ch)),
+			Z: c[1]*16 + size[2]/2}, true
+	}
+	return Scattered{}, false
+}
+
+// NearestIglooBasement finds the igloo with a basement nearest to block
+// (x, z), searching maxRegions placement regions around it. The position
+// returned is the trapdoor over the ladder down. It is safe for concurrent
+// use.
+func (o *Overworld) NearestIglooBasement(x, z int32, maxRegions int32) (Scattered, bool) {
+	jt := o.template("igloo/igloo_top_trapdoor")
+	if jt == nil {
+		return Scattered{}, false
+	}
+	var door [3]int32
+	for _, b := range jt.tpl.Blocks {
+		if strings.HasSuffix(jt.tpl.Palette[b.State].Name, "trapdoor") {
+			door = b.Pos
+		}
+	}
+	for _, c := range o.scatterCandidates(x, z, maxRegions) {
+		if o.scatteredAt(c[0], c[1]) != scatterIgloo {
+			continue
+		}
+		// The draws of igloo: the turn, then the basement roll.
+		var r rand.MT
+		r.Seed(populationSeed(o.seed, c[0], c[1]))
+		rot := int(r.IntN(4))
+		if r.Float64() < 0.5 {
+			continue
+		}
+		var ch Chunk
+		o.GenerateChunk(c[0], c[1], &ch)
+		y := o.topSolid(Pack(&ch), c[0]*16, c[1]*16, false) - 1
+		d := rotatePos(door, rot)
+		return Scattered{Kind: "igloo_basement", X: c[0]*16 + d[0], Y: y + d[1], Z: c[1]*16 + d[2]}, true
+	}
+	return Scattered{}, false
+}
+
+// scatterCandidates lists the start chunks of the scattered feature
+// regions within maxRegions of block (x, z), nearest first.
+func (o *Overworld) scatterCandidates(x, z int32, maxRegions int32) [][2]int32 {
 	type cand struct {
 		cx, cz int32
 		d      int64
@@ -1014,16 +1067,9 @@ func (o *Overworld) NearestScattered(x, z int32, kind string, maxRegions int32) 
 		}
 	}
 	slices.SortFunc(cands, func(a, b cand) int { return cmp.Compare(a.d, b.d) })
-	for _, c := range cands {
-		k := o.scatteredAt(c.cx, c.cz)
-		if k == scatterNone || kind != "" && ScatteredKinds[k-1] != kind {
-			continue
-		}
-		var ch Chunk
-		o.GenerateChunk(c.cx, c.cz, &ch)
-		size := scatterSize[k]
-		return Scattered{Kind: ScatteredKinds[k-1], X: c.cx*16 + size[0]/2, Y: o.scatteredY(k, c.cx, c.cz, Pack(&ch)),
-			Z: c.cz*16 + size[2]/2}, true
+	out := make([][2]int32, len(cands))
+	for i, c := range cands {
+		out[i] = [2]int32{c.cx, c.cz}
 	}
-	return Scattered{}, false
+	return out
 }

@@ -31,7 +31,7 @@ func TestListDataJigsaws(t *testing.T) {
 					continue
 				}
 				for _, p := range s.pieces {
-					if o.template(p.el.template) == nil {
+					if o.elementTemplate(p.el) == nil {
 						t.Errorf("%s: missing template %q", d.kind, p.el.template)
 					}
 				}

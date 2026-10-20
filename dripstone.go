@@ -198,6 +198,13 @@ func columnScan(w *featureWorld, x, y, z, rng int32, cont, surface func(uint32) 
 type clusterFeature struct {
 	speleothemBlocks
 	stone []uint32 // what a pool may border (stone, deepslate, tuff)
+	// minHeight and maxHeight bound the tallest point (3 and 5 for
+	// dripstone, 1 and 4 for sulfur).
+	minHeight, maxHeight int32
+	// The pool chance is a gaussian times wetScale plus wetBase, clamped
+	// to [wetMin, wetMax] (0.1, 0.3, 0.1, 1 for dripstone; all 0 for sulfur,
+	// which never pools).
+	wetBase, wetScale, wetMin, wetMax float32
 }
 
 func (f *clusterFeature) place(w *featureWorld, x, y, z int32, r *rand.MT) (blockPos, bool) {
@@ -205,12 +212,15 @@ func (f *clusterFeature) place(w *featureWorld, x, y, z int32, r *rand.MT) (bloc
 	if b, _ := w.block(x, y, z); !o.emptyOrWater(b) {
 		return blockPos{}, false
 	}
-	height := 3 + r.IntN(3)
-	wet := float32(float32(r.GaussianFloat()*0.3) + 0.1)
-	if 1 < wet {
-		wet = 1
+	height := f.minHeight
+	if f.maxHeight >= f.minHeight {
+		height += r.IntN(f.maxHeight - f.minHeight + 1)
+	}
+	wet := float32(float32(r.GaussianFloat()*f.wetScale) + f.wetBase)
+	if f.wetMax < wet {
+		wet = f.wetMax
 	} else {
-		wet = max(wet, 0.1)
+		wet = max(wet, f.wetMin)
 	}
 	density := r.Float()
 	xr, zr := r.IntN(6)+2, r.IntN(6)+2

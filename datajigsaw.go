@@ -15,8 +15,8 @@ import (
 )
 
 // Data-driven jigsaw structures (br::worldgen::JigsawStructure), written
-// from BDS 1.26.52: trail ruins from the vanilla worldgen JSON files, and
-// trial chambers, which BDS defines in code (sub_D228C00) with pools built
+// from BDS 1.26.52: trail ruins and abandoned camps from the vanilla
+// worldgen JSON files, and trial chambers, which BDS defines in code (sub_D228C00) with pools built
 // in sub_5092590 (data/bds/trial_chambers.json).
 //
 //   start      sub_D1FF960 / sub_D1FE510: the start height, then a turn
@@ -46,14 +46,23 @@ type djDef struct {
 	minY0, maxY0        int32 // the start height range, absolute
 	project             bool  // raise the start to the world surface
 	bury                bool
-	biomeTag            string
-	biomes              []bool // instead of biomeTag
+	beard               bool     // beard_thin
+	biomeTags           []string // every one must match
+	biomes              []bool   // instead of biomeTags
 	spacing, separation int32
 	salt                int32
 	aliases             []djAlias
 	starts              sync.Map // [2]int32 -> *djStructure
 	reach               int32    // chunks a structure can reach from its start chunk
 	kind                string   // the /tpstructure name
+	// variants are the structures of a structure set with more than one
+	// (abandoned camps): the set's placement picks one per start.
+	variants []djVariant
+}
+
+type djVariant struct {
+	d      *djDef
+	weight int32
 }
 
 // djAlias is a pool alias bound once per structure (Java's pool_aliases):
@@ -80,27 +89,77 @@ type cappedRule struct {
 	loot   string
 }
 
+// djSetJSON is a vanilla minecraft:structure_set file.
+type djSetJSON struct {
+	Set struct {
+		Placement struct {
+			Salt, Separation, Spacing int32
+		}
+		Structures []struct {
+			Structure string
+			Weight    int32
+		}
+	} `json:"minecraft:structure_set"`
+}
+
 // loadTrailRuins reads the trail ruins from the vanilla worldgen files.
 func (o *Overworld) loadTrailRuins() (*djDef, error) {
 	root := "data/vanilla/worldgen"
-	var set struct {
-		Set struct {
-			Placement struct {
-				Salt, Separation, Spacing int32
-				SpreadType                string `json:"spread_type"`
-			}
-		} `json:"minecraft:structure_set"`
-	}
+	var set djSetJSON
 	if err := readJSON(root+"/structure_sets/trail_ruins.json", &set); err != nil {
 		return nil, err
 	}
+	pools, err := o.loadPools(root, "trail_ruins")
+	if err != nil {
+		return nil, err
+	}
+	d, err := loadDJStructure(root+"/structures/trail_ruins.json", pools)
+	if err != nil {
+		return nil, err
+	}
+	d.kind = "trail_ruins"
+	d.spacing, d.separation, d.salt = set.Set.Placement.Spacing, set.Set.Placement.Separation, set.Set.Placement.Salt
+	return d, nil
+}
+
+// loadAbandonedCamps reads the abandoned camps: one structure set with a
+// structure per biome group, all sharing the camp pools.
+func (o *Overworld) loadAbandonedCamps() (*djDef, error) {
+	root := "data/vanilla/worldgen"
+	var set djSetJSON
+	if err := readJSON(root+"/structure_sets/abandoned_camp.json", &set); err != nil {
+		return nil, err
+	}
+	pools, err := o.loadPools(root, "abandoned_camp")
+	if err != nil {
+		return nil, err
+	}
+	d := &djDef{id: "minecraft:abandoned_camp", kind: "abandoned_camp", spacing: set.Set.Placement.Spacing,
+		separation: set.Set.Placement.Separation, salt: set.Set.Placement.Salt}
+	for _, e := range set.Set.Structures {
+		name, _ := strings.CutPrefix(e.Structure, "minecraft:")
+		v, err := loadDJStructure(root+"/structures/"+name+".json", pools)
+		if err != nil {
+			return nil, err
+		}
+		d.variants = append(d.variants, djVariant{v, e.Weight})
+		d.reach = max(d.reach, v.reach)
+		d.bury = d.bury || v.bury
+		d.beard = d.beard || v.beard
+	}
+	return d, nil
+}
+
+// loadDJStructure reads a minecraft:jigsaw structure file.
+func loadDJStructure(file string, pools map[string]*jigsawPool) (*djDef, error) {
 	var st struct {
 		J struct {
-			Filters []struct{ Value string } `json:"biome_filters"`
-			Adapt   string                   `json:"terrain_adaptation"`
-			Start   string                   `json:"start_pool"`
-			Depth   int                      `json:"max_depth"`
-			Dist    struct {
+			Description struct{ Identifier string }
+			Filters     []struct{ Value string } `json:"biome_filters"`
+			Adapt       string                   `json:"terrain_adaptation"`
+			Start       string                   `json:"start_pool"`
+			Depth       int                      `json:"max_depth"`
+			Dist        struct {
 				Horizontal, Vertical int32
 			} `json:"max_distance_from_center"`
 			Height struct {
@@ -108,25 +167,34 @@ func (o *Overworld) loadTrailRuins() (*djDef, error) {
 					Absolute int32
 				}
 			} `json:"start_height"`
+			Padding    int32  `json:"dimension_padding"`
 			Projection string `json:"heightmap_projection"`
 		} `json:"minecraft:jigsaw"`
 	}
-	if err := readJSON(root+"/structures/trail_ruins.json", &st); err != nil {
+	if err := readJSON(file, &st); err != nil {
 		return nil, err
 	}
-	d := &djDef{id: "minecraft:trail_ruins", kind: "trail_ruins", start: st.J.Start, maxDepth: st.J.Depth,
+	d := &djDef{id: st.J.Description.Identifier, start: st.J.Start, maxDepth: st.J.Depth,
 		maxH: st.J.Dist.Horizontal, maxV: st.J.Dist.Vertical, minY0: st.J.Height.Value.Absolute, maxY0: st.J.Height.Value.Absolute,
-		project: st.J.Projection != "", bury: st.J.Adapt == "bury",
-		spacing: set.Set.Placement.Spacing, separation: set.Set.Placement.Separation, salt: set.Set.Placement.Salt,
-		pools: map[string]*jigsawPool{}}
-	if len(st.J.Filters) > 0 {
-		d.biomeTag = st.J.Filters[0].Value
+		padBottom: st.J.Padding, padTop: st.J.Padding,
+		project: st.J.Projection != "", bury: st.J.Adapt == "bury", beard: st.J.Adapt == "beard_thin", pools: pools}
+	for _, f := range st.J.Filters {
+		d.biomeTags = append(d.biomeTags, f.Value)
 	}
+	// The whole structure lies within the free space around the start.
+	d.reach = (d.maxH+48)/16 + 1
+	return d, nil
+}
+
+// loadPools reads the template pools of one folder, with the processors
+// they name.
+func (o *Overworld) loadPools(root, dir string) (map[string]*jigsawPool, error) {
 	procs, err := o.loadProcessors(root + "/processors")
 	if err != nil {
 		return nil, err
 	}
-	err = fs.WalkDir(vanillaData, root+"/template_pools/trail_ruins", func(p string, e fs.DirEntry, err error) error {
+	pools := map[string]*jigsawPool{}
+	err = fs.WalkDir(vanillaData, root+"/template_pools/"+dir, func(p string, e fs.DirEntry, err error) error {
 		if err != nil || e.IsDir() || path.Ext(p) != ".json" {
 			return err
 		}
@@ -138,6 +206,7 @@ func (o *Overworld) loadTrailRuins() (*djDef, error) {
 					Element struct {
 						Type       string `json:"element_type"`
 						Location   string
+						Feature    string
 						Processors string
 					}
 					Weight int32
@@ -156,20 +225,21 @@ func (o *Overworld) loadTrailRuins() (*djDef, error) {
 			if pr := procs[el.Element.Processors]; pr != nil {
 				je.rules, je.capped = pr.rules, pr.capped
 			}
-			if el.Element.Type == "minecraft:empty_pool_element" {
+			switch el.Element.Type {
+			case "minecraft:empty_pool_element":
 				je.template = ""
+			case "minecraft:feature_pool_element":
+				je.id, je.template, je.feature = el.Element.Feature, "", el.Element.Feature
 			}
 			pool.entries = append(pool.entries, jigsawEntry{je, el.Weight})
 		}
-		d.pools[pool.name] = pool
+		pools[pool.name] = pool
 		return nil
 	})
 	if err != nil {
-		return nil, fmt.Errorf("worldgen: trail ruins pools: %w", err)
+		return nil, fmt.Errorf("worldgen: %s pools: %w", dir, err)
 	}
-	// The whole structure lies within the free space around the start.
-	d.reach = (d.maxH+48)/16 + 1
-	return d, nil
+	return pools, nil
 }
 
 func readJSON(p string, v any) error {
@@ -477,11 +547,49 @@ func (a *djAssembly) sortedJigsaws(p *jigsawPiece) []jigsawBlock {
 // turn and element and every draw of the assembly come from it (checked
 // against BDS's trial chamber starts on the comparison seed).
 func (d *djDef) assemble(o *Overworld, cx, cz int32) *djStructure {
+	if len(d.variants) == 0 {
+		return d.assembleOne(o, cx, cz)
+	}
+	// A set of several structures draws one by weight and tries it; one
+	// that fails (its biome, its height) drops out and the draw repeats
+	// (the structure set loop of BDS's createStructures).
+	// VERIFY: read from the named 1.21.3 build, not yet in 1.26.52.
 	var r rand.Java
-	r.Seed(o.seed)
-	a1 := int64(r.Next(32))<<32 + int64(r.Next(32))
-	b1 := int64(r.Next(32))<<32 + int64(r.Next(32))
-	r.Seed(int64(cx)*a1 ^ int64(cz)*b1 ^ o.seed)
+	largeFeatureSeed(&r, o.seed, cx, cz)
+	vs := slices.Clone(d.variants)
+	var total int32
+	for _, v := range vs {
+		total += v.weight
+	}
+	for len(vs) > 0 && total > 0 {
+		n := r.IntN(total)
+		i := 0
+		for ; i < len(vs)-1; i++ {
+			if n -= vs[i].weight; n < 0 {
+				break
+			}
+		}
+		if s := vs[i].d.assembleOne(o, cx, cz); s != nil {
+			return s
+		}
+		total -= vs[i].weight
+		vs = slices.Delete(vs, i, i+1)
+	}
+	return nil
+}
+
+// largeFeatureSeed seeds r as Java's setLargeFeatureSeed does.
+func largeFeatureSeed(r *rand.Java, seed int64, cx, cz int32) {
+	r.Seed(seed)
+	a := int64(r.Next(32))<<32 + int64(r.Next(32))
+	b := int64(r.Next(32))<<32 + int64(r.Next(32))
+	r.Seed(int64(cx)*a ^ int64(cz)*b ^ seed)
+}
+
+// assembleOne builds one structure starting in chunk (cx, cz).
+func (d *djDef) assembleOne(o *Overworld, cx, cz int32) *djStructure {
+	var r rand.Java
+	largeFeatureSeed(&r, o.seed, cx, cz)
 	y := d.minY0
 	if d.maxY0 > d.minY0 {
 		y += r.IntN(d.maxY0 - d.minY0 + 1)
@@ -500,7 +608,7 @@ func (d *djDef) assemble(o *Overworld, cx, cz int32) *djStructure {
 	if tpl == nil {
 		return nil
 	}
-	p := &jigsawPiece{el: el, tpl: tpl, pos: [3]int32{cx * 16, y, cz * 16}, rotation: rot}
+	p := &jigsawPiece{el: el, tpl: tpl, pos: [3]int32{cx * 16, y, cz * 16}, rotation: rot, ground: 1}
 	p.bb = tplBox(tpl.tpl, p.pos, rot)
 	mx := p.bb.x0 + (p.bb.x1-p.bb.x0+1)>>1
 	mz := p.bb.z0 + (p.bb.z1-p.bb.z0+1)>>1
@@ -516,7 +624,12 @@ func (d *djDef) assemble(o *Overworld, cx, cz int32) *djStructure {
 	}
 	// The biome is checked at the start position.
 	b := o.BiomeAt(mx, y, mz)
-	if d.biomeTag != "" && !o.biomeHas(b, d.biomeTag) || d.biomes != nil && (int(b) >= len(d.biomes) || !d.biomes[b]) {
+	for _, t := range d.biomeTags {
+		if !o.biomeHas(b, t) {
+			return nil
+		}
+	}
+	if d.biomes != nil && (int(b) >= len(d.biomes) || !d.biomes[b]) {
 		return nil
 	}
 	a := &djAssembly{o: o, d: d, r: &r, pieces: []*jigsawPiece{p}, pools: map[string]string{}}
@@ -595,10 +708,10 @@ func (a *djAssembly) children(q djState) {
 func (a *djAssembly) fit(q djState, j jigsawBlock, target [3]int32, region *djRegion, cands []*jigsawElement) {
 	want := opposite(j.facing)
 	for _, el := range cands {
-		if el.template == "" {
+		if el.template == "" && el.feature == "" {
 			return
 		}
-		tpl := a.o.template(el.template)
+		tpl := a.o.elementTemplate(el)
 		if tpl == nil {
 			return
 		}
@@ -617,6 +730,10 @@ func (a *djAssembly) fit(q djState, j jigsawBlock, target [3]int32, region *djRe
 				}
 				region.out = append(region.out, bb)
 				cand.pos, cand.bb, cand.depth = pos, bb, q.p.depth+1
+				// The joining jigsaw's height in the piece is its
+				// ground, as for villages.
+				// VERIFY: for data-driven structures.
+				cand.ground = cj.pos[1]
 				a.pieces = append(a.pieces, cand)
 				if cand.depth <= a.d.maxDepth {
 					a.queue = append(a.queue, djState{cand, region, j.placePrio})
@@ -627,11 +744,56 @@ func (a *djAssembly) fit(q djState, j jigsawBlock, target [3]int32, region *djRe
 	}
 }
 
+// featureTemplate stands in for every feature pool element: one block with
+// one jigsaw at its origin, facing down, named minecraft:bottom and joining
+// nothing (Java's FeaturePoolElement), so the assembly's draws run as they
+// should. The feature itself (a camp's tree) is not placed yet.
+// VERIFY: BDS's feature pool element is taken to match Java's.
+var featureTemplate = &jigsawTemplate{tpl: &Template{Size: [3]int32{1, 1, 1}},
+	jigsaws: []jigsawBlock{{facing: "down", top: "south", name: "minecraft:bottom", target: "minecraft:empty", pool: "minecraft:empty"}}}
+
+// elementTemplate is the template an element places.
+func (o *Overworld) elementTemplate(el *jigsawElement) *jigsawTemplate {
+	if el.feature != "" {
+		return featureTemplate
+	}
+	return o.template(el.template)
+}
+
+// dataJigsawBeards lists the beards of beard_thin data-driven structures
+// near chunk (cx, cz), as villageBeards does.
+// VERIFY: BDS keeps these in its classic list (sub_D1F06A0); taken as the
+// village beard here.
+func (o *Overworld) dataJigsawBeards(cx, cz int32) []beardBox {
+	var out []beardBox
+	for _, d := range o.dataJigsaws {
+		if !d.beard {
+			continue
+		}
+		d.near(o, cx, cz, func(s *djStructure) {
+			for _, p := range s.pieces {
+				if p.el.feature != "" {
+					continue
+				}
+				if (p.bb.x0-12)>>4 <= cx && cx <= (p.bb.x1+12)>>4 && (p.bb.z0-12)>>4 <= cz && cz <= (p.bb.z1+12)>>4 {
+					out = append(out, newBeardBox(p.bb, p.ground))
+				}
+			}
+		})
+	}
+	return out
+}
+
 // surfaceNoStructures is the world surface (the y above the highest
 // non-air block, water included) of the terrain fill without structure
 // terrain adjustments.
 func (o *Overworld) surfaceNoStructures(x, z int32) int32 {
-	cx, cz := x>>4, z>>4
+	h := o.plainHeights.get([2]int32{x >> 4, z >> 4}, func() *[256]int16 { return o.plainHeightMap(x>>4, z>>4) })
+	return int32(h[(z&15)<<4|x&15])
+}
+
+// plainHeightMap is surfaceNoStructures for every column of chunk (cx, cz).
+func (o *Overworld) plainHeightMap(cx, cz int32) *[256]int16 {
 	var cols [gridXZ * gridXZ]column
 	for i := range gridXZ {
 		for k := range gridXZ {
@@ -641,13 +803,18 @@ func (o *Overworld) surfaceNoStructures(x, z int32) int32 {
 	c := new(Chunk)
 	g := new(grids)
 	o.fillDensity(cx, cz, &cols, g)
-	o.fillBlocksAdj(cx, cz, g, newAquifer(o, cx, cz), c, nil)
-	for y := MaxY - 1; y >= MinY; y-- {
-		if c.Block(int(x&15), y, int(z&15)) != o.ids.air {
-			return int32(y + 1)
+	o.fillBlocksAdj(cx, cz, g, newAquifer(o, cx, cz), c, nil, nil)
+	h := new([256]int16)
+	for i := range h {
+		h[i] = MinY
+		for y := MaxY - 1; y >= MinY; y-- {
+			if c.Block(i&15, y, i>>4) != o.ids.air {
+				h[i] = int16(y + 1)
+				break
+			}
 		}
 	}
-	return MinY
+	return h
 }
 
 // buryBoxes lists the piece boxes of buried structures near chunk
@@ -786,8 +953,8 @@ func (o *Overworld) cappedPicks(p *jigsawPiece) map[int]cappedRule {
 	return p.capped
 }
 
-// NearestDataJigsaw finds the trail ruins or trial chambers ("trail_ruins",
-// "trial_chambers") whose start chunk is nearest to block (x, z),
+// NearestDataJigsaw finds the trail ruins, trial chambers or abandoned camp
+// ("trail_ruins", "trial_chambers", "abandoned_camp") whose start chunk is nearest to block (x, z),
 // searching maxRegions placement regions out. It is safe for concurrent
 // use.
 func (o *Overworld) NearestDataJigsaw(kind string, x, z, maxRegions int32) (Scattered, bool) {

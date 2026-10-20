@@ -85,8 +85,13 @@ func (o *Overworld) outpostAt(cx, cz int32) []outpostPiece {
 	}
 	var pieces []outpostPiece
 	if o.isOutpostChunk(cx, cz) {
+		// The start continues the region's random after the spread draws,
+		// as villages do (the rotation matches BDS's outposts).
 		var r rand.MT
-		r.Seed(populationSeed(o.seed, cx, cz))
+		structureSeed(&r, o.seed, floorDivRegion(cx, outpostSpacing), floorDivRegion(cz, outpostSpacing), outpostSalt)
+		for range 4 {
+			r.IntN(outpostSpacing - outpostSeparation)
+		}
 		rot := int(r.IntN(4))
 		x, z := cx*16, cz*16
 		pieces = append(pieces,

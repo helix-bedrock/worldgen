@@ -97,10 +97,51 @@ func (o *Overworld) cityAdjustments(chunkX, chunkZ int32) []beardShaver {
 	return out
 }
 
-// adjust is the density added at block (x, y, z) by the beard and shavers
-// (the first loop of sub_D1EE730; the other kinds are not registered by any
-// structure built yet).
-func (o *Overworld) adjust(bs []beardShaver, x, y, z int32) float32 {
+// beardBox is one registered beard (sub_D1ED140, kind 0 of a jigsaw
+// piece: every rigid village piece): the piece box widened by 2 on x and z,
+// and its ground level.
+type beardBox struct {
+	x0, z0, x1, z1, ground int32
+}
+
+func newBeardBox(bb box, groundDelta int32) beardBox {
+	return beardBox{x0: bb.x0 - 2, z0: bb.z0 - 2, x1: bb.x1 + 2, z1: bb.z1 + 2, ground: bb.y0 + groundDelta}
+}
+
+// villageBeards lists the beards registered in chunk (chunkX, chunkZ): the
+// rigid pieces of the villages that reach it within 12 blocks, by village
+// region, then in assembly order. It is nil when there are none.
+func (o *Overworld) villageBeards(chunkX, chunkZ int32) []beardBox {
+	if o.jigsaw == nil {
+		return nil
+	}
+	var out []beardBox
+	r0x, r1x := floorDivRegion(chunkX-7, villageSpacing), floorDivRegion(chunkX+7, villageSpacing)
+	r0z, r1z := floorDivRegion(chunkZ-7, villageSpacing), floorDivRegion(chunkZ+7, villageSpacing)
+	for rx := r0x; rx <= r1x; rx++ {
+		for rz := r0z; rz <= r1z; rz++ {
+			sx, sz, _ := o.villagePick(rx, rz)
+			v := o.villageAt(sx, sz)
+			if v == nil {
+				continue
+			}
+			for _, p := range v.pieces {
+				if p.el.terrainMatching {
+					continue
+				}
+				if (p.bb.x0-12)>>4 <= chunkX && chunkX <= (p.bb.x1+12)>>4 &&
+					(p.bb.z0-12)>>4 <= chunkZ && chunkZ <= (p.bb.z1+12)>>4 {
+					out = append(out, newBeardBox(p.bb, p.ground))
+				}
+			}
+		}
+	}
+	return out
+}
+
+// adjust is the density added at block (x, y, z) by the beard and shavers,
+// then the beards (the first two loops of sub_D1EE730).
+func (o *Overworld) adjust(bs []beardShaver, beards []beardBox, x, y, z int32) float32 {
 	var sum float32
 	for i := range bs {
 		b := &bs[i]
@@ -133,6 +174,12 @@ func (o *Overworld) adjust(bs []beardShaver, x, y, z int32) float32 {
 			w = float32(1.5 - float32(dist/r))
 		}
 		sum = float32(sum + float32(k*w))
+	}
+	for i := range beards {
+		b := &beards[i]
+		dx := max(b.x0-x, x-b.x1, 0)
+		dz := max(b.z0-z, z-b.z1, 0)
+		sum = float32(sum + float32(o.kernelAt(dx, y-b.ground, dz)*0.8))
 	}
 	return sum
 }

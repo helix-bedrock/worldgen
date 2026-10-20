@@ -80,6 +80,12 @@ func (o *Overworld) snowCanStand(c *Chunk, x, y, z int) bool {
 	case o.ids.ice, o.ids.packedIce, o.ids.blueIce:
 		return false
 	}
+	// A campfire's top is not full: BDS leaves the abandoned camp's
+	// campfire at -846 70 2226 bare on the comparison seed.
+	switch o.blockName(b) {
+	case "minecraft:campfire", "minecraft:soul_campfire":
+		return false
+	}
 	return o.solidMaterial(b)
 }
 

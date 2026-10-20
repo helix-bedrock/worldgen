@@ -461,14 +461,30 @@ type rootSystemFeature struct {
 	// replace holds the block names the roots may take, in any state (BDS
 	// compares block types).
 	replace map[string]bool
+	// space is the test for the block the tree goes in; nil is the
+	// azalea's.
+	space func(o *Overworld, b uint32) bool
+}
+
+// azaleaSpace is the azalea's space test (sub_D299D10): air, a replaceable
+// block, water or leaves.
+// VERIFY: plant materials pass only on a region check that was not read.
+func azaleaSpace(o *Overworld, b uint32) bool {
+	return b == o.ids.air || o.builtOver(b) || o.waterMaterial(b) || o.hasBlockTag(b, "leaves")
+}
+
+// sulfurSpringSpace is the sulfur spring trail's space test (sub_4FAE5F0):
+// a block that can be built over (BlockType vfunc +672) and is not a
+// liquid.
+func sulfurSpringSpace(o *Overworld, b uint32) bool {
+	return o.builtOver(b) && !o.liquidMaterial(b)
 }
 
 func (f *rootSystemFeature) free(w *featureWorld, b uint32) bool {
-	// The azalea's space test (sub_D299D10): air, a replaceable block, water
-	// or leaves.
-	// VERIFY: plant materials pass only on a region check that was not read.
-	o := w.o
-	return b == o.ids.air || o.builtOver(b) || o.waterMaterial(b) || o.hasBlockTag(b, "leaves")
+	if f.space != nil {
+		return f.space(w.o, b)
+	}
+	return azaleaSpace(w.o, b)
 }
 
 func (f *rootSystemFeature) place(w *featureWorld, x, y, z int32, r *rand.MT) (blockPos, bool) {

@@ -41,7 +41,15 @@ func (o *Overworld) builtinFeatures(set *featureSet) {
 		tips:    []uint32{id("minecraft:pointed_dripstone"), id("minecraft:sulfur_spike")}}
 	add("minecraft:pointed_dripstone_feature", &pointedFeature{drip})
 	add("minecraft:dripstone_cluster_feature", &clusterFeature{speleothemBlocks: drip,
-		stone: []uint32{o.ids.stone, o.ids.deepslate, id("minecraft:tuff")}})
+		stone: []uint32{o.ids.stone, o.ids.deepslate, id("minecraft:tuff")}, minHeight: 3, maxHeight: 5,
+		wetBase: 0.1, wetScale: 0.3, wetMin: 0.1, wetMax: 1})
+	// Sulfur caves use the same classes (sulfur, cinnabar list xmmword_F60D660).
+	sulfur := speleothemBlocks{base: id("minecraft:sulfur"), tip: id("minecraft:sulfur_spike"),
+		replace: []uint32{id("minecraft:sulfur"), id("minecraft:cinnabar")}}
+	add("minecraft:sulfur_spike_feature", &pointedFeature{sulfur})
+	add("minecraft:sulfur_pool", &lakeFeature{liquid: o.ids.water, border: sulfur.base, avoid: []string{"minecraft:sulfur_spike"}})
+	add("minecraft:sulfur_spike_cluster_feature", &clusterFeature{speleothemBlocks: sulfur,
+		stone: []uint32{o.ids.stone, o.ids.deepslate, id("minecraft:tuff")}, minHeight: 1, maxHeight: 4})
 	add("minecraft:large_dripstone_feature", &largeFeature{drip})
 	add("minecraft:dripleaf_feature", o.newDripleaf(id, set))
 	singleVine := &vinesSingleFaceFeature{vine: id("minecraft:vine"), invisibleBedrock: id("minecraft:invisible_bedrock")}
@@ -87,6 +95,18 @@ func (o *Overworld) builtinFeatures(set *featureSet) {
 		roots.replace["minecraft:"+n] = true
 	}
 	add("minecraft:azalea_root_system_feature", roots)
+	// The same class leads sulfur caves to a spring on the surface, the
+	// trail of sulfur in the column below (xmmword_F60D648).
+	sulfurTrail := &rootSystemFeature{tree: featureRef{"minecraft:random_sulfur_spring_with_tuff_feature", set},
+		hanging: id("minecraft:sulfur"), roots: id("minecraft:sulfur"), replace: map[string]bool{}, space: sulfurSpringSpace}
+	for _, n := range []string{"powder_snow", "snow", "sand", "gravel", "clay", "red_sand", "dirt", "mud", "moss_block",
+		"grass_block", "stone", "granite", "diorite", "andesite", "tuff", "deepslate", "white_terracotta",
+		"orange_terracotta", "magenta_terracotta", "light_blue_terracotta", "yellow_terracotta", "lime_terracotta",
+		"pink_terracotta", "gray_terracotta", "light_gray_terracotta", "cyan_terracotta", "purple_terracotta",
+		"blue_terracotta", "brown_terracotta", "green_terracotta", "red_terracotta", "black_terracotta"} {
+		sulfurTrail.replace["minecraft:"+n] = true
+	}
+	add("minecraft:sulfur_spring_trail_to_surface_feature", sulfurTrail)
 	add("minecraft:dead_bush_feature", &deadBushFeature{bush: id("minecraft:deadbush")})
 
 	grass := func(typ string) uint32 {
@@ -141,6 +161,15 @@ func (o *Overworld) builtinFeatures(set *featureSet) {
 		sa.plants[i] = id("minecraft:" + c + "_coral")
 	}
 	add("minecraft:sea_anemone_feature", sa)
+	rock := map[string]bool{}
+	for _, n := range []string{"stone", "deepslate", "tuff", "calcite", "snow", "powder_snow", "packed_ice", "dirt", "coarse_dirt"} {
+		rock["minecraft:"+n] = true
+	}
+	waterSpring := &springFeature{liquid: o.ids.water, rock: rock}
+	lavaSpring := &springFeature{liquid: o.ids.lava, rock: rock}
+	add("minecraft:water_spring_feature", waterSpring)
+	add("minecraft:lava_spring_feature", lavaSpring)
+	add("minecraft:legacy:springs_feature", &legacySpringsFeature{water: waterSpring, lava: lavaSpring})
 }
 
 // isWater reports whether a block is water.
