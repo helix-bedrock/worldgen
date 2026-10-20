@@ -15,7 +15,8 @@
 >   berries, pumpkins, sugar cane, mushrooms, bamboo, lily pads, cactus, dead bushes, melons, vines,
 >   firefly bushes, dry grass, red shrubs, lilacs, rose bushes and peonies.
 > - **Biome features:** ice spikes, forest rocks in giant taigas and grass patches in mangrove swamps.
-> - **Oceans:** seagrass, kelp, coral reefs and icebergs.
+> - **Oceans:** seagrass, kelp, coral reefs, coral crusts, sea anemones, icebergs, and magma with
+>   bubble columns.
 > - **Structures:** villages, mineshafts, dungeons, ancient cities, desert pyramids, jungle temples,
 >   witch huts, igloos, ocean ruins, shipwrecks, buried treasure, ocean monuments, pillager outposts,
 >   ruined portals, woodland mansions, strongholds, trail ruins, trial chambers, fossils and desert
@@ -106,7 +107,7 @@ The full list of what is and is not generated is in [STATUS.md](STATUS.md).
 | Part | State |
 |---|---|
 | Terrain, biomes, surface, caves, aquifers, ores | ✅ done |
-| Ocean decorations, freezing | 🟡 seagrass, kelp, coral reefs, icebergs and freezing done; coral crust, magma and bubble columns next |
+| Ocean decorations, freezing | 🟡 all placed, close to BDS |
 | Cave decorations | 🟡 lush, dripstone, deep dark sculk and glow lichen close to BDS; geodes exact; sulfur spikes next |
 | Plants and flowers | 🟡 all placed, close to BDS |
 | Trees | 🟡 all placed; mangroves too sparse |

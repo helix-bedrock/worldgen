@@ -228,9 +228,17 @@ func (o *Overworld) loadFeatureRules(fsys fs.FS, dir string, defs map[string]*bi
 			if !ok {
 				continue
 			}
-			if ok, err := filterAccepts(r.Conditions.Filter, d.Tags); err != nil {
-				return fmt.Errorf("worldgen: rule %s: %w", rule.id, err)
-			} else if ok {
+			// A rule without a biome filter runs in every biome: BDS puts
+			// overworld_underwater_magma_feature's magma in plains caves
+			// and warm oceans alike.
+			ok = len(r.Conditions.Filter) == 0
+			if !ok {
+				var err error
+				if ok, err = filterAccepts(r.Conditions.Filter, d.Tags); err != nil {
+					return fmt.Errorf("worldgen: rule %s: %w", rule.id, err)
+				}
+			}
+			if ok {
 				if fr.byBiome[id] == nil {
 					fr.byBiome[id] = make([][]*featureRule, len(passOrder))
 				}
@@ -739,6 +747,7 @@ func (o *Overworld) decorate(chunkX, chunkZ int32, c *Chunk, base *PackedChunk, 
 		}
 	}
 	o.freeze(chunkX, chunkZ, c)
+	o.bubbleColumns(c)
 	o.keepWater(c, base)
 	o.dropOverwrittenBlockEntities(c)
 }
@@ -755,25 +764,19 @@ func (o *Overworld) keepWater(c *Chunk, base *PackedChunk) {
 			continue
 		}
 		for i := s << 12; i < (s+1)<<12; i++ {
-			if b := uint32(c.Blocks[i]); base.at(i) == o.ids.water && b != o.ids.water && waterloggable(o.blockName(b)) {
+			if b := uint32(c.Blocks[i]); base.at(i) == o.ids.water && b != o.ids.water && o.holdsWater(b) {
 				c.Water[i>>6] |= 1 << (i & 63)
 			}
 		}
 	}
 }
 
-// waterloggable reports whether a block keeps the water it is placed in.
-// VERIFY: these are the blocks BDS 1.26.52 worlds hold with water in their
-// second layer after generation (seagrass, kelp, coral fans and wall fans,
-// sea pickles, glow lichen, chests); BDS decides by the block's
-// can-contain-liquid flag, whose table was not read.
-func waterloggable(name string) bool {
-	switch name {
-	case "minecraft:seagrass", "minecraft:kelp", "minecraft:sea_pickle", "minecraft:glow_lichen", "minecraft:chest",
-		"minecraft:pointed_dripstone", "minecraft:sculk_vein", "minecraft:mangrove_roots", "minecraft:mangrove_propagule":
-		return true
-	}
-	return strings.HasSuffix(name, "_coral_fan") || strings.HasSuffix(name, "_coral_wall_fan")
+// holdsWater reports whether a block keeps the water it is placed in: BDS's
+// can-contain-liquid flag (Block+184 bit 0), from data/bds/liquid_holders.json
+// (exported with the script API's BlockPermutation.canContainLiquid; every
+// state of a block agrees in 1.26.52).
+func (o *Overworld) holdsWater(b uint32) bool {
+	return b != o.ids.air && o.holdsLiquid[o.blockName(b)]
 }
 
 // chunkBiomes lists the distinct biomes of a chunk in BDS's order: sub-chunk

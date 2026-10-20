@@ -199,6 +199,13 @@ func (o *Overworld) convertJavaState(st TemplateState) (uint32, bool, bool) {
 					name = stone + "_double_slab"
 				}
 			}
+		case "stone":
+			// BDS keeps these three and leaves other variants plain stone
+			// (sub_D276010).
+			switch v {
+			case "granite", "diorite", "andesite":
+				name = v
+			}
 		case "monster_egg":
 			name = map[string]string{"stone": "infested_stone", "cobblestone": "infested_cobblestone",
 				"stone_brick": "infested_stone_bricks", "mossy_brick": "infested_mossy_stone_bricks",

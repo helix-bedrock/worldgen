@@ -203,6 +203,8 @@ type blockIDs struct {
 	// terracotta is indexed by dye colour (0 white ... 15 black).
 	terracotta [16]uint32
 	mycelium   uint32
+	// magma and bubbleColumn (drag_down) are 0 when the block list lacks them.
+	magma, bubbleColumn uint32
 	// carvable is the set of blocks cave carvers may cut.
 	carvable map[uint32]struct{}
 	// canyonCarvable is the set canyons may cut (a different list).
@@ -282,6 +284,8 @@ func NewOverworld(seed int64, reg *blocks.Registry, biomeIDs map[string]uint32, 
 		}
 		*n.dst = id
 	}
+	o.ids.magma, _ = reg.Default("minecraft:magma")
+	o.ids.bubbleColumn, _ = reg.Lookup("minecraft:bubble_column", map[string]any{"drag_down": true})
 	for _, n := range []string{"stone", "granite", "polished_granite", "diorite", "polished_diorite", "andesite", "polished_andesite"} {
 		id, ok := reg.Default("minecraft:" + n)
 		if !ok {

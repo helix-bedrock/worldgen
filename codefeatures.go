@@ -135,6 +135,12 @@ func (o *Overworld) builtinFeatures(set *featureSet) {
 	}
 	add("minecraft:coral_feature", cf)
 	add("minecraft:coral_hang_feature", &coralHangFeature{coral: cf})
+	add("minecraft:coral_crust_feature", newCoralCrust(cf))
+	sa := &seaAnemoneFeature{coral: cf}
+	for i, c := range []string{"tube", "brain", "bubble", "fire", "horn"} {
+		sa.plants[i] = id("minecraft:" + c + "_coral")
+	}
+	add("minecraft:sea_anemone_feature", sa)
 }
 
 // isWater reports whether a block is water.

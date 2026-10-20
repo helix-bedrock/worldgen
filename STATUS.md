@@ -91,9 +91,14 @@ BDS generated from the same seed. The marks mean:
 | --- | --- |
 | Seagrass and kelp | Close |
 | Coral reefs, coral fans and sea pickles | Close |
-| Coral crust and sea anemones | Not yet |
-| Magma blocks and bubble columns on the ocean floor | Not yet |
+| Coral crust (dead coral crusts and outcroppings with live coral on them) | Close (the dead coral colour is random in BDS, see below) |
+| Sea anemones (live coral and fans on shallow warm ocean floors) | Close |
+| Magma blocks under water, with bubble columns above them | Close |
 | Water and lava springs in cliffs | Not yet |
+
+BDS picks the colour of each coral crust template's dead coral from a random seeded with the time
+since the server started, so two BDS runs of the same seed disagree. worldgen picks it from the
+world seed and the template instead, so the same seed always gives the same colours.
 
 ## Other features
 

@@ -905,6 +905,9 @@ func (o *Overworld) placePiece(p *jigsawPiece, c *Chunk, chunkBox box, height fu
 		if o.floorBedrock(uint32(c.Blocks[i]), y) {
 			continue
 		}
+		// A block that can hold water keeps the water it replaces, as in
+		// BDS's template placement (sub_D2B7A10).
+		wet := cs.water || o.isWater(uint32(c.Blocks[i])) && o.holdsWater(cs.id)
 		c.Blocks[i] = uint16(cs.id)
 		if d := o.blockEntityFor(cs.id, st.Name, x, y, z); d != nil {
 			be := BlockEntity{X: x, Y: y, Z: z, Data: d}
@@ -919,7 +922,7 @@ func (o *Overworld) placePiece(p *jigsawPiece, c *Chunk, chunkBox box, height fu
 			}
 			c.BlockEntities = append(c.BlockEntities, be)
 		}
-		if cs.water {
+		if wet {
 			c.Water[i>>6] |= 1 << (i & 63)
 		} else {
 			c.Water[i>>6] &^= 1 << (i & 63)

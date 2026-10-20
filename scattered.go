@@ -305,8 +305,15 @@ func (b *scBuild) setWorld(wx, wy, wz int32, s uint32) bool {
 	if b.o.floorBedrock(uint32(b.c.Blocks[i]), wy) {
 		return false
 	}
+	// A block that can hold water keeps the water it replaces, as in
+	// BDS's template placement (sub_D2B7A10).
+	wet := b.o.isWater(uint32(b.c.Blocks[i])) && b.o.holdsWater(s)
 	b.c.set(int(wx&15), int(wy), int(wz&15), s)
-	b.c.Water[i>>6] &^= 1 << (i & 63)
+	if wet {
+		b.c.Water[i>>6] |= 1 << (i & 63)
+	} else {
+		b.c.Water[i>>6] &^= 1 << (i & 63)
+	}
 	return true
 }
 
