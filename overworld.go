@@ -161,6 +161,9 @@ type Overworld struct {
 	mansions     sync.Map
 	// shFirst holds the first three strongholds' chunks, found once;
 	// strongholds holds each assembled stronghold by its start chunk.
+	// dataJigsaws are the data-driven jigsaw structures (trail ruins,
+	// trial chambers).
+	dataJigsaws []*djDef
 	shFirstOnce sync.Once
 	shFirst     [][2]int32
 	strongholds sync.Map
@@ -407,6 +410,13 @@ func NewOverworld(seed int64, reg *blocks.Registry, biomeIDs map[string]uint32, 
 		return nil, err
 	}
 	o.kernel = beardKernel()
+	for _, load := range []func() (*djDef, error){o.loadTrailRuins, o.loadTrialChambers} {
+		d, err := load()
+		if err != nil {
+			return nil, err
+		}
+		o.dataJigsaws = append(o.dataJigsaws, d)
+	}
 	features, err := o.loadFeatures(vanillaData, "data/vanilla/features")
 	if err != nil {
 		return nil, err

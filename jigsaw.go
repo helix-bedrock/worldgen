@@ -52,6 +52,9 @@ type jigsawElement struct {
 	terrainMatching       bool
 	// rules are the block rules applied as the element is placed.
 	rules []blockRule
+	// capped are capped processors run after the rules (data-driven
+	// structures).
+	capped []cappedRule
 }
 
 // jigsawTemplate is a template prepared for placement: its blocks converted
@@ -253,6 +256,10 @@ type convertedState struct {
 type jigsawBlock struct {
 	pos        [3]int32
 	facing     string
+	top        string // the front_top orientation's top, for aligned joints
+	aligned    bool   // the joint must keep its top
+	selPrio    int32  // selection_priority: tried first when higher
+	placePrio  int32  // placement_priority: its child is expanded first when higher
 	attachment string
 	// name and target are the jigsaw's own name and the name it joins.
 	name, target string
@@ -346,6 +353,23 @@ func loadJigsawData(file string, reg blockLookup) (*jigsawData, error) {
 	return d, nil
 }
 
+// nbtInt reads an integer NBT value of any width, 0 if it is not one.
+func nbtInt(v any) int32 {
+	switch n := v.(type) {
+	case int32:
+		return n
+	case int16:
+		return int32(n)
+	case int8:
+		return int32(n)
+	case uint8:
+		return int32(n)
+	case int64:
+		return int32(n)
+	}
+	return 0
+}
+
 // blockLookup finds a block's default state.
 type blockLookup interface {
 	Default(name string) (uint32, bool)
@@ -376,8 +400,19 @@ func (o *Overworld) template(path string) *jigsawTemplate {
 				// Newer templates give the jigsaw's front and top as
 				// orientation (front_top).
 				if or := st.Props["orientation"]; jb.facing == "" && or != "" {
-					jb.facing, _, _ = strings.Cut(or, "_")
+					jb.facing, jb.top, _ = strings.Cut(or, "_")
 				}
+				// Joints are rollable unless named aligned; vertical ones
+				// default to aligned.
+				switch b.NBT["joint"] {
+				case "aligned":
+					jb.aligned = true
+				case "rollable":
+				default:
+					jb.aligned = jb.facing == "up" || jb.facing == "down"
+				}
+				jb.selPrio = nbtInt(b.NBT["selection_priority"])
+				jb.placePrio = nbtInt(b.NBT["placement_priority"])
 				jb.name, _ = b.NBT["name"].(string)
 				jb.target, _ = b.NBT["target"].(string)
 				jb.attachment, _ = b.NBT["attachement_type"].(string)
@@ -511,6 +546,9 @@ type jigsawPiece struct {
 	// ground is the piece's ground level above its bottom, for terrain
 	// adjustments (ancient cities only).
 	ground int32
+
+	cappedOnce sync.Once
+	capped     map[int]cappedRule
 }
 
 // placedJigsaws returns a piece's jigsaw blocks in world space.
@@ -520,6 +558,7 @@ func (p *jigsawPiece) placedJigsaws() []jigsawBlock {
 		rp := rotatePos(j.pos, p.rotation)
 		j.pos = [3]int32{rp[0] + p.pos[0], rp[1] + p.pos[1], rp[2] + p.pos[2]}
 		j.facing = rotateFacing(j.facing, p.rotation)
+		j.top = rotateFacing(j.top, p.rotation)
 		out[i] = j
 	}
 	return out
@@ -824,7 +863,11 @@ func (o *Overworld) placePiece(p *jigsawPiece, c *Chunk, chunkBox box, height fu
 	t := p.tpl.tpl
 	rot := p.rotation
 	conv := o.templateStates(p.tpl, rot)
-	for _, b := range t.Blocks {
+	var picks map[int]cappedRule
+	if len(p.el.capped) > 0 {
+		picks = o.cappedPicks(p)
+	}
+	for bi, b := range t.Blocks {
 		rp := rotatePos(b.Pos, rot)
 		x, z := rp[0]+p.pos[0], rp[2]+p.pos[2]
 		y := rp[1] + p.pos[1]
@@ -855,13 +898,21 @@ func (o *Overworld) placePiece(p *jigsawPiece, c *Chunk, chunkBox box, height fu
 		if len(p.el.rules) > 0 {
 			cs = o.applyRules(p.el.rules, cs, x, y, z, uint32(c.Blocks[i]))
 		}
+		loot := ""
+		if cr, ok := picks[bi]; ok {
+			cs, loot = convertedState{cr.output, false, true}, cr.loot
+		}
 		if o.floorBedrock(uint32(c.Blocks[i]), y) {
 			continue
 		}
 		c.Blocks[i] = uint16(cs.id)
 		if d := o.blockEntityFor(cs.id, st.Name, x, y, z); d != nil {
 			be := BlockEntity{X: x, Y: y, Z: z, Data: d}
-			if lt, ok := b.NBT["LootTable"].(string); ok && lt != "" {
+			if loot != "" {
+				be.LootTable = loot
+				d["LootTable"] = loot
+				d["LootTableSeed"] = int32(positionSeed(o.seed, x, y, z))
+			} else if lt, ok := b.NBT["LootTable"].(string); ok && lt != "" {
 				be.LootTable = "loot_tables/" + strings.TrimPrefix(lt, "minecraft:") + ".json"
 				d["LootTable"] = be.LootTable
 				d["LootTableSeed"] = int32(positionSeed(o.seed, x, y, z))
@@ -1053,11 +1104,12 @@ func positionSeed(seed int64, x, y, z int32) uint32 {
 }
 
 // placeStructures writes the structures that reach chunk (cx, cz) into c,
-// in BDS's order: villages, mineshafts, strongholds, ancient cities, scattered
+// in BDS's order: trail ruins and trial chambers, villages, mineshafts, strongholds, ancient cities, scattered
 // features, pillager outposts, woodland mansions, ocean monuments, ocean ruins, shipwrecks,
 // then buried treasure. raw gives undecorated terrain.
 // VERIFY: the order of structure types (sub_C970F80 walks the registry).
 func (o *Overworld) placeStructures(cx, cz int32, c *Chunk, height func(x, z int32) int32, raw func(cx, cz int32) *PackedChunk) {
+	o.placeDataJigsaws(cx, cz, c)
 	o.placeVillages(cx, cz, c, height)
 	o.placeMineshafts(cx, cz, c, raw)
 	o.placeStrongholds(cx, cz, c, raw)
@@ -1075,7 +1127,7 @@ func (o *Overworld) placeStructures(cx, cz int32, c *Chunk, height func(x, z int
 // structuresReach reports whether a structure has a piece in chunk
 // (cx, cz).
 func (o *Overworld) structuresReach(cx, cz int32, height func(x, z int32) int32, raw func(cx, cz int32) *PackedChunk) bool {
-	return o.villagesReach(cx, cz, height) || o.mineshaftReaches(cx, cz) || o.strongholdReaches(cx, cz) || o.citiesReach(cx, cz) ||
+	return o.dataJigsawsReach(cx, cz) || o.villagesReach(cx, cz, height) || o.mineshaftReaches(cx, cz) || o.strongholdReaches(cx, cz) || o.citiesReach(cx, cz) ||
 		o.scatteredReaches(cx, cz) || o.ruinReaches(cx, cz) ||
 		o.shipReaches(cx, cz) || o.isTreasureChunk(cx, cz) || o.monumentReaches(cx, cz) ||
 		o.outpostReaches(cx, cz) || o.portalReaches(cx, cz) || o.mansionReaches(cx, cz, raw)

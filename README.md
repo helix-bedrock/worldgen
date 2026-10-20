@@ -16,8 +16,8 @@
 > - **Oceans:** seagrass, kelp, coral reefs and icebergs.
 > - **Structures:** villages, mineshafts, dungeons, ancient cities, desert pyramids, jungle temples,
 >   witch huts, igloos, ocean ruins, shipwrecks, buried treasure, ocean monuments, pillager outposts,
->   ruined portals, woodland mansions and strongholds. Trial chambers, trail ruins, fossils and desert
->   wells are not started, and chests are still empty in game.
+>   ruined portals, woodland mansions, strongholds, trail ruins, trial chambers, fossils and desert
+>   wells. Chests are still empty in game.
 > - **The Nether and the End are not started.**
 > - **The API is not stable.** Names and behaviour change between commits.
 >
@@ -119,8 +119,9 @@ The full list of what is and is not generated is in [STATUS.md](STATUS.md).
 | Pillager outposts (watchtower, overgrown overlay, cages, tents, logs, targets) | 🟡 written from BDS; not yet compared with BDS |
 | Ruined portals (buried and surface, netherrack spread, aging) | 🟡 written from BDS; not yet compared with BDS |
 | Woodland mansions (room grid, all floors and rooms, roofs, foundation, entrance steps) | 🟡 written from BDS; checked in game, close |
-| Strongholds (first three on village chunks, grid placement, all rooms, portal room fallback) | 🟡 written from BDS; checked in game, close |
-| Trial chambers, trail ruins, fossils, desert wells | ⬜ not started |
+| Strongholds (first three on village chunks, grid placement, all rooms, portal room fallback) | 🟡 placement matches BDS's locate; checked in game, close |
+| Trail ruins, trial chambers (placement matches BDS's locate; pools from BDS, buried terrain) | 🟡 written from BDS; trial chambers checked in game, close |
+| Fossils, desert wells | 🟡 written from BDS; desert wells checked in game |
 | Nether and End | ⬜ not started |
 
 **The goal is to match the latest Minecraft version exactly.** After that, every time Minecraft

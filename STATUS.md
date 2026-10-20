@@ -96,8 +96,8 @@ BDS generated from the same seed. The marks mean:
 | --- | --- |
 | Forest rocks (mossy cobblestone boulders in giant taigas) | Not yet |
 | Ice spikes and their ice patches | Not yet |
-| Fossils | Not yet |
-| Desert wells | Not yet |
+| Fossils (desert and swamp; deepslate fossils with diamond ore) | Close (not yet checked in game) |
+| Desert wells (with suspicious sand) | Close (checked in game) |
 | Emerald ore in mountain surfaces | Not yet |
 
 ## Structures
@@ -120,7 +120,8 @@ BDS generated from the same seed. The marks mean:
 | Ruined portals (buried and on the surface, netherrack spread, aging) | Close (not yet compared with BDS) |
 | Woodland mansions (all floors and rooms, roofs, foundation, entrance steps, joined windows) | Close (checked in game) |
 | Strongholds (all rooms, library, portal room with silverfish spawner, joined fences and bars) | Close (checked in game) |
-| Trial chambers, trail ruins, fossils, desert wells | Not yet |
+| Trail ruins (buried under a mound, with suspicious gravel) | Close (placement matches BDS) |
+| Trial chambers (all chamber kinds, copper bulb aging, buried shell; spawners and vaults have no mob or loot data yet) | Close (placement matches BDS; checked in game) |
 
 Structure chests, dispensers and suspicious sand carry their loot table, but the loot is not filled in yet, so chests are empty in
 game.

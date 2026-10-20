@@ -34,3 +34,24 @@ func BlockSeed(x, y, z int32) int64 {
 	l := int64(x*3129871) ^ int64(z)*116129781 ^ int64(y)
 	return (l*l*42317861 + l*11) >> 16
 }
+
+// IntN returns a value in [0, n) as java.util.Random.nextInt(bound) does,
+// 0 when n <= 0.
+func (j *Java) IntN(n int32) int32 {
+	if n <= 0 {
+		return 0
+	}
+	if n&(n-1) == 0 {
+		return int32(int64(n) * int64(j.next(31)) >> 31)
+	}
+	for {
+		bits := j.next(31)
+		val := bits % n
+		if bits-val+(n-1) >= 0 {
+			return val
+		}
+	}
+}
+
+// Next returns the next bits random bits (Java's next(bits)).
+func (j *Java) Next(bits uint) int32 { return j.next(bits) }

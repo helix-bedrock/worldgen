@@ -454,6 +454,9 @@ type featureWorld struct {
 	// reproducible (see shuffleRandom).
 	shuffle   rand.MT
 	shuffleOK bool
+	// featSeed is the seed of the current rule's feature random; template
+	// features seed their integrity random with it.
+	featSeed uint32
 
 	// overlay holds the current origin's placements, one array per chunk
 	// column they touch (a map lookup per block read was most of the
@@ -842,6 +845,7 @@ func (o *Overworld) decorateFrom(w *featureWorld, ox, oz int32, origin *PackedCh
 				}
 				// The feature random is a second generator with the same seed.
 				feat.Seed(seed)
+				w.featSeed = seed
 				base := [3]int32{ox * 16, 0, oz * 16}
 				slow := r.axes[0].molang() || r.axes[1].molang() || r.axes[2].molang()
 				for i := n - 1; i >= 0; i-- {

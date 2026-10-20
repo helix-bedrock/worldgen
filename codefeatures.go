@@ -54,6 +54,7 @@ func (o *Overworld) builtinFeatures(set *featureSet) {
 		id("minecraft:cornflower"), id("minecraft:oxeye_daisy"), id("minecraft:azure_bluet"), id("minecraft:dandelion"),
 		id("minecraft:short_grass"), id("minecraft:tall_grass")}})
 	add("minecraft:sweet_berry_bush_feature", o.newSweetBerry())
+	add("minecraft:desert_well_feature", o.newDesertWell())
 
 	grass := func(typ string) uint32 {
 		b, _ := o.reg.Lookup("minecraft:seagrass", map[string]any{"sea_grass_type": typ})

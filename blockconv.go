@@ -78,6 +78,7 @@ var blockEntityIDs = map[string]string{
 	"minecraft:wall_banner": "Banner", "minecraft:skeleton_skull": "Skull", "minecraft:decorated_pot": "DecoratedPot",
 	"minecraft:chiseled_bookshelf": "ChiseledBookshelf", "minecraft:unpowered_comparator": "Comparator",
 	"minecraft:suspicious_sand": "BrushableBlock", "minecraft:suspicious_gravel": "BrushableBlock",
+	"minecraft:trial_spawner": "TrialSpawner", "minecraft:vault": "Vault",
 }
 
 // bedColors are Bedrock's colour indexes for bed block entities.
@@ -376,6 +377,15 @@ func (o *Overworld) convertJavaState(st TemplateState) (uint32, bool, bool) {
 	}
 	if f, ok := st.Props["facing"]; !ok || f == "up" {
 		set("torch_facing_direction", "top")
+	}
+	// Floor and ceiling buttons point up and down; facing only turns them.
+	if strings.HasSuffix(target, "button") {
+		switch st.Props["face"] {
+		case "floor":
+			set("facing_direction", int32(1))
+		case "ceiling":
+			set("facing_direction", int32(0))
+		}
 	}
 	if target == "lever" {
 		set("lever_direction", leverDirection(st.Props))

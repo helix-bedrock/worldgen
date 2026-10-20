@@ -210,6 +210,8 @@ func (o *Overworld) parseFeature(typ string, raw json.RawMessage, set *featureSe
 		return o.parseGeode(raw)
 	case "minecraft:multiface_feature":
 		return o.parseMultiface(raw)
+	case "minecraft:fossil_feature":
+		return o.parseFossil(raw)
 	case "minecraft:surface_relative_threshold_feature":
 		var r struct {
 			Feature string `json:"feature_to_place"`
