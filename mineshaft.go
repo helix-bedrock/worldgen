@@ -595,27 +595,48 @@ func (b *msBuild) edgesLiquid(p *msPiece) bool {
 }
 
 // placeMineshafts writes the pieces of nearby mineshafts that reach chunk
-// (cx, cz) into c. raw gives the terrain of neighbouring chunks.
+// (cx, cz) into c, then joins their fences. raw gives the terrain of
+// neighbouring chunks.
 func (o *Overworld) placeMineshafts(cx, cz int32, c *Chunk, raw func(cx, cz int32) *PackedChunk) {
-	b := msBuild{o: o, c: c, cx: cx, cz: cz, raw: raw,
+	cbox := box{cx * 16, MinY, cz * 16, cx*16 + 15, MaxY - 1, cz*16 + 15}
+	var b *msBuild
+	var built []*mineshaft
+	for sx := cx - msReach; sx <= cx+msReach; sx++ {
+		for sz := cz - msReach; sz <= cz+msReach; sz++ {
+			ms := o.mineshaftAt(sx, sz)
+			if ms == nil || !ms.bb.intersects(cbox) {
+				continue
+			}
+			if b == nil {
+				b = o.newMsBuild(cx, cz, c, raw)
+			}
+			b.build(ms)
+			built = append(built, ms)
+		}
+	}
+	// Joined fences are other blocks than the fence the pieces protect,
+	// so they are joined once every mineshaft is in.
+	for _, ms := range built {
+		area := box{max(cbox.x0, ms.bb.x0), ms.bb.y0, max(cbox.z0, ms.bb.z0), min(cbox.x1, ms.bb.x1), ms.bb.y1, min(cbox.z1, ms.bb.z1)}
+		o.joinFences(c, cx, cz, area, raw, func(nx, nz int32, n *Chunk) {
+			nb := o.newMsBuild(nx, nz, n, raw)
+			for _, other := range built {
+				nb.build(other)
+			}
+		})
+	}
+}
+
+// newMsBuild is the state for building mineshaft pieces into chunk
+// (cx, cz), with the chunk's random.
+func (o *Overworld) newMsBuild(cx, cz int32, c *Chunk, raw func(cx, cz int32) *PackedChunk) *msBuild {
+	b := &msBuild{o: o, c: c, cx: cx, cz: cz, raw: raw,
 		cbox: box{cx * 16, MinY, cz * 16, cx*16 + 15, MaxY - 1, cz*16 + 15}}
 	for i := range b.heights {
 		b.heights[i] = MinY - 1
 	}
-	seeded := false
-	for sx := cx - msReach; sx <= cx+msReach; sx++ {
-		for sz := cz - msReach; sz <= cz+msReach; sz++ {
-			ms := o.mineshaftAt(sx, sz)
-			if ms == nil || !ms.bb.intersects(b.cbox) {
-				continue
-			}
-			if !seeded {
-				b.r.Seed(populationSeed(o.seed, cx, cz))
-				seeded = true
-			}
-			b.build(ms)
-		}
-	}
+	b.r.Seed(populationSeed(o.seed, cx, cz))
+	return b
 }
 
 // mineshaftReaches reports whether a mineshaft has a piece in chunk

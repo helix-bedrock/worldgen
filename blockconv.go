@@ -129,12 +129,50 @@ var (
 	dirEWSN = map[string]int32{"east": 0, "west": 1, "south": 2, "north": 3} // stairs, trapdoors
 )
 
+// leverDirection is Bedrock's lever_direction for a Java lever: on a wall
+// the side it faces, on the floor ("up") or ceiling ("down") the axis it
+// lies along. Older templates name floor and ceiling levers up_x, down_z...
+func leverDirection(p map[string]string) string {
+	f := p["facing"]
+	switch f {
+	case "up_x":
+		return "up_east_west"
+	case "up_z":
+		return "up_north_south"
+	case "down_x":
+		return "down_east_west"
+	case "down_z":
+		return "down_north_south"
+	}
+	axis := "north_south"
+	if f == "east" || f == "west" {
+		axis = "east_west"
+	}
+	switch p["face"] {
+	case "floor":
+		return "up_" + axis
+	case "ceiling":
+		return "down_" + axis
+	}
+	return f
+}
+
+// withJavaProp returns a copy of p with one property set.
+func withJavaProp(p map[string]string, k, v string) map[string]string {
+	out := make(map[string]string, len(p)+1)
+	for pk, pv := range p {
+		out[pk] = pv
+	}
+	out[k] = v
+	return out
+}
+
 // convertJavaState returns the registry index of the Bedrock block for a
 // Java template state and whether it is waterlogged.
 func (o *Overworld) convertJavaState(st TemplateState) (uint32, bool, bool) {
 	name := strings.TrimPrefix(st.Name, "minecraft:")
-	// Older templates (the shipwrecks) still use Java's pre-1.13 names,
-	// with the wood in a variant property.
+	// Older templates (the shipwrecks, the mansion) still use Java's
+	// pre-1.13 names, with the wood, colour or stone in a property.
 	if v := st.Props["variant"]; v != "" {
 		switch name {
 		case "planks":
@@ -143,7 +181,41 @@ func (o *Overworld) convertJavaState(st TemplateState) (uint32, bool, bool) {
 			name = v + "_slab"
 		case "double_wooden_slab":
 			name = v + "_double_slab"
+		case "log", "log2":
+			name = v + "_log"
+		case "leaves", "leaves2":
+			name = v + "_leaves"
+			if st.Props["decayable"] == "false" {
+				st.Props = withJavaProp(st.Props, "persistent", "true")
+			}
+		case "stone_slab", "double_stone_slab":
+			stone := map[string]string{"smoothstone": "smooth_stone", "stone": "smooth_stone", "cobblestone": "cobblestone",
+				"sandstone": "sandstone", "brick": "brick", "stone_brick": "stone_brick", "nether_brick": "nether_brick",
+				"quartz": "quartz", "wood_old": "petrified_oak"}[v]
+			if stone != "" {
+				name = stone + "_slab"
+				if st.Name == "minecraft:double_stone_slab" {
+					name = stone + "_double_slab"
+				}
+			}
+		case "monster_egg":
+			name = map[string]string{"stone": "infested_stone", "cobblestone": "infested_cobblestone",
+				"stone_brick": "infested_stone_bricks", "mossy_brick": "infested_mossy_stone_bricks",
+				"cracked_brick": "infested_cracked_stone_bricks", "chiseled_brick": "infested_chiseled_stone_bricks"}[v]
 		}
+	}
+	if c := st.Props["color"]; c != "" && (name == "wool" || name == "carpet" || name == "stained_glass" ||
+		name == "stained_glass_pane" || name == "stained_hardened_clay" || name == "concrete") {
+		if c == "silver" {
+			c = "light_gray"
+		}
+		if name == "stained_hardened_clay" {
+			name = "terracotta"
+		}
+		name = c + "_" + name
+	}
+	if t := st.Props["type"]; name == "sapling" && t != "" {
+		name = t + "_sapling"
 	}
 	if name == "fence" {
 		name = "oak_fence"
@@ -247,6 +319,8 @@ func (o *Overworld) convertJavaState(st TemplateState) (uint32, bool, bool) {
 			case "none":
 				set("wall_connection_type_"+k, "none")
 			}
+		case "persistent":
+			set("persistent_bit", v == "true")
 		case "attachment":
 			// Bells.
 			switch v {
@@ -300,8 +374,12 @@ func (o *Overworld) convertJavaState(st TemplateState) (uint32, bool, bool) {
 			}
 		}
 	}
-	if _, ok := st.Props["facing"]; !ok {
+	if f, ok := st.Props["facing"]; !ok || f == "up" {
 		set("torch_facing_direction", "top")
+	}
+	if target == "lever" {
+		set("lever_direction", leverDirection(st.Props))
+		set("open_bit", st.Props["powered"] == "true")
 	}
 	id, ok := o.reg.Lookup(full, props)
 	if !ok {

@@ -1,6 +1,6 @@
 # What worldgen generates
 
-Status as of 2026-10-18. This page lists everything worldgen places today and what is still
+Status as of 2026-10-19. This page lists everything worldgen places today and what is still
 missing, so you know what to expect in a world. Only the **Overworld** is generated so far.
 
 Every part is built from the Bedrock Dedicated Server (BDS 1.26.52) and compared with chunks that
@@ -105,7 +105,7 @@ BDS generated from the same seed. The marks mean:
 | What | Status |
 | --- | --- |
 | Villages (all biome types, with loot chests) | Close |
-| Mineshafts (normal and badlands; cobwebs, rails, torches, cave spider spawners) | Close |
+| Mineshafts (normal and badlands; cobwebs, rails, torches, cave spider spawners; fences joined to their walls) | Close |
 | Ancient cities, with the cave around them and their sculk | Close |
 | Mineshaft minecarts with chests | Not yet |
 | Ocean ruins (warm and cold, large ones with clusters of small ones, chests) | Close (not yet compared with BDS; no suspicious sand or gravel yet) |
@@ -117,8 +117,10 @@ BDS generated from the same seed. The marks mean:
 | Witch huts (cauldron with a random potion) | Close |
 | Igloos (half with a basement) | Close |
 | Pillager outposts (watchtower, overgrown overlay, feature pieces, chest; no pillagers) | Close (not yet compared with BDS) |
-| Woodland mansions | Not yet |
-| Strongholds, trial chambers, trail ruins, ruined portals | Not yet |
+| Ruined portals (buried and on the surface, netherrack spread, aging) | Close (not yet compared with BDS) |
+| Woodland mansions (all floors and rooms, roofs, foundation, entrance steps, joined windows) | Close (checked in game) |
+| Strongholds (all rooms, library, portal room with silverfish spawner, joined fences and bars) | Close (checked in game) |
+| Trial chambers, trail ruins, fossils, desert wells | Not yet |
 
 Structure chests, dispensers and suspicious sand carry their loot table, but the loot is not filled in yet, so chests are empty in
 game.

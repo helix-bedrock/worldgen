@@ -4,7 +4,7 @@
 > **This is early and not finished.** It is under active, heavy development, and it will take a
 > while before it is complete.
 >
-> Status as of 2026-10-18:
+> Status as of 2026-10-19:
 >
 > - **The base Overworld matches BDS:** terrain, all biomes, surface layers, caves and canyons,
 >   underground water and lava, ores and stone patches, and an unbroken bedrock floor.
@@ -15,8 +15,9 @@
 >   sugar cane, mushrooms, bamboo and lily pads. Cactus, dead bushes and melons are not placed yet.
 > - **Oceans:** seagrass, kelp, coral reefs and icebergs.
 > - **Structures:** villages, mineshafts, dungeons, ancient cities, desert pyramids, jungle temples,
->   witch huts, igloos, ocean ruins, shipwrecks, buried treasure, ocean monuments and pillager outposts. Other structures are not started, and chests are still
->   empty in game.
+>   witch huts, igloos, ocean ruins, shipwrecks, buried treasure, ocean monuments, pillager outposts,
+>   ruined portals, woodland mansions and strongholds. Trial chambers, trail ruins, fossils and desert
+>   wells are not started, and chests are still empty in game.
 > - **The Nether and the End are not started.**
 > - **The API is not stable.** Names and behaviour change between commits.
 >
@@ -28,7 +29,8 @@
 > [!IMPORTANT]
 > **Verified against Bedrock itself.** The generation comes from the decompiled Bedrock Dedicated
 > Server (BDS): the same noises, the same rules, and the same random draws in the same order.
-> Every part is checked block by block against chunks that BDS itself generated from the same seed.
+> Parts are checked against chunks that BDS itself generated from the same seed; the rest is checked
+> in game, and a final refinement pass makes everything match block for block.
 > The decompiled code is **not** in this repo; it was only used to read how the game works.
 
 ---
@@ -115,7 +117,10 @@ The full list of what is and is not generated is in [STATUS.md](STATUS.md).
 | Shipwrecks (ocean and beached, random woods, chests) | 🟡 written from BDS; not yet compared with BDS |
 | Buried treasure, ocean monuments (all room types, sponge rooms, gold core) | 🟡 written from BDS; not yet compared with BDS |
 | Pillager outposts (watchtower, overgrown overlay, cages, tents, logs, targets) | 🟡 written from BDS; not yet compared with BDS |
-| Other structures | ⬜ not started |
+| Ruined portals (buried and surface, netherrack spread, aging) | 🟡 written from BDS; not yet compared with BDS |
+| Woodland mansions (room grid, all floors and rooms, roofs, foundation, entrance steps) | 🟡 written from BDS; checked in game, close |
+| Strongholds (first three on village chunks, grid placement, all rooms, portal room fallback) | 🟡 written from BDS; checked in game, close |
+| Trial chambers, trail ruins, fossils, desert wells | ⬜ not started |
 | Nether and End | ⬜ not started |
 
 **The goal is to match the latest Minecraft version exactly.** After that, every time Minecraft

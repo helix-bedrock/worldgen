@@ -153,6 +153,17 @@ type Overworld struct {
 	// outpost start's pieces by start chunk.
 	outpostBiome []bool
 	outposts     sync.Map
+	// portals holds each built ruined portal by start chunk.
+	portals sync.Map
+	// mansionBiome is the woodland mansion biome set; mansions holds each
+	// mansion start's layout by start chunk.
+	mansionBiome []bool
+	mansions     sync.Map
+	// shFirst holds the first three strongholds' chunks, found once;
+	// strongholds holds each assembled stronghold by its start chunk.
+	shFirstOnce sync.Once
+	shFirst     [][2]int32
+	strongholds sync.Map
 	// jigsaw is the village pools and elements; templates caches prepared
 	// templates by path and villages assembled villages by start chunk.
 	jigsaw    *jigsawData

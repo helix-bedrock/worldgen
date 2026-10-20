@@ -59,8 +59,14 @@ type jigsawElement struct {
 type jigsawTemplate struct {
 	tpl     *Template
 	jigsaws []jigsawBlock
-	once    [4]sync.Once
-	conv    [4][]convertedState
+	// once and conv cache the converted palette per turn, then per turn
+	// with each mirror (index rot+4*mirror).
+	once [12]sync.Once
+	conv [12][]convertedState
+
+	// at indexes the blocks by position, built once.
+	atOnce sync.Once
+	at     map[[3]int32]int
 
 	// chest is the spot WithHouseChests puts a chest in, computed once.
 	chestOnce sync.Once
@@ -425,6 +431,26 @@ func rotatePos(p [3]int32, r int) [3]int32 {
 		x, z = z, -x
 	}
 	return [3]int32{x, p[1], z}
+}
+
+// Template mirrors, numbered as BDS's placement settings: mirrorZ flips z
+// (Java's LEFT_RIGHT), mirrorX flips x (Java's FRONT_BACK). A template is
+// mirrored about its origin before it is turned.
+const (
+	mirrorNone uint8 = iota
+	mirrorZ
+	mirrorX
+)
+
+// mirrorPos mirrors a template position about the origin.
+func mirrorPos(p [3]int32, m uint8) [3]int32 {
+	switch m {
+	case mirrorZ:
+		p[2] = -p[2]
+	case mirrorX:
+		p[0] = -p[0]
+	}
+	return p
 }
 
 var horizontal = []string{"north", "east", "south", "west"}
@@ -853,16 +879,29 @@ func (o *Overworld) placePiece(p *jigsawPiece, c *Chunk, chunkBox box, height fu
 // templateStates returns a template's palette turned rot quarter turns and
 // converted to Bedrock states, converting it once.
 func (o *Overworld) templateStates(jt *jigsawTemplate, rot int) []convertedState {
-	jt.once[rot].Do(func() {
+	return o.templateStatesMirror(jt, rot, mirrorNone)
+}
+
+// templateStatesMirror is templateStates with the palette first mirrored
+// (mirrorZ or mirrorX).
+func (o *Overworld) templateStatesMirror(jt *jigsawTemplate, rot int, mirror uint8) []convertedState {
+	k := rot&3 + 4*int(min(mirror, mirrorX))
+	jt.once[k].Do(func() {
 		conv := make([]convertedState, len(jt.tpl.Palette))
 		for i, st := range jt.tpl.Palette {
+			switch mirror {
+			case mirrorZ:
+				st.Props = mirrorPropsZ(st.Props)
+			case mirrorX:
+				st.Props = mirrorPropsX(st.Props)
+			}
 			st.Props = rotateProps(st.Props, rot)
 			id, w, ok := o.convertJavaState(st)
 			conv[i] = convertedState{id, w, ok}
 		}
-		jt.conv[rot] = conv
+		jt.conv[k] = conv
 	})
-	return jt.conv[rot]
+	return jt.conv[k]
 }
 
 // isDwelling reports whether a houses-pool template is a building one lives
@@ -945,6 +984,13 @@ func rotateProps(p map[string]string, rot int) map[string]string {
 	}
 	if f, ok := p["facing"]; ok {
 		out["facing"] = rotateFacing(f, rot)
+		// Older floor and ceiling levers name their axis.
+		switch f {
+		case "up_x", "up_z", "down_x", "down_z":
+			if rot&1 == 1 {
+				out["facing"] = map[string]string{"up_x": "up_z", "up_z": "up_x", "down_x": "down_z", "down_z": "down_x"}[f]
+			}
+		}
 	}
 	if a, ok := p["axis"]; ok && rot&1 == 1 {
 		switch a {
@@ -1007,29 +1053,32 @@ func positionSeed(seed int64, x, y, z int32) uint32 {
 }
 
 // placeStructures writes the structures that reach chunk (cx, cz) into c,
-// in BDS's order: villages, mineshafts, ancient cities, scattered
-// features, pillager outposts, ocean monuments, ocean ruins, shipwrecks,
+// in BDS's order: villages, mineshafts, strongholds, ancient cities, scattered
+// features, pillager outposts, woodland mansions, ocean monuments, ocean ruins, shipwrecks,
 // then buried treasure. raw gives undecorated terrain.
 // VERIFY: the order of structure types (sub_C970F80 walks the registry).
 func (o *Overworld) placeStructures(cx, cz int32, c *Chunk, height func(x, z int32) int32, raw func(cx, cz int32) *PackedChunk) {
 	o.placeVillages(cx, cz, c, height)
 	o.placeMineshafts(cx, cz, c, raw)
+	o.placeStrongholds(cx, cz, c, raw)
 	o.placeCities(cx, cz, c)
 	o.placeScattered(cx, cz, c, raw)
 	o.placeOutposts(cx, cz, c, raw)
+	o.placeMansions(cx, cz, c, raw)
 	o.placeMonuments(cx, cz, c)
 	o.placeRuins(cx, cz, c, raw)
 	o.placeShips(cx, cz, c, raw)
 	o.placeTreasure(cx, cz, c, raw(cx, cz))
+	o.placePortals(cx, cz, c, raw)
 }
 
 // structuresReach reports whether a structure has a piece in chunk
 // (cx, cz).
-func (o *Overworld) structuresReach(cx, cz int32, height func(x, z int32) int32) bool {
-	return o.villagesReach(cx, cz, height) || o.mineshaftReaches(cx, cz) || o.citiesReach(cx, cz) ||
+func (o *Overworld) structuresReach(cx, cz int32, height func(x, z int32) int32, raw func(cx, cz int32) *PackedChunk) bool {
+	return o.villagesReach(cx, cz, height) || o.mineshaftReaches(cx, cz) || o.strongholdReaches(cx, cz) || o.citiesReach(cx, cz) ||
 		o.scatteredReaches(cx, cz) || o.ruinReaches(cx, cz) ||
 		o.shipReaches(cx, cz) || o.isTreasureChunk(cx, cz) || o.monumentReaches(cx, cz) ||
-		o.outpostReaches(cx, cz)
+		o.outpostReaches(cx, cz) || o.portalReaches(cx, cz) || o.mansionReaches(cx, cz, raw)
 }
 
 // villagesReach reports whether a village has a piece in chunk (cx, cz).
@@ -1067,7 +1116,7 @@ func (o *Overworld) structuredView(raw func(cx, cz int32) *PackedChunk) func(cx,
 			return p
 		}
 		p := raw(cx, cz)
-		if p != nil && o.structuresReach(cx, cz, height) {
+		if p != nil && o.structuresReach(cx, cz, height, raw) {
 			full := new(Chunk)
 			p.Unpack(full)
 			o.placeStructures(cx, cz, full, height, raw)
