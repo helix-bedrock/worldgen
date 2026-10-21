@@ -31,8 +31,8 @@ type region struct {
 	n      *Nether
 	x0, z0 int32 // world coordinates of the north-west corner
 	// biome is the origin's biome for its feature rules: BDS takes the one
-	// at the chunk's stored position.
-	// VERIFY: taken as the chunk's north-west column.
+	// at the chunk's stored maximum corner (LevelChunk+68, after the
+	// minimum), the south-east column.
 	biome  uint32
 	blocks [regionSize * regionSize * Height]uint16
 	// slots holds the placements in each of the 3x3 chunks, in order.
@@ -89,7 +89,7 @@ func (r *region) load(ox, oz int32, neighbour func(cx, cz int32) *Chunk) {
 	air := uint16(r.n.ids.air)
 	r.biome = ^uint32(0)
 	if c := neighbour(ox, oz); c != nil {
-		r.biome = c.Biome(0, 0)
+		r.biome = c.Biome(15, 15)
 	}
 	for cx := range int32(3) {
 		for cz := range int32(3) {
@@ -143,9 +143,9 @@ func (ow *originWrites) apply(c *Chunk, slot int) {
 
 // decoIDs are the blocks the decoration places or looks for.
 type decoIDs struct {
-	fire, soulFire, soulSoil, glowstone, basalt, blackstone uint32
-	brownMushroom, redMushroom                              uint32
-	goldOre, quartzOre, magma, gravel, ancientDebris        uint32
+	fire, soulFire, soulSoil, soulSand, glowstone, basalt, blackstone uint32
+	brownMushroom, redMushroom                                        uint32
+	goldOre, quartzOre, magma, gravel, ancientDebris                  uint32
 }
 
 func (n *Nether) loadDecoIDs() error {
@@ -156,6 +156,7 @@ func (n *Nether) loadDecoIDs() error {
 		{&n.deco.fire, "minecraft:fire"},
 		{&n.deco.soulFire, "minecraft:soul_fire"},
 		{&n.deco.soulSoil, "minecraft:soul_soil"},
+		{&n.deco.soulSand, "minecraft:soul_sand"},
 		{&n.deco.glowstone, "minecraft:glowstone"},
 		{&n.deco.basalt, "minecraft:basalt"},
 		{&n.deco.blackstone, "minecraft:blackstone"},
@@ -264,7 +265,7 @@ func (n *Nether) decorate(r *region, ox, oz int32) {
 	// debris positions needs exactly one (113 of 120 hit with it, 3 without).
 	// VERIFY: which call in the rule passes (sub_5163DB0) makes it.
 	mt.Uint32()
-	n.runRules(r, ox, oz, r.biome)
+	n.runRules(r, ox, oz, r.biome, mt)
 	for range 2 {
 		x, y, z := at(0, 16, 8)
 		n.debris(r, x, y, z, 0, 4, mt)

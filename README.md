@@ -23,10 +23,10 @@
 >   ruined portals, woodland mansions, strongholds, trail ruins, trial chambers, abandoned camps, fossils
 >   and desert wells. Chests are still empty in game.
 > - **The Nether is in progress:** terrain, biomes, surfaces, bedrock, the cave carver, lava springs,
->   fire, glowstone, ores (gold, quartz, magma, gravel, blackstone, ancient debris), huge crimson and
->   warped fungi, fungi, roots and weeping vines match BDS closely (warped forests and twisting vines
->   are not yet compared). Basalt deltas, soul sand valley features and Nether structures are not
->   done yet.
+>   fire, glowstone, ores (gold, quartz, magma, gravel, blackstone, ancient debris), basalt deltas,
+>   basalt pillars, soul sand and Nether fossils match BDS; huge crimson and warped fungi, fungi,
+>   roots and vines are close. Nether structures (fortresses, bastions, ruined portals) are not done
+>   yet.
 > - **The End is not started.**
 > - **The API is not stable.** Names and behaviour change between commits.
 >
@@ -134,7 +134,7 @@ The full list of what is and is not generated is in [STATUS.md](STATUS.md).
 | Strongholds (first three on village chunks, grid placement, all rooms, portal room fallback) | 🟡 placement matches BDS's locate; checked in game, close |
 | Trail ruins, trial chambers (placement matches BDS's locate; pools from BDS, buried terrain) | 🟡 written from BDS; trial chambers match BDS for the first 26 pieces, then drift |
 | Fossils, desert wells | 🟡 written from BDS; desert wells checked in game |
-| Nether (terrain, cave carver, ores, crimson and warped forests) | 🟡 matches BDS closely; basalt deltas, soul sand valleys and structures not yet |
+| Nether (terrain, cave carver, ores, all five biomes' decorations) | 🟡 matches BDS closely; fungus trees close; structures not yet |
 | The End | ⬜ not started |
 
 **The goal is to match the latest Minecraft version exactly.** After that, every time Minecraft

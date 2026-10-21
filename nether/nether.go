@@ -67,6 +67,7 @@ type Nether struct {
 	// rules[biome][pass] are the biome's feature rules.
 	rules  map[uint32][][]*netherRule
 	carver netherCarver
+	fossil fossilIDs
 }
 
 // New builds the noises for a seed. reg must contain the vanilla blocks the
@@ -119,6 +120,9 @@ func New(seed int64, reg *blocks.Registry, biomeIDs map[string]uint32) (*Nether,
 		return nil, err
 	}
 	if err := n.loadFungi(); err != nil {
+		return nil, err
+	}
+	if err := n.loadFossils(); err != nil {
 		return nil, err
 	}
 	if err := n.loadRules(biomeIDs); err != nil {

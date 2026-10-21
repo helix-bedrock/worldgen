@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io/fs"
+	"math"
 	"slices"
 	"strings"
 
@@ -35,6 +36,9 @@ type netherRule struct {
 	hash       uint32
 	place      placeFunc
 	iterations int32
+	// iterRand, when set, is Math.Random(lo, hi) iterations, drawn per
+	// chunk from the population random.
+	iterRand *[2]float32
 	// num/den is the scatter chance; den 0 places every time.
 	num, den int32
 	order    [3]int
@@ -61,6 +65,17 @@ func (n *Nether) netherFeatures() (map[string]placeFunc, error) {
 		},
 		"minecraft:_weeping_vines_cluster_feature":  (*Nether).weepingVinesCluster,
 		"minecraft:_twisting_vines_cluster_feature": (*Nether).twistingVinesCluster,
+		"minecraft:delta_feature":                   (*Nether).deltaFeature,
+		"minecraft:basalt_columns_feature":          (*Nether).basaltColumns,
+		"minecraft:_basalt_pillar_feature":          (*Nether).basaltPillar,
+		"minecraft:nether_fossil_feature":           (*Nether).netherFossil,
+	}
+	for _, id := range []string{"minecraft:nether_soul_sand_underground_feature"} {
+		o, err := n.loadOre(id)
+		if err != nil {
+			return nil, err
+		}
+		feats[id] = o.place
 	}
 	for _, id := range []string{"minecraft:crimson_fungus_scatter_feature", "minecraft:warped_fungus_scatter_feature",
 		"minecraft:crimson_roots_scatter_feature", "minecraft:warped_roots_scatter_feature",
@@ -131,7 +146,9 @@ func (n *Nether) loadRules(biomeIDs map[string]uint32) error {
 		}
 		rule := &netherRule{id: r.Description.Identifier, hash: feature.RuleHash(r.Description.Identifier), place: place, order: [3]int{0, 2, 1}}
 		if err := json.Unmarshal(r.Distribution.Iterations, &rule.iterations); err != nil {
-			return fmt.Errorf("worldgen: rule %s: iterations: %w", rule.id, err)
+			if rule.iterRand, err = parseRandomIterations(r.Distribution.Iterations); err != nil {
+				return fmt.Errorf("worldgen: rule %s: %w", rule.id, err)
+			}
 		}
 		if len(r.Distribution.Scatter) > 0 {
 			var frac struct{ Numerator, Denominator int32 }
@@ -172,6 +189,24 @@ func (n *Nether) loadRules(biomeIDs map[string]uint32) error {
 	return nil
 }
 
+// parseRandomIterations reads iterations of the form "Math.Random(lo, hi)",
+// the only Molang the Nether's rules use.
+func parseRandomIterations(raw json.RawMessage) (*[2]float32, error) {
+	var src string
+	if err := json.Unmarshal(raw, &src); err != nil {
+		return nil, fmt.Errorf("iterations %s not supported", raw)
+	}
+	var lo, hi float32
+	args, ok := strings.CutPrefix(strings.ToLower(strings.ReplaceAll(src, " ", "")), "math.random(")
+	if !ok {
+		return nil, fmt.Errorf("iterations %q not supported", src)
+	}
+	if _, err := fmt.Sscanf(strings.TrimSuffix(args, ")"), "%g,%g", &lo, &hi); err != nil {
+		return nil, fmt.Errorf("iterations %q: %w", src, err)
+	}
+	return &[2]float32{lo, hi}, nil
+}
+
 // parseUniform reads a constant or a uniform extent axis.
 func parseUniform(raw json.RawMessage) ([2]int32, error) {
 	var c int32
@@ -188,24 +223,31 @@ func parseUniform(raw json.RawMessage) ([2]int32, error) {
 	return a.Extent, nil
 }
 
-// runRules runs the feature rules of biome b for origin (ox, oz).
-func (n *Nether) runRules(r *region, ox, oz int32, b uint32) {
+// runRules runs the feature rules of biome b for origin (ox, oz). pop is
+// the population random, which Math.Random iterations draw from.
+func (n *Nether) runRules(r *region, ox, oz int32, b uint32, pop *rand.MT) {
 	passes := n.rules[b]
 	if passes == nil {
 		return
 	}
-	pop := populationSeed(n.seed, ox, oz)
+	popSeed := populationSeed(n.seed, ox, oz)
 	var ruleMT, featMT rand.MT
 	base := [3]int32{ox * 16, 0, oz * 16}
 	for _, rules := range passes {
 		for _, rule := range rules {
-			seed := feature.RuleSeed(pop, rule.hash)
+			seed := feature.RuleSeed(popSeed, rule.hash)
 			ruleMT.Seed(seed)
 			if rule.den > 0 && rule.num != rule.den && ruleMT.IntN(rule.den) >= rule.num {
 				continue
 			}
+			iterations := rule.iterations
+			if ir := rule.iterRand; ir != nil {
+				// As the overworld evaluates math.random: lo + (hi-lo)*f,
+				// rounded.
+				iterations = int32(math.Round(float64(ir[0] + (ir[1]-ir[0])*pop.Float())))
+			}
 			featMT.Seed(seed)
-			for range rule.iterations {
+			for range iterations {
 				var pos [3]int32
 				for _, a := range rule.order {
 					lo, hi := rule.axes[a][0], rule.axes[a][1]
