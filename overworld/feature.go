@@ -447,6 +447,9 @@ func (a axis) sample(r *rand.MT) int32 {
 // be computed once and applied to each chunk they reach. BDS instead sees
 // whatever its neighbours placed first, which depends on chunk load order.
 type featureWorld struct {
+	// guard holds blocks no write may change while it is set: the cells of
+	// a structure whose own feature pieces (a camp's trees) are placing.
+	guard     map[[3]int32]bool
 	o         *Overworld
 	ox, oz    int32 // the origin chunk
 	slots     [16]writeList
@@ -555,6 +558,9 @@ func (w *featureWorld) shuffleRandom() *rand.MT {
 // it is inside it.
 func (w *featureWorld) set(x, y, z int32, b uint32) {
 	if y < MinY || y >= MaxY {
+		return
+	}
+	if w.guard != nil && w.guard[[3]int32{x, y, z}] {
 		return
 	}
 	if cur, ok := w.block(x, y, z); ok && w.o.floorBedrock(cur, y) {
@@ -814,6 +820,11 @@ func (o *Overworld) decorateFrom(w *featureWorld, ox, oz int32, origin *PackedCh
 	w.shuffleOK = false
 	o.lakesAndDungeons(w, ox, oz, popMT)
 	o.cityFeatures(w, ox, oz, pop)
+	o.dataJigsawFeatures(w, ox, oz, pop)
+	// No rule's feature may change an abandoned camp's cells either (a
+	// Helix rule: BDS lets nearby trees grow into a camp).
+	w.guard = o.campCells(ox, oz)
+	defer func() { w.guard = nil }()
 	bs := origin.biomeList
 	single := len(bs) == 1
 	var rule, feat rand.MT

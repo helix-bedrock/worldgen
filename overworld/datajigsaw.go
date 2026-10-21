@@ -748,7 +748,7 @@ func (a *djAssembly) fit(q djState, j jigsawBlock, target [3]int32, region *djRe
 // featureTemplate stands in for every feature pool element: one block with
 // one jigsaw at its origin, facing down, named minecraft:bottom and joining
 // nothing (Java's FeaturePoolElement), so the assembly's draws run as they
-// should. The feature itself (a camp's tree) is not placed yet.
+// should. dataJigsawFeatures places the feature itself.
 // VERIFY: BDS's feature pool element is taken to match Java's.
 var featureTemplate = &jigsawTemplate{tpl: &Template{Size: [3]int32{1, 1, 1}},
 	jigsaws: []jigsawBlock{{facing: "down", top: "south", name: "minecraft:bottom", target: "minecraft:empty", pool: "minecraft:empty"}}}
@@ -996,4 +996,85 @@ func (o *Overworld) NearestDataJigsaw(kind string, x, z, maxRegions int32) (Scat
 		}
 	}
 	return Scattered{}, false
+}
+
+// dataJigsawFeatures places the features of the data-driven structures'
+// feature pieces standing in chunk (ox, oz), such as an abandoned camp's
+// trees. BDS runs structure pieces after reseeding the chunk's population
+// random (OverworldGenerator::postProcess, before postProcessStructures),
+// and a feature piece places its feature at its own position with that
+// random (FeaturePoolElement::place), as cityFeatures does.
+// The features may not change any cell the structure's templates fill, its
+// air included, so a camp's trees never grow through the camp. This is a
+// Helix rule, not BDS's: BDS lets leaves fill a template's air.
+// VERIFY: read from the named 1.21.3 build; the old structures run first
+// with the same random and are taken to draw nothing in a camp's chunk.
+// Against BDS the trees stand on the right spots, but BDS's heights differ
+// and it leaves out one of camp (-844, 2222)'s three trees.
+func (o *Overworld) dataJigsawFeatures(w *featureWorld, ox, oz int32, pop uint32) {
+	var r *rand.MT
+	for _, d := range o.dataJigsaws {
+		d.near(o, ox, oz, func(s *djStructure) {
+			defer func() { w.guard = nil }()
+			for _, p := range s.pieces {
+				if p.el.feature == "" || p.pos[0]>>4 != ox || p.pos[2]>>4 != oz {
+					continue
+				}
+				f, ok := o.features.get(p.el.feature)
+				if !ok {
+					continue
+				}
+				if r == nil {
+					r = rand.NewMT(pop)
+				}
+				if w.guard == nil {
+					w.guard = structureCells(s)
+				}
+				f.place(w, p.pos[0], p.pos[1], p.pos[2], r)
+			}
+		})
+	}
+}
+
+// structureCells lists every cell the templates of a structure fill.
+func structureCells(s *djStructure) map[[3]int32]bool {
+	cells := map[[3]int32]bool{}
+	for _, p := range s.pieces {
+		if p.el.feature != "" || p.tpl == nil {
+			continue
+		}
+		for _, b := range p.tpl.tpl.Blocks {
+			if p.tpl.tpl.Palette[b.State].Name == "minecraft:structure_void" {
+				continue
+			}
+			rp := rotatePos(b.Pos, p.rotation)
+			cells[[3]int32{rp[0] + p.pos[0], rp[1] + p.pos[1], rp[2] + p.pos[2]}] = true
+		}
+	}
+	return cells
+}
+
+// campCells lists the cells of the abandoned camps whose box comes within
+// 16 blocks of chunk (cx, cz), the reach of a tree from a neighbour; nil
+// when there are none.
+func (o *Overworld) campCells(cx, cz int32) map[[3]int32]bool {
+	var cells map[[3]int32]bool
+	area := box{cx*16 - 16, MinY, cz*16 - 16, cx*16 + 31, MaxY - 1, cz*16 + 31}
+	for _, d := range o.dataJigsaws {
+		if d.kind != "abandoned_camp" {
+			continue
+		}
+		d.near(o, cx, cz, func(s *djStructure) {
+			if !s.bb.intersects(area) {
+				return
+			}
+			if cells == nil {
+				cells = map[[3]int32]bool{}
+			}
+			for c := range structureCells(s) {
+				cells[c] = true
+			}
+		})
+	}
+	return cells
 }

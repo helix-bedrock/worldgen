@@ -132,7 +132,7 @@ world seed and the template instead, so the same seed always gives the same colo
 | Woodland mansions (all floors and rooms, roofs, foundation, entrance steps, joined windows) | Close (checked in game) |
 | Strongholds (all rooms, library, portal room with silverfish spawner, joined fences and bars) | Close (checked in game) |
 | Trail ruins (buried under a mound, with suspicious gravel) | Close (placement matches BDS) |
-| Abandoned camps (all 18 biome kinds, tents and campsites; the trees are not placed yet) | Close (two camps match BDS) |
+| Abandoned camps (all 18 biome kinds, tents, campsites and their trees; no tree grows into a camp) | Close (two camps match BDS; camp tree heights do not yet) |
 | Trial chambers (all chamber kinds, copper bulb aging, buried shell; spawners and vaults have no mob or loot data yet) | Close (placement matches BDS; checked in game) |
 
 Structure chests, dispensers and suspicious sand carry their loot table, but the loot is not filled in yet, so chests are empty in
