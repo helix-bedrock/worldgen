@@ -762,9 +762,10 @@ func (o *Overworld) elementTemplate(el *jigsawElement) *jigsawTemplate {
 }
 
 // dataJigsawBeards lists the beards of beard_thin data-driven structures
-// near chunk (cx, cz), as villageBeards does.
-// VERIFY: BDS keeps these in its classic list (sub_D1F06A0); taken as the
-// village beard here.
+// near chunk (cx, cz). BDS keeps these in its classic list (sub_D1F06A0),
+// which works as Java's beard_thin: each piece's own box, not widened as a
+// village's is, with its ground one block above its bottom. Checked against
+// BDS at two abandoned camps (765 of 768 columns the same height at one).
 func (o *Overworld) dataJigsawBeards(cx, cz int32) []beardBox {
 	var out []beardBox
 	for _, d := range o.dataJigsaws {
@@ -777,7 +778,7 @@ func (o *Overworld) dataJigsawBeards(cx, cz int32) []beardBox {
 					continue
 				}
 				if (p.bb.x0-12)>>4 <= cx && cx <= (p.bb.x1+12)>>4 && (p.bb.z0-12)>>4 <= cz && cz <= (p.bb.z1+12)>>4 {
-					out = append(out, newBeardBox(p.bb, p.ground))
+					out = append(out, beardBox{x0: p.bb.x0, z0: p.bb.z0, x1: p.bb.x1, z1: p.bb.z1, ground: p.bb.y0 + 1})
 				}
 			}
 		})
