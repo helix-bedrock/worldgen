@@ -71,14 +71,17 @@ go get github.com/helix-bedrock/worldgen
 
 ```go
 reg, _ := blocks.Load(paletteFile, typesFile) // block list exported from BDS
-gen, _ := worldgen.NewOverworld(seed, reg, biomeIDs)
-cache := worldgen.NewTerrainCache(gen, 1024)
+gen, _ := overworld.NewOverworld(seed, reg, biomeIDs)
+cache := overworld.NewTerrainCache(gen, 1024)
 
-var c worldgen.Chunk
+var c overworld.Chunk
 cache.Generate(chunkX, chunkZ, &c) // terrain + features, safe from many goroutines
 ```
 
 The generator returns indices into the block list; your server maps them to its own block IDs.
+
+Each dimension has its own package: [`overworld`](overworld) today, with the Nether and the End to
+follow. The shared vanilla data and the `biome`, `blocks`, `noise` and `rand` packages stay at the top.
 
 ## Features
 
