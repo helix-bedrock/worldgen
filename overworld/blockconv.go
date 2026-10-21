@@ -26,6 +26,8 @@ var javaBlockNames = map[string]string{
 	"melon":                        "melon_block",
 	"oak_door":                     "wooden_door",
 	"dirt_path":                    "grass_path",
+	"chain":                        "iron_chain",
+	"tripwire":                     "trip_wire",
 	"magma_block":                  "magma",
 	"attached_melon_stem":          "melon_stem",
 	"oak_pressure_plate":           "wooden_pressure_plate",

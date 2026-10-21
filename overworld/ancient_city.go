@@ -281,7 +281,7 @@ func (o *Overworld) applyRules(rules []blockRule, cs convertedState, x, y, z int
 		pass := ru.chance >= 1
 		if !pass && (ru.set != nil || ru.chance > 0) {
 			if !seeded {
-				r.Seed(rand.BlockSeed(x, y, z))
+				r.Seed(rand.RuleSeed(x, y, z))
 				seeded = true
 			}
 			f := r.Float()

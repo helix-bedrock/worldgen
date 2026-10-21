@@ -35,6 +35,15 @@ func BlockSeed(x, y, z int32) int64 {
 	return (l*l*42317861 + l*11) >> 16
 }
 
+// RuleSeed is the seed of the random BDS's structure rule processor
+// (br::worldgen::processors::Rule, sub_D1BE660) draws from at a block:
+// Mth.getSeed with x*3129871 as a 64-bit product, unlike Java's, so it
+// differs from BlockSeed where |x| > 686.
+func RuleSeed(x, y, z int32) int64 {
+	l := int64(x)*3129871 ^ int64(z)*116129781 ^ int64(y)
+	return (l*l*42317861 + l*11) >> 16
+}
+
 // IntN returns a value in [0, n) as java.util.Random.nextInt(bound) does,
 // 0 when n <= 0.
 func (j *Java) IntN(n int32) int32 {

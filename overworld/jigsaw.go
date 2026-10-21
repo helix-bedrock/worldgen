@@ -641,16 +641,20 @@ type jigsawAssembly struct {
 	height   func(x, z int32) int32
 	maxDepth int
 	pieces   []*jigsawPiece
-	bounds   box
 }
 
 // assembleJigsaw builds a structure from a start pool at pos (y ignored:
-// the start piece sits on the ground at its centre).
+// the start piece sits on the ground at its centre), as BDS does
+// (sub_D2B36D0): depth first, each new piece's children built before its
+// parent's next jigsaw is tried.
 func (o *Overworld) assembleJigsaw(start *jigsawPool, pos [3]int32, rotation int, maxDepth int, r *rand.MT, height func(x, z int32) int32) []*jigsawPiece {
 	if start == nil || len(start.entries) == 0 {
 		return nil
 	}
-	el := start.entries[r.IntN(int32(len(start.entries)))].el
+	// The start element is drawn from the weight-expanded pool
+	// (sub_D27F680).
+	all := start.expanded()
+	el := all[r.IntN(int32(len(all)))]
 	tpl := o.elementTemplate(el)
 	if tpl == nil {
 		return nil
@@ -663,163 +667,155 @@ func (o *Overworld) assembleJigsaw(start *jigsawPool, pos [3]int32, rotation int
 	p.pos[1] += dy
 	p.bb = p.bb.raise(dy)
 	p.ground = 1
-	a := &jigsawAssembly{o: o, r: r, height: height, maxDepth: maxDepth, pieces: []*jigsawPiece{p},
-		bounds: box{cx - 80, MinY, cz - 80, cx + 80, MaxY - 1, cz + 80}}
-	queue := []*jigsawPiece{p}
-	for len(queue) > 0 {
-		cur := queue[0]
-		queue = queue[1:]
-		for _, ch := range a.children(cur) {
-			if ch.depth <= maxDepth {
-				queue = append(queue, ch)
-			}
-		}
-	}
+	a := &jigsawAssembly{o: o, r: r, height: height, maxDepth: maxDepth, pieces: []*jigsawPiece{p}}
+	a.children(p)
 	return a.pieces
 }
 
-// children tries each jigsaw block of piece p and returns the pieces added.
-func (a *jigsawAssembly) children(p *jigsawPiece) []*jigsawPiece {
-	var added []*jigsawPiece
+// children tries each jigsaw block of piece p (sub_D2B3CB0): the pool,
+// unless p is at the last depth, then its fallback if the pool placed
+// nothing. A placed piece's own children are built at once.
+func (a *jigsawAssembly) children(p *jigsawPiece) {
+	if p.depth > a.maxDepth {
+		return
+	}
 	js := p.placedJigsaws()
 	shuffle(js, a.r)
-	rigid := !p.el.terrainMatching
+	// inner are the pieces placed inside p's box, which only they and p
+	// itself limit.
+	var inner []box
 	for _, j := range js {
 		pool := a.o.jigsaw.pools[j.pool]
 		if pool == nil || len(pool.entries) == 0 {
 			continue
 		}
 		fallback := a.o.jigsaw.pools[pool.fallback]
-		dir := jigsawDir(j.facing)
-		target := [3]int32{j.pos[0] + dir[0], j.pos[1] + dir[1], j.pos[2] + dir[2]}
-		insideParent := p.bb.contains(target)
-		var cands []*jigsawElement
-		if p.depth != a.maxDepth {
-			cands = pool.weightedShuffle(a.r)
+		if fallback != nil && len(fallback.entries) == 0 {
+			fallback = nil
+		}
+		if p.depth != a.maxDepth && a.fit(p, j, pool, &inner) {
+			continue
 		}
 		if fallback != nil {
-			cands = append(cands, fallback.weightedShuffle(a.r)...)
-		}
-		relY := j.pos[1] - p.bb.y0
-		surface := int32(-1 << 30)
-		if np := a.fit(p, j, target, relY, rigid, insideParent, cands, &surface); np != nil {
-			added = append(added, np)
+			a.fit(p, j, fallback, &inner)
 		}
 	}
-	return added
 }
 
-func (a *jigsawAssembly) fit(p *jigsawPiece, j jigsawBlock, target [3]int32, relY int32, rigid, insideParent bool, cands []*jigsawElement, surface *int32) *jigsawPiece {
-	for _, el := range cands {
+// overlaps2D reports whether two boxes share a column (touching counts):
+// BDS tests village pieces in x and z only.
+func overlaps2D(b, c box) bool {
+	return b.x1 >= c.x0 && b.x0 <= c.x1 && b.z1 >= c.z0 && b.z0 <= c.z1
+}
+
+// fit tries the elements of pool at jigsaw j of p (sub_D2B4120) and
+// places the first that fits, with its children.
+func (a *jigsawAssembly) fit(p *jigsawPiece, j jigsawBlock, pool *jigsawPool, inner *[]box) bool {
+	dir := jigsawDir(j.facing)
+	target := [3]int32{j.pos[0] + dir[0], j.pos[1] + dir[1], j.pos[2] + dir[2]}
+	insideParent := p.bb.contains(target)
+	surface := int32(-1 << 30)
+	for _, el := range pool.weightedShuffle(a.r) {
+		// An empty element places nothing and ends the search, as a
+		// success: the fallback is not tried either.
+		if el.template == "" && el.feature == "" {
+			return true
+		}
 		tpl := a.o.elementTemplate(el)
 		if tpl == nil {
 			continue
 		}
-		rots := []int{0, 1, 2, 3}
-		shuffle(rots, a.r)
-		for _, rot := range rots {
+		for _, rot := range a.rotations() {
 			cand := &jigsawPiece{el: el, tpl: tpl, rotation: rot}
 			cjs := cand.placedJigsaws()
-			// A short piece reserves room above it for what its inward
-			// jigsaws will attach: its box is raised to the tallest
-			// element of their pools (and fallbacks).
-			reserve := a.reserveHeight(tpl, cjs, rot)
 			shuffle(cjs, a.r)
 			for _, cj := range cjs {
 				if cj.facing != opposite(j.facing) || cj.attachment != j.attachment {
 					continue
 				}
+				if (j.facing == "up" || j.facing == "down") && j.aligned && villageTop(j, p.rotation) != villageTop(cj, rot) {
+					continue
+				}
 				off := [3]int32{target[0] - cj.pos[0], target[1] - cj.pos[1], target[2] - cj.pos[2]}
 				bb := tplBox(tpl.tpl, off, rot)
-				candRigid := !el.terrainMatching
-				cjRelY := cj.pos[1]
-				var y int32
-				if rigid && candRigid {
-					y = p.bb.y0 + relY - cjRelY + jigsawDir(j.facing)[1]
-				} else {
-					if *surface == -1<<30 {
-						*surface = a.height(j.pos[0], j.pos[2])
+				// The new box's bottom: from the parent's bottom when
+				// both pieces are rigid, else from the ground at the
+				// parent's jigsaw minus one, each plus the jigsaw's
+				// height in the parent and its vertical direction.
+				base := p.bb.y0
+				if p.el.terrainMatching || el.terrainMatching {
+					if surface == -1<<30 {
+						surface = a.height(j.pos[0], j.pos[2])
 					}
-					y = *surface - cjRelY
+					base = surface - 1
 				}
+				y := dir[1] + base + j.pos[1] - cj.pos[1] - p.bb.y0
 				dy := y - bb.y0
 				bb = bb.raise(dy)
-				if reserve > 0 {
-					bb.y1 = bb.y0 + max(reserve+1, bb.y1-bb.y0)
-				}
-				if !a.free(bb, p, insideParent) {
-					continue
+				if insideParent {
+					if bb.x0 < p.bb.x0 || bb.x1 > p.bb.x1 || bb.z0 < p.bb.z0 || bb.z1 > p.bb.z1 {
+						continue
+					}
+					clear := true
+					for _, q := range *inner {
+						if overlaps2D(bb, q) {
+							clear = false
+							break
+						}
+					}
+					if !clear {
+						continue
+					}
+					*inner = append(*inner, bb)
+				} else {
+					clear := true
+					for _, q := range a.pieces {
+						if overlaps2D(bb, q.bb) {
+							clear = false
+							break
+						}
+					}
+					if !clear {
+						continue
+					}
 				}
 				cand.pos = [3]int32{off[0], off[1] + dy, off[2]}
 				cand.bb = bb
 				cand.depth = p.depth + 1
-				// The joining jigsaw's height in the piece is its ground
-				// (sub_D2B4120).
-				cand.ground = cjRelY
+				// The joining jigsaw's height in the piece is its ground.
+				cand.ground = cj.pos[1]
 				a.pieces = append(a.pieces, cand)
-				return cand
+				a.children(cand)
+				return true
 			}
 		}
 	}
-	return nil
+	return false
 }
 
-// reserveHeight is the tallest element any jigsaw of a candidate (placed
-// at the origin) can attach inside its own box, 0 for boxes over 16 high.
-func (a *jigsawAssembly) reserveHeight(tpl *jigsawTemplate, cjs []jigsawBlock, rot int) int32 {
-	bb := tplBox(tpl.tpl, [3]int32{}, rot)
-	if bb.y1-bb.y0+1 > 16 {
-		return 0
+// villageTop is the top of a vertical jigsaw turned by rot: an old
+// template's jigsaw has no top and keeps north before the turn.
+func villageTop(j jigsawBlock, rot int) string {
+	if j.top != "" {
+		return j.top
 	}
-	var h int32
-	for _, j := range cjs {
-		d := jigsawDir(j.facing)
-		if !bb.contains([3]int32{j.pos[0] + d[0], j.pos[1] + d[1], j.pos[2] + d[2]}) {
-			continue
-		}
-		pool := a.o.jigsaw.pools[j.pool]
-		if pool == nil {
-			continue
-		}
-		h = max(h, a.o.poolMaxHeight(pool))
-		if fb := a.o.jigsaw.pools[pool.fallback]; fb != nil {
-			h = max(h, a.o.poolMaxHeight(fb))
-		}
-	}
-	return h
+	return rotateFacing("north", rot)
 }
 
-// poolMaxHeight is the tallest template of a pool.
-func (o *Overworld) poolMaxHeight(p *jigsawPool) int32 {
-	var h int32
-	for _, e := range p.entries {
-		if t := o.elementTemplate(e.el); t != nil {
-			h = max(h, t.tpl.Size[1])
-		}
+// rotations are the four turns in BDS's order (sub_D2B3520): 1, 2, 3, 0
+// with each of the last three swapped with a random earlier one.
+func (a *jigsawAssembly) rotations() [4]int {
+	r := [4]int{1, 2, 3, 0}
+	if a.r.Uint32()&1 == 0 {
+		r[0], r[1] = r[1], r[0]
 	}
-	return h
-}
-
-// free reports whether bb fits: inside the parent's box for a connector
-// inside it, else inside the structure bounds, and clear of every other
-// piece (touching allowed).
-func (a *jigsawAssembly) free(bb box, parent *jigsawPiece, insideParent bool) bool {
-	limit := a.bounds
-	if insideParent {
-		limit = parent.bb
+	if i := a.r.Uint32() % 3; i != 2 {
+		r[2], r[i] = r[i], r[2]
 	}
-	if !bb.inside(limit) {
-		return false
+	if i := a.r.Uint32() & 3; i != 3 {
+		r[3], r[i] = r[i], r[3]
 	}
-	for _, q := range a.pieces {
-		if q == parent && insideParent {
-			continue
-		}
-		if bb.intersects(q.bb) {
-			return false
-		}
-	}
-	return true
+	return r
 }
 
 // village is an assembled village and the chunk range it covers.
@@ -1347,4 +1343,37 @@ func (o *Overworld) villageFeatures(w *featureWorld, ox, oz int32, pop uint32) {
 			}
 		}
 	}
+}
+
+// PieceInfo describes one placed jigsaw piece, for tools.
+type PieceInfo struct {
+	Template string
+	// Box is the inclusive box x0, y0, z0, x1, y1, z1.
+	Box      [6]int32
+	Rotation int
+	Depth    int
+}
+
+// VillagePieces returns the pieces, in assembly order, of the village
+// that starts in the region holding chunk (cx, cz), if any. It is meant
+// for tools.
+func (o *Overworld) VillagePieces(cx, cz int32) []PieceInfo {
+	if o.jigsaw == nil {
+		return nil
+	}
+	sx, sz, _ := o.villagePick(floorDivRegion(cx, villageSpacing), floorDivRegion(cz, villageSpacing))
+	v := o.villageAt(sx, sz)
+	if v == nil {
+		return nil
+	}
+	out := make([]PieceInfo, 0, len(v.pieces))
+	for _, p := range v.pieces {
+		name := p.el.template
+		if name == "" {
+			name = "feature:" + p.el.feature
+		}
+		out = append(out, PieceInfo{Template: name, Box: [6]int32{p.bb.x0, p.bb.y0, p.bb.z0, p.bb.x1, p.bb.y1, p.bb.z1},
+			Rotation: p.rotation, Depth: p.depth})
+	}
+	return out
 }

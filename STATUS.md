@@ -1,6 +1,6 @@
 # What worldgen generates
 
-Status as of 2026-10-20. This page lists everything worldgen places today and what is still
+Status as of 2026-10-21. This page lists everything worldgen places today and what is still
 missing, so you know what to expect in a world. Only the **Overworld** is generated so far.
 
 Every part is built from the Bedrock Dedicated Server (BDS 1.26.52) and compared with chunks that
@@ -115,7 +115,7 @@ world seed and the template instead, so the same seed always gives the same colo
 
 | What | Status |
 | --- | --- |
-| Villages (all biome types, with loot chests; ground raised and cut under the houses as BDS does) | Close (placement matches BDS) |
+| Villages (all biome types and farm kinds, with loot chests; ground raised and cut under the houses as BDS does) | Close (placement matches BDS; the assembly follows BDS and the first pieces of a compared village match, but it drifts at one decoration, where BDS places a lamp and worldgen hay) |
 | Mineshafts (normal and badlands; cobwebs, rails, torches, cave spider spawners; fences joined to their walls) | Close |
 | Ancient cities, with the cave around them and their sculk | Close |
 | Mineshaft minecarts with chests | Not yet |
@@ -133,7 +133,7 @@ world seed and the template instead, so the same seed always gives the same colo
 | Strongholds (all rooms, library, portal room with silverfish spawner, joined fences and bars) | Close (checked in game) |
 | Trail ruins (buried under a mound, with suspicious gravel) | Close (placement matches BDS) |
 | Abandoned camps (all 18 biome kinds, tents, campsites and their trees; no tree grows into a camp) | Close (two camps match BDS; camp tree heights do not yet) |
-| Trial chambers (all chamber kinds, copper bulb aging, buried shell; spawners and vaults have no mob or loot data yet) | Close (placement matches BDS; checked in game) |
+| Trial chambers (all chamber kinds, copper bulb aging, buried shell; spawners and vaults have no mob or loot data yet) | Close (placement matches BDS; the first 26 pieces of a compared chamber match, copper bulbs and pots match; BDS then makes 3 random draws worldgen does not, at or before a failed entrance cap, so the rest of the layout differs) |
 
 Structure chests, dispensers and suspicious sand carry their loot table, but the loot is not filled in yet, so chests are empty in
 game.

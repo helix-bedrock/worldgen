@@ -635,9 +635,13 @@ func (d *djDef) assembleOne(o *Overworld, cx, cz int32) *djStructure {
 	}
 	a := &djAssembly{o: o, d: d, r: &r, pieces: []*jigsawPiece{p}, pools: map[string]string{}}
 	if len(d.aliases) > 0 {
-		// VERIFY: the aliases are bound with a positional random at the
-		// start (sub_D23EC10), as Java does.
-		ar := rand.NewPositional(rand.Seed128(o.seed)).At(cx*16, y, cz*16)
+		// The aliases are bound with Java's legacy positional random
+		// (sub_D23EC10): Random(world seed), forked with one nextLong,
+		// then at the start, before any projection to the surface.
+		var jr, ar rand.Java
+		jr.Seed(o.seed)
+		fork := int64(jr.Next(32))<<32 + int64(jr.Next(32))
+		ar.Seed(rand.BlockSeed(cx*16, y, cz*16) ^ fork)
 		for _, al := range d.aliases {
 			for _, pr := range al.groups[ar.IntN(int32(len(al.groups)))] {
 				a.pools[pr[0]] = pr[1]
@@ -1113,4 +1117,35 @@ func (o *Overworld) campCells(cx, cz int32) map[[3]int32]bool {
 		})
 	}
 	return cells
+}
+
+// JigsawPieces returns the pieces, in assembly order, of the first
+// data-driven jigsaw structure whose id contains id (such as
+// "trial_chambers") that reaches chunk (cx, cz), if any. It is meant for
+// tools.
+func (o *Overworld) JigsawPieces(id string, cx, cz int32) []PieceInfo {
+	var out []PieceInfo
+	for _, d := range o.dataJigsaws {
+		if !strings.Contains(d.id, id) {
+			continue
+		}
+		d.near(o, cx, cz, func(s *djStructure) {
+			if out != nil {
+				return
+			}
+			out = make([]PieceInfo, 0, len(s.pieces))
+			for _, p := range s.pieces {
+				name := p.el.template
+				if name == "" {
+					name = p.el.feature
+				}
+				out = append(out, PieceInfo{Template: name, Box: [6]int32{p.bb.x0, p.bb.y0, p.bb.z0, p.bb.x1, p.bb.y1, p.bb.z1},
+					Rotation: p.rotation, Depth: p.depth})
+			}
+		})
+		if out != nil {
+			return out
+		}
+	}
+	return out
 }

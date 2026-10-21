@@ -4,7 +4,7 @@
 > **This is early and not finished.** It is under active, heavy development, and it will take a
 > while before it is complete.
 >
-> Status as of 2026-10-20:
+> Status as of 2026-10-21:
 >
 > - **The base Overworld matches BDS:** terrain, all biomes, surface layers, caves and canyons,
 >   underground water and lava, ores and stone patches, and an unbroken bedrock floor.
@@ -115,7 +115,7 @@ The full list of what is and is not generated is in [STATUS.md](STATUS.md).
 | Cave decorations | 🟡 lush, dripstone, deep dark sculk, glow lichen and sulfur caves close to BDS; geodes exact; springs match |
 | Plants and flowers | 🟡 all placed, close to BDS |
 | Trees | 🟡 all placed; mangroves too sparse |
-| Villages | 🟡 placed and built, layout close but not block-exact |
+| Villages | 🟡 assembled as BDS does (pieces, farms, decorations); one known layout drift left |
 | Dungeons and lava lakes | ✅ match BDS (a few differ where neighbouring chunks overlap) |
 | Mineshafts | ✅ placement matches BDS; blocks close (refined at the end) |
 | Ancient cities | 🟡 placement, layout and cave match BDS near the centre; sculk placed |
@@ -127,7 +127,7 @@ The full list of what is and is not generated is in [STATUS.md](STATUS.md).
 | Ruined portals (buried and surface, netherrack spread, aging) | 🟡 written from BDS; not yet compared with BDS |
 | Woodland mansions (room grid, all floors and rooms, roofs, foundation, entrance steps) | 🟡 written from BDS; checked in game, close |
 | Strongholds (first three on village chunks, grid placement, all rooms, portal room fallback) | 🟡 placement matches BDS's locate; checked in game, close |
-| Trail ruins, trial chambers (placement matches BDS's locate; pools from BDS, buried terrain) | 🟡 written from BDS; trial chambers checked in game, close |
+| Trail ruins, trial chambers (placement matches BDS's locate; pools from BDS, buried terrain) | 🟡 written from BDS; trial chambers match BDS for the first 26 pieces, then drift |
 | Fossils, desert wells | 🟡 written from BDS; desert wells checked in game |
 | Nether and End | ⬜ not started |
 

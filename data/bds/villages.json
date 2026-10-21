@@ -1,5 +1,5 @@
 {
- "source": "BDS 1.26.52.3 Linux: pools registered in sub_4FD2920, elements in sub_50CE980; extracted with notes/tools/ida_registry_emu.py; block rules sub_50AB940 (hashes are FNV-1 of the block names)",
+ "source": "BDS 1.26.52.3 Linux: pools registered in sub_4FD2920 (empty elements from sub_D228790), elements in sub_50CE980; extracted with notes/tools/ida_registry_emu.py; block rules sub_50AB940 (hashes are FNV-1 of the block names)",
  "pools": [
   {
    "name": "minecraft:village/plains/town_centers",
@@ -1434,6 +1434,10 @@
     {
      "element": "minecraft:hay_pile",
      "weight": 1
+    },
+    {
+     "element": "minecraft:empty",
+     "weight": 3
     }
    ]
   },
@@ -1456,6 +1460,10 @@
     {
      "element": "minecraft:melon_pile",
      "weight": 1
+    },
+    {
+     "element": "minecraft:empty",
+     "weight": 4
     }
    ]
   },
@@ -1486,6 +1494,10 @@
     {
      "element": "minecraft:ice_pile",
      "weight": 1
+    },
+    {
+     "element": "minecraft:empty",
+     "weight": 9
     }
    ]
   },
@@ -1532,6 +1544,10 @@
     {
      "element": "minecraft:sweet_berry_bush",
      "weight": 1
+    },
+    {
+     "element": "minecraft:empty",
+     "weight": 4
     }
    ]
   },
@@ -1550,6 +1566,10 @@
     {
      "element": "minecraft:hay_pile",
      "weight": 4
+    },
+    {
+     "element": "minecraft:empty",
+     "weight": 10
     }
    ]
   },
@@ -2920,6 +2940,10 @@
     {
      "element": "minecraft:hay_pile",
      "weight": 1
+    },
+    {
+     "element": "minecraft:empty",
+     "weight": 3
     }
    ]
   },
@@ -2942,6 +2966,10 @@
     {
      "element": "minecraft:melon_pile",
      "weight": 1
+    },
+    {
+     "element": "minecraft:empty",
+     "weight": 4
     }
    ]
   },
@@ -2972,6 +3000,10 @@
     {
      "element": "minecraft:ice_pile",
      "weight": 4
+    },
+    {
+     "element": "minecraft:empty",
+     "weight": 7
     }
    ]
   },
@@ -3010,6 +3042,10 @@
     {
      "element": "minecraft:sweet_berry_bush",
      "weight": 1
+    },
+    {
+     "element": "minecraft:empty",
+     "weight": 4
     }
    ]
   },
@@ -3028,11 +3064,18 @@
     {
      "element": "minecraft:hay_pile",
      "weight": 4
+    },
+    {
+     "element": "minecraft:empty",
+     "weight": 10
     }
    ]
   }
  ],
  "elements": [
+  {
+   "id": "minecraft:empty"
+  },
   {
    "id": "minecraft:plains_fountain_1",
    "template": "village/plains/town_centers/plains_fountain_01",
