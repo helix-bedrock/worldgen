@@ -3,11 +3,13 @@ package nether
 import (
 	"encoding/json"
 	"fmt"
+	"maps"
 	"sync/atomic"
 
 	"github.com/helix-bedrock/worldgen"
 	"github.com/helix-bedrock/worldgen/feature"
 	"github.com/helix-bedrock/worldgen/internal/lru"
+	"github.com/helix-bedrock/worldgen/overworld"
 	"github.com/helix-bedrock/worldgen/rand"
 )
 
@@ -439,16 +441,40 @@ func (n *Nether) originWrites(ox, oz int32, neighbour func(cx, cz int32) *Chunk)
 }
 
 // Decorate adds the decoration to c, the GenerateChunk output for chunk
-// (chunkX, chunkZ). neighbour must return the unchanged GenerateChunk output
-// of any chunk within 2 chunks, the target's own included (nil for one it
-// cannot provide: it reads as air). Cache does the same with the neighbours
-// kept. It is safe to call from many goroutines if neighbour is.
+// (chunkX, chunkZ), and joins its fences. neighbour must return the
+// unchanged GenerateChunk output of any chunk within 3 chunks, the target's
+// own included (nil for one it cannot provide: it reads as air); only a
+// fence on the chunk's side needs more than 2. Cache does the same with the
+// neighbours kept. It is safe to call from many goroutines if neighbour is.
 func (n *Nether) Decorate(chunkX, chunkZ int32, c *Chunk, neighbour func(cx, cz int32) *Chunk) {
+	writes := func(ox, oz int32) *originWrites { return n.originWrites(ox, oz, neighbour) }
+	n.decorateWith(chunkX, chunkZ, c, writes)
+	n.connectFences(c, chunkX, chunkZ, func(cx, cz int32) *Chunk {
+		return n.decorated(cx, cz, neighbour, writes)
+	})
+}
+
+// decorateWith applies the placements of the nine origins around chunk
+// (chunkX, chunkZ) to c.
+func (n *Nether) decorateWith(chunkX, chunkZ int32, c *Chunk, writes func(ox, oz int32) *originWrites) {
 	for ox := chunkX - 1; ox <= chunkX+1; ox++ {
 		for oz := chunkZ - 1; oz <= chunkZ+1; oz++ {
-			n.originWrites(ox, oz, neighbour).apply(c, int(chunkX-ox+1)*3+int(chunkZ-oz+1))
+			writes(ox, oz).apply(c, int(chunkX-ox+1)*3+int(chunkZ-oz+1))
 		}
 	}
+}
+
+// decorated is the decorated chunk (cx, cz), without its fences joined,
+// for joining a neighbour's fences; nil where terrain has none.
+func (n *Nether) decorated(cx, cz int32, terrain func(cx, cz int32) *Chunk, writes func(ox, oz int32) *originWrites) *Chunk {
+	t := terrain(cx, cz)
+	if t == nil {
+		return nil
+	}
+	c := new(Chunk)
+	c.Blocks = t.Blocks
+	n.decorateWith(cx, cz, c, writes)
+	return c
 }
 
 // Cache keeps recently generated undecorated chunks and the placements of
@@ -481,19 +507,35 @@ func (c *Cache) Terrain(chunkX, chunkZ int32) *Chunk {
 // Generate writes the finished chunk at (chunkX, chunkZ), terrain and
 // decoration, into out.
 func (c *Cache) Generate(chunkX, chunkZ int32, out *Chunk) {
-	*out = *c.Terrain(chunkX, chunkZ)
-	for ox := chunkX - 1; ox <= chunkX+1; ox++ {
-		for oz := chunkZ - 1; oz <= chunkZ+1; oz++ {
-			pos := [2]int32{ox, oz}
-			ow := c.writes.Get(pos, func() *originWrites { return c.n.originWrites(ox, oz, c.Terrain) })
-			// After the nine chunks they reach have taken them, they are
-			// dropped: a chunk made again later recomputes them.
-			if ow.uses.Add(1) == 9 {
-				c.writes.Remove(pos)
-			}
-			ow.apply(out, int(chunkX-ox+1)*3+int(chunkZ-oz+1))
-		}
+	t := c.Terrain(chunkX, chunkZ)
+	*out = *t
+	// The terrain is shared: its block entities are copied, data too.
+	out.BlockEntities = make([]overworld.BlockEntity, len(t.BlockEntities))
+	for i, be := range t.BlockEntities {
+		be.Data = maps.Clone(be.Data)
+		out.BlockEntities[i] = be
 	}
+	c.n.decorateWith(chunkX, chunkZ, out, func(ox, oz int32) *originWrites {
+		pos := [2]int32{ox, oz}
+		ow := c.origin(ox, oz)
+		// After the nine chunks they reach have taken them, they are
+		// dropped: a chunk made again later recomputes them.
+		if ow.uses.Add(1) == 9 {
+			c.writes.Remove(pos)
+		}
+		return ow
+	})
+	// BDS joins the fences after the decoration: a fence joins the
+	// glowstone grown beside it. A neighbour read for that does not count
+	// as a use of its origins.
+	c.n.connectFences(out, chunkX, chunkZ, func(cx, cz int32) *Chunk {
+		return c.n.decorated(cx, cz, c.Terrain, c.origin)
+	})
+}
+
+// origin returns the placements of origin (ox, oz).
+func (c *Cache) origin(ox, oz int32) *originWrites {
+	return c.writes.Get([2]int32{ox, oz}, func() *originWrites { return c.n.originWrites(ox, oz, c.Terrain) })
 }
 
 // loadTopSupport reads the block states whose top face is sturdy (exported

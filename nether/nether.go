@@ -9,6 +9,7 @@ import (
 
 	"github.com/helix-bedrock/worldgen/blocks"
 	"github.com/helix-bedrock/worldgen/noise"
+	"github.com/helix-bedrock/worldgen/overworld"
 	"github.com/helix-bedrock/worldgen/rand"
 )
 
@@ -25,6 +26,9 @@ type Chunk struct {
 	// Biomes holds one biome ID per column, index z<<4 | x: the Nether's
 	// biomes are the same at every height.
 	Biomes [16 * 16]uint16
+	// BlockEntities are the block entities of blocks structures placed
+	// (chests and spawners).
+	BlockEntities []overworld.BlockEntity
 }
 
 // Biome returns the biome ID at local (x, z).
@@ -68,6 +72,10 @@ type Nether struct {
 	rules  map[uint32][][]*netherRule
 	carver netherCarver
 	fossil fossilIDs
+
+	nb         fortressIDs
+	fenceJoin  []uint8  // by state: what it is to a nether brick fence
+	fortresses sync.Map // [2]int32 start chunk -> *fortress
 }
 
 // New builds the noises for a seed. reg must contain the vanilla blocks the
@@ -119,6 +127,9 @@ func New(seed int64, reg *blocks.Registry, biomeIDs map[string]uint32) (*Nether,
 	if err := n.loadDecoIDs(); err != nil {
 		return nil, err
 	}
+	if err := n.loadFortressIDs(); err != nil {
+		return nil, err
+	}
 	if err := n.loadFungi(); err != nil {
 		return nil, err
 	}
@@ -138,14 +149,18 @@ func New(seed int64, reg *blocks.Registry, biomeIDs map[string]uint32) (*Nether,
 func (n *Nether) Seed() int64 { return n.seed }
 
 // GenerateChunk fills c with the chunk at (chunkX, chunkZ), in BDS's order
-// (NetherGenerator loadChunk, sub_5163F50).
+// (NetherGenerator loadChunk, sub_5163F50), and the structure pieces in it.
+// Fence connections across the chunk's sides need its neighbours: Decorate
+// sets them.
 func (n *Nether) GenerateChunk(chunkX, chunkZ int32, c *Chunk) {
+	c.BlockEntities = c.BlockEntities[:0]
 	n.terrain(chunkX, chunkZ, c)
 	n.biomes.fill(chunkX, chunkZ, &c.Biomes)
 	mt := rand.NewMT(chunkSeed(chunkX, chunkZ))
 	n.bedrock(mt, c)
 	n.surface(chunkX, chunkZ, c, mt)
 	n.carver.carve(n.seed, chunkX, chunkZ, c)
+	n.placeFortresses(chunkX, chunkZ, c)
 }
 
 // ChunkBiomes writes the biome ID of every column of chunk (chunkX, chunkZ),

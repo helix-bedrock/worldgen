@@ -168,47 +168,54 @@ func (s *biomeSource) fill(chunkX, chunkZ int32, out *[256]uint16) {
 	}
 	for z := range int32(16) {
 		for x := range int32(16) {
-			i, j := chunkX*16+x-2, chunkZ*16+z-2
-			k, l := i>>2, j>>2
-			// The four corners' jitter, x then z each.
-			var ox, oz [4]float32
-			for c := range 4 {
-				cx, cz := k<<2, l<<2
-				if c&1 != 0 {
-					cx += 4
-				}
-				if c&2 != 0 {
-					cz += 4
-				}
-				r := mix(mix(mix(mix(s.zoomSeed, int64(cx)), int64(cz)), int64(cx)), int64(cz))
-				dx := float32(float32(float32((r>>24)&1023)*0.0009765625)+-0.5) * 3.6
-				r = mix(r, s.zoomSeed)
-				dz := float32(float32(float32((r>>24)&1023)*0.0009765625)+-0.5) * 3.6
-				if c&1 != 0 {
-					dx += 4
-				}
-				if c&2 != 0 {
-					dz += 4
-				}
-				ox[c], oz[c] = dx, dz
-			}
-			fx, fz := float32(i&3), float32(j&3)
-			var d [4]float32
-			for c := range 4 {
-				d[c] = (ox[c]-fx)*(ox[c]-fx) + (oz[c]-fz)*(oz[c]-fz)
-			}
-			var b uint32
-			switch {
-			case d[0] < d[1] && d[0] < d[2] && d[0] < d[3]:
-				b = at(k, l)
-			case d[1] < d[0] && d[1] < d[2] && d[1] < d[3]:
-				b = at(k+1, l)
-			case d[2] < d[0] && d[2] < d[1] && d[2] < d[3]:
-				b = at(k, l+1)
-			default:
-				b = at(k+1, l+1)
-			}
-			out[z<<4|x] = uint16(b)
+			out[z<<4|x] = uint16(s.zoom(chunkX*16+x, chunkZ*16+z, at))
 		}
 	}
+}
+
+// column is the biome of block column (x, z), as fill gives it.
+func (s *biomeSource) column(x, z int32) uint32 {
+	return s.zoom(x, z, s.pick)
+}
+
+// zoom picks the biome of block column (x, z) from the quarter grid at.
+func (s *biomeSource) zoom(x, z int32, at func(qx, qz int32) uint32) uint32 {
+	i, j := x-2, z-2
+	k, l := i>>2, j>>2
+	// The four corners' jitter, x then z each.
+	var ox, oz [4]float32
+	for c := range 4 {
+		cx, cz := k<<2, l<<2
+		if c&1 != 0 {
+			cx += 4
+		}
+		if c&2 != 0 {
+			cz += 4
+		}
+		r := mix(mix(mix(mix(s.zoomSeed, int64(cx)), int64(cz)), int64(cx)), int64(cz))
+		dx := float32(float32(float32((r>>24)&1023)*0.0009765625)+-0.5) * 3.6
+		r = mix(r, s.zoomSeed)
+		dz := float32(float32(float32((r>>24)&1023)*0.0009765625)+-0.5) * 3.6
+		if c&1 != 0 {
+			dx += 4
+		}
+		if c&2 != 0 {
+			dz += 4
+		}
+		ox[c], oz[c] = dx, dz
+	}
+	fx, fz := float32(i&3), float32(j&3)
+	var d [4]float32
+	for c := range 4 {
+		d[c] = (ox[c]-fx)*(ox[c]-fx) + (oz[c]-fz)*(oz[c]-fz)
+	}
+	switch {
+	case d[0] < d[1] && d[0] < d[2] && d[0] < d[3]:
+		return at(k, l)
+	case d[1] < d[0] && d[1] < d[2] && d[1] < d[3]:
+		return at(k+1, l)
+	case d[2] < d[0] && d[2] < d[1] && d[2] < d[3]:
+		return at(k, l+1)
+	}
+	return at(k+1, l+1)
 }

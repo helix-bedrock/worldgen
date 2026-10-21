@@ -149,5 +149,6 @@ game.
 | Basalt deltas (deltas, basalt columns) | Matches BDS (differences only in chunks whose neighbours BDS never generated) |
 | Soul sand valley (basalt pillars, underground soul sand, Nether fossils with dried ghasts) | Matches BDS (both fossils in fully generated BDS chunks match block for block, dried ghast included) |
 | Nether cave carver | Matches BDS (lava that BDS let flow into the caves while ticking is not generation) |
-| Nether fortresses, bastions, Nether ruined portals | Not yet |
+| Nether fortresses (all bridge and castle pieces, blaze spawners, chests, nether wart) | Matches BDS: every block of a fortress and the 110 chunks around it, fence connections included (fences join after decoration). Chests get their loot table; the test server has no fortress loot yet |
+| Bastions, Nether ruined portals | Not yet |
 | The End | Not yet |
