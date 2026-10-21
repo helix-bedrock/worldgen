@@ -745,13 +745,14 @@ func (a *djAssembly) fit(q djState, j jigsawBlock, target [3]int32, region *djRe
 	}
 }
 
-// featureTemplate stands in for every feature pool element: one block with
-// one jigsaw at its origin, facing down, named minecraft:bottom and joining
-// nothing (Java's FeaturePoolElement), so the assembly's draws run as they
-// should. dataJigsawFeatures places the feature itself.
-// VERIFY: BDS's feature pool element is taken to match Java's.
-var featureTemplate = &jigsawTemplate{tpl: &Template{Size: [3]int32{1, 1, 1}},
-	jigsaws: []jigsawBlock{{facing: "down", top: "south", name: "minecraft:bottom", target: "minecraft:empty", pool: "minecraft:empty"}}}
+// featureTemplate stands in for every feature pool element: size 0, so its
+// box is empty and blocks no other piece (BDS's FeaturePoolElement getSize,
+// sub_D231C90, returns 0), with one jigsaw at its origin facing down, named
+// minecraft:bottom and joining nothing (sub_D231DD0), so the assembly's
+// draws run as they should. The features are placed during decoration.
+var featureTemplate = &jigsawTemplate{tpl: &Template{},
+	jigsaws: []jigsawBlock{{facing: "down", top: "south", name: "minecraft:bottom", target: "minecraft:empty", pool: "minecraft:empty",
+		attachment: "minecraft:bottom"}}}
 
 // elementTemplate is the template an element places.
 func (o *Overworld) elementTemplate(el *jigsawElement) *jigsawTemplate {
@@ -1018,7 +1019,22 @@ func (o *Overworld) dataJigsawFeatures(w *featureWorld, ox, oz int32, pop uint32
 		d.near(o, ox, oz, func(s *djStructure) {
 			defer func() { w.guard = nil }()
 			for _, p := range s.pieces {
-				if p.el.feature == "" || p.pos[0]>>4 != ox || p.pos[2]>>4 != oz {
+				if p.el.feature == "" {
+					// A template piece draws one number per chest it
+					// places in this chunk, for the chest's loot seed
+					// (LegacyStructureTemplate::placeInWorld), before
+					// the pieces after it.
+					if n := chestsInChunk(p, ox, oz); n > 0 {
+						if r == nil {
+							r = rand.NewMT(pop)
+						}
+						for range n {
+							r.Uint32()
+						}
+					}
+					continue
+				}
+				if p.pos[0]>>4 != ox || p.pos[2]>>4 != oz {
 					continue
 				}
 				f, ok := o.features.get(p.el.feature)
@@ -1035,6 +1051,25 @@ func (o *Overworld) dataJigsawFeatures(w *featureWorld, ox, oz int32, pop uint32
 			}
 		})
 	}
+}
+
+// chestsInChunk counts the chests template piece p places in chunk
+// (cx, cz).
+func chestsInChunk(p *jigsawPiece, cx, cz int32) int {
+	if p.tpl == nil {
+		return 0
+	}
+	n := 0
+	for _, b := range p.tpl.tpl.Blocks {
+		if name := p.tpl.tpl.Palette[b.State].Name; name != "minecraft:chest" && name != "minecraft:trapped_chest" {
+			continue
+		}
+		rp := rotatePos(b.Pos, p.rotation)
+		if (rp[0]+p.pos[0])>>4 == cx && (rp[2]+p.pos[2])>>4 == cz {
+			n++
+		}
+	}
+	return n
 }
 
 // structureCells lists every cell the templates of a structure fill.

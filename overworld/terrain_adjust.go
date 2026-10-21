@@ -126,7 +126,9 @@ func (o *Overworld) villageBeards(chunkX, chunkZ int32) []beardBox {
 				continue
 			}
 			for _, p := range v.pieces {
-				if p.el.terrainMatching {
+				// Feature pieces get no beard (BDS registers only pieces
+				// whose element places a template, element vfunc +40).
+				if p.el.terrainMatching || p.el.feature != "" {
 					continue
 				}
 				if (p.bb.x0-12)>>4 <= chunkX && chunkX <= (p.bb.x1+12)>>4 &&

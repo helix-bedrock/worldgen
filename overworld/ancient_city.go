@@ -292,7 +292,7 @@ func (o *Overworld) applyRules(rules []blockRule, cs convertedState, x, y, z int
 			continue
 		}
 		// VERIFY: the location test's own chance is taken as 1.
-		if ws, ok := o.reg.State(world); ok && ru.notIn[ws.Name] {
+		if ws, ok := o.reg.State(world); ok && (ru.notIn[ws.Name] || ru.at != "" && ws.Name != ru.at) {
 			continue
 		}
 		return convertedState{ru.output, false, true}

@@ -821,6 +821,7 @@ func (o *Overworld) decorateFrom(w *featureWorld, ox, oz int32, origin *PackedCh
 	w.shuffleOK = false
 	o.lakesAndDungeons(w, ox, oz, popMT)
 	o.cityFeatures(w, ox, oz, pop)
+	o.villageFeatures(w, ox, oz, pop)
 	o.dataJigsawFeatures(w, ox, oz, pop)
 	// No rule's feature may change an abandoned camp's cells either (a
 	// Helix rule: BDS lets nearby trees grow into a camp).

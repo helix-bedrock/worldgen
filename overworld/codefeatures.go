@@ -29,6 +29,12 @@ func (o *Overworld) builtinFeatures(set *featureSet) {
 	add("minecraft:gravel_feature", &discFeature{block: o.ids.gravel, replace: dirt, radius: 6})
 	add("minecraft:reeds_feature", &reedsFeature{reeds: id("minecraft:reeds"), farmland: id("minecraft:farmland"), frostedIce: id("minecraft:frosted_ice")})
 	add("minecraft:pumpkin_feature", &pumpkinFeature{pumpkin: id("minecraft:pumpkin"), count: 96})
+	// Block piles of village streets (vtable off_EE54AC0).
+	add("minecraft:hay_pile_feature", &pileFeature{block: id("minecraft:hay_block"), kind: pileHay})
+	add("minecraft:melon_pile_feature", &pileFeature{block: id("minecraft:melon_block")})
+	add("minecraft:snow_pile_feature", &pileFeature{block: id("minecraft:snow")})
+	add("minecraft:ice_pile_feature", &pileFeature{block: id("minecraft:packed_ice"), kind: pileIce, other: id("minecraft:blue_ice")})
+	add("minecraft:pumpkin_pile_feature", &pileFeature{block: id("minecraft:pumpkin"), kind: pilePumpkin, other: id("minecraft:carved_pumpkin")})
 	// Mushroom tries: 1, or 64 in old worlds (sub_4E2BB50 picks by a base
 	// game version check, as for the seagrass count).
 	soil := []uint32{id("minecraft:mycelium"), id("minecraft:podzol")}
@@ -595,4 +601,76 @@ func (f *grassDiscFeature) place(w *featureWorld, x, y, z int32, r *rand.MT) (bl
 		}
 	}
 	return blockPos{x, y, z}, true
+}
+
+// Block pile kinds: the block a pile places varies for hay (its axis),
+// packed ice (sometimes blue ice) and pumpkins (sometimes carved).
+const (
+	pilePlain = iota
+	pileHay
+	pileIce
+	pilePumpkin
+)
+
+// pileFeature is BDS's block pile feature (sub_4987920, block choice
+// sub_4988060): two layers around the position, each spot within a ragged
+// radius (nextFloat*10 - nextFloat*6 against its squared distance), or
+// else 3.1% of the time, takes the block where it is air and stands on a
+// sturdy top face or a grass path. Nothing is placed within 5 blocks of
+// the world bottom.
+type pileFeature struct {
+	block, other uint32
+	kind         int
+}
+
+func (f *pileFeature) place(w *featureWorld, x, y, z int32, r *rand.MT) (blockPos, bool) {
+	if y < MinY+5 {
+		return blockPos{}, false
+	}
+	a := r.IntN(2)
+	b := r.IntN(2)
+	for bx := x - a - 2; bx != x+a+3; bx++ {
+		for by := y; by <= y+1; by++ {
+			for bz := z - b - 2; bz != z+b+3; bz++ {
+				dx, dz := x-bx, z-bz
+				far := r.Float()*10 - r.Float()*6
+				if far < float32(dx*dx+dz*dz) && r.Float() >= 0.031 {
+					continue
+				}
+				f.tryPlace(w, bx, by, bz, r)
+			}
+		}
+	}
+	return blockPos{x, y, z}, true
+}
+
+// tryPlace puts the pile's block at a spot that is air with a sturdy top
+// face or a grass path under it.
+func (f *pileFeature) tryPlace(w *featureWorld, x, y, z int32, r *rand.MT) {
+	below, ok := w.block(x, y-1, z)
+	if !ok || !w.o.sturdyFace(below, 1) && w.o.blockName(below) != "minecraft:grass_path" {
+		return
+	}
+	if at, ok := w.block(x, y, z); !ok || at != w.o.ids.air {
+		return
+	}
+	w.set(x, y, z, f.pick(w.o, r))
+}
+
+// pick is the block for one spot (sub_4988060).
+// VERIFY: hay's nextInt(2) indexes pillar_axis taken as y, x, z.
+func (f *pileFeature) pick(o *Overworld, r *rand.MT) uint32 {
+	switch f.kind {
+	case pileHay:
+		return o.withProp(f.block, "pillar_axis", [2]string{"y", "x"}[r.IntN(2)])
+	case pileIce:
+		if r.IntN(7) == 0 {
+			return f.other
+		}
+	case pilePumpkin:
+		if r.Float() >= 0.95 {
+			return f.other
+		}
+	}
+	return f.block
 }

@@ -1,5 +1,5 @@
 {
- "source": "BDS 1.26.52.3 Linux: pools registered in sub_4FD2920, elements in sub_50CE980; extracted with notes/tools/ida_registry_emu.py",
+ "source": "BDS 1.26.52.3 Linux: pools registered in sub_4FD2920, elements in sub_50CE980; extracted with notes/tools/ida_registry_emu.py; block rules sub_50AB940 (hashes are FNV-1 of the block names)",
  "pools": [
   {
    "name": "minecraft:village/plains/town_centers",
@@ -7114,5 +7114,1406 @@
    "template": "village/common/villager",
    "projection": "rigid"
   }
- ]
+ ],
+ "block_rules": {
+  "minecraft:cobblestone_building_low_decay": [
+   {
+    "input": {
+     "type": "random_block_match",
+     "block": "minecraft:cobblestone",
+     "probability": 0.1
+    },
+    "output": "minecraft:mossy_cobblestone"
+   }
+  ],
+  "minecraft:cobblestone_building_decay": [
+   {
+    "input": {
+     "type": "random_block_match",
+     "block": "minecraft:cobblestone",
+     "probability": 0.2
+    },
+    "output": "minecraft:mossy_cobblestone"
+   }
+  ],
+  "minecraft:cobblestone_building_high_decay": [
+   {
+    "input": {
+     "type": "random_block_match",
+     "block": "minecraft:cobblestone",
+     "probability": 0.7
+    },
+    "output": "minecraft:mossy_cobblestone"
+   }
+  ],
+  "minecraft:abandoned_plains_decay": [
+   {
+    "input": {
+     "type": "random_block_match",
+     "block": "minecraft:cobblestone",
+     "probability": 0.8
+    },
+    "output": "minecraft:mossy_cobblestone"
+   },
+   {
+    "input": {
+     "type": "block_match",
+     "block": "minecraft:wooden_door"
+    },
+    "output": "minecraft:air"
+   },
+   {
+    "input": {
+     "type": "block_match",
+     "block": "minecraft:torch"
+    },
+    "output": "minecraft:air"
+   },
+   {
+    "input": {
+     "type": "random_block_match",
+     "block": "minecraft:cobblestone",
+     "probability": 0.07
+    },
+    "output": "minecraft:web"
+   },
+   {
+    "input": {
+     "type": "random_block_match",
+     "block": "minecraft:mossy_cobblestone",
+     "probability": 0.07
+    },
+    "output": "minecraft:web"
+   },
+   {
+    "input": {
+     "type": "random_block_match",
+     "block": "minecraft:white_terracotta",
+     "probability": 0.07
+    },
+    "output": "minecraft:web"
+   },
+   {
+    "input": {
+     "type": "random_block_match",
+     "block": "minecraft:oak_log",
+     "probability": 0.05
+    },
+    "output": "minecraft:web"
+   },
+   {
+    "input": {
+     "type": "random_block_match",
+     "block": "minecraft:oak_planks",
+     "probability": 0.1
+    },
+    "output": "minecraft:web"
+   },
+   {
+    "input": {
+     "type": "random_block_match",
+     "block": "minecraft:oak_stairs",
+     "probability": 0.1
+    },
+    "output": "minecraft:web"
+   },
+   {
+    "input": {
+     "type": "random_block_match",
+     "block": "minecraft:stripped_oak_log",
+     "probability": 0.02
+    },
+    "output": "minecraft:web"
+   },
+   {
+    "input": {
+     "type": "random_block_match",
+     "block": "minecraft:glass_pane",
+     "probability": 0.5
+    },
+    "output": "minecraft:web"
+   },
+   {
+    "input": {
+     "type": "random_block_match",
+     "block": "minecraft:white_stained_glass_pane",
+     "probability": 0.2
+    },
+    "output": "minecraft:web"
+   },
+   {
+    "input": {
+     "type": "block_match",
+     "block": "minecraft:glass_pane"
+    },
+    "output": "minecraft:brown_stained_glass_pane"
+   }
+  ],
+  "minecraft:abandoned_savanna_decay": [
+   {
+    "input": {
+     "type": "block_match",
+     "block": "minecraft:acacia_door"
+    },
+    "output": "minecraft:air"
+   },
+   {
+    "input": {
+     "type": "block_match",
+     "block": "minecraft:torch"
+    },
+    "output": "minecraft:air"
+   },
+   {
+    "input": {
+     "type": "random_block_match",
+     "block": "minecraft:white_terracotta",
+     "probability": 0.05
+    },
+    "output": "minecraft:web"
+   },
+   {
+    "input": {
+     "type": "random_block_match",
+     "block": "minecraft:acacia_log",
+     "probability": 0.05
+    },
+    "output": "minecraft:web"
+   },
+   {
+    "input": {
+     "type": "random_block_match",
+     "block": "minecraft:oak_planks",
+     "probability": 0.2
+    },
+    "output": "minecraft:web"
+   },
+   {
+    "input": {
+     "type": "random_block_match",
+     "block": "minecraft:acacia_stairs",
+     "probability": 0.2
+    },
+    "output": "minecraft:web"
+   },
+   {
+    "input": {
+     "type": "random_block_match",
+     "block": "minecraft:oak_wood",
+     "probability": 0.05
+    },
+    "output": "minecraft:web"
+   },
+   {
+    "input": {
+     "type": "random_block_match",
+     "block": "minecraft:glass_pane",
+     "probability": 0.5
+    },
+    "output": "minecraft:web"
+   },
+   {
+    "input": {
+     "type": "random_block_match",
+     "block": "minecraft:white_stained_glass_pane",
+     "probability": 0.2
+    },
+    "output": "minecraft:web"
+   },
+   {
+    "input": {
+     "type": "block_match",
+     "block": "minecraft:glass_pane"
+    },
+    "output": "minecraft:brown_stained_glass_pane"
+   }
+  ],
+  "minecraft:abandoned_snowy_decay": [
+   {
+    "input": {
+     "type": "block_match",
+     "block": "minecraft:spruce_door"
+    },
+    "output": "minecraft:air"
+   },
+   {
+    "input": {
+     "type": "block_match",
+     "block": "minecraft:torch"
+    },
+    "output": "minecraft:air"
+   },
+   {
+    "input": {
+     "type": "block_match",
+     "block": "minecraft:lantern"
+    },
+    "output": "minecraft:air"
+   },
+   {
+    "input": {
+     "type": "random_block_match",
+     "block": "minecraft:oak_log",
+     "probability": 0.05
+    },
+    "output": "minecraft:web"
+   },
+   {
+    "input": {
+     "type": "random_block_match",
+     "block": "minecraft:oak_planks",
+     "probability": 0.2
+    },
+    "output": "minecraft:web"
+   },
+   {
+    "input": {
+     "type": "random_block_match",
+     "block": "minecraft:oak_slab",
+     "probability": 0.4
+    },
+    "output": "minecraft:web"
+   },
+   {
+    "input": {
+     "type": "random_block_match",
+     "block": "minecraft:oak_wood",
+     "probability": 0.05
+    },
+    "output": "minecraft:web"
+   },
+   {
+    "input": {
+     "type": "random_block_match",
+     "block": "minecraft:glass_pane",
+     "probability": 0.5
+    },
+    "output": "minecraft:web"
+   },
+   {
+    "input": {
+     "type": "random_block_match",
+     "block": "minecraft:white_stained_glass_pane",
+     "probability": 0.2
+    },
+    "output": "minecraft:web"
+   },
+   {
+    "input": {
+     "type": "block_match",
+     "block": "minecraft:glass_pane"
+    },
+    "output": "minecraft:brown_stained_glass_pane"
+   }
+  ],
+  "minecraft:abandoned_taiga_decay": [
+   {
+    "input": {
+     "type": "random_block_match",
+     "block": "minecraft:cobblestone",
+     "probability": 0.8
+    },
+    "output": "minecraft:mossy_cobblestone"
+   },
+   {
+    "input": {
+     "type": "block_match",
+     "block": "minecraft:spruce_door"
+    },
+    "output": "minecraft:air"
+   },
+   {
+    "input": {
+     "type": "block_match",
+     "block": "minecraft:torch"
+    },
+    "output": "minecraft:air"
+   },
+   {
+    "input": {
+     "type": "block_match",
+     "block": "minecraft:campfire"
+    },
+    "output": "minecraft:campfire[extinguished=true]"
+   },
+   {
+    "input": {
+     "type": "random_block_match",
+     "block": "minecraft:cobblestone",
+     "probability": 0.08
+    },
+    "output": "minecraft:web"
+   },
+   {
+    "input": {
+     "type": "random_block_match",
+     "block": "minecraft:oak_log",
+     "probability": 0.08
+    },
+    "output": "minecraft:web"
+   },
+   {
+    "input": {
+     "type": "random_block_match",
+     "block": "minecraft:glass_pane",
+     "probability": 0.5
+    },
+    "output": "minecraft:web"
+   },
+   {
+    "input": {
+     "type": "random_block_match",
+     "block": "minecraft:white_stained_glass_pane",
+     "probability": 0.2
+    },
+    "output": "minecraft:web"
+   },
+   {
+    "input": {
+     "type": "block_match",
+     "block": "minecraft:glass_pane"
+    },
+    "output": "minecraft:brown_stained_glass_pane"
+   }
+  ],
+  "minecraft:abandoned_desert_decay": [
+   {
+    "input": {
+     "type": "block_match",
+     "block": "minecraft:jungle_door"
+    },
+    "output": "minecraft:air"
+   },
+   {
+    "input": {
+     "type": "block_match",
+     "block": "minecraft:torch"
+    },
+    "output": "minecraft:air"
+   },
+   {
+    "input": {
+     "type": "random_block_match",
+     "block": "minecraft:sandstone",
+     "probability": 0.09
+    },
+    "output": "minecraft:web"
+   },
+   {
+    "input": {
+     "type": "random_block_match",
+     "block": "minecraft:hardened_clay",
+     "probability": 0.08
+    },
+    "output": "minecraft:web"
+   },
+   {
+    "input": {
+     "type": "random_block_match",
+     "block": "minecraft:smooth_sandstone_stairs",
+     "probability": 0.08
+    },
+    "output": "minecraft:web"
+   },
+   {
+    "input": {
+     "type": "random_block_match",
+     "block": "minecraft:smooth_sandstone_slab",
+     "probability": 0.08
+    },
+    "output": "minecraft:web"
+   }
+  ],
+  "minecraft:plains_path_decay": [
+   {
+    "input": {
+     "type": "block_match",
+     "block": "minecraft:grass_block"
+    },
+    "location": {
+     "type": "block_match",
+     "block": "minecraft:water"
+    },
+    "output": "minecraft:oak_planks"
+   },
+   {
+    "input": {
+     "type": "block_match",
+     "block": "minecraft:grass_block"
+    },
+    "location": {
+     "type": "block_match",
+     "block": "minecraft:air"
+    },
+    "output": "minecraft:air"
+   },
+   {
+    "input": {
+     "type": "random_block_match",
+     "block": "minecraft:grass_block",
+     "probability": 0.025
+    },
+    "output": "minecraft:grass_block"
+   },
+   {
+    "input": {
+     "type": "block_match",
+     "block": "minecraft:grass_block"
+    },
+    "location": {
+     "type": "block_match",
+     "block": "minecraft:water"
+    },
+    "output": "minecraft:water"
+   },
+   {
+    "input": {
+     "type": "block_match",
+     "block": "minecraft:dirt"
+    },
+    "location": {
+     "type": "block_match",
+     "block": "minecraft:water"
+    },
+    "output": "minecraft:water"
+   }
+  ],
+  "minecraft:desert_path_decay": [
+   {
+    "input": {
+     "type": "block_match",
+     "block": "minecraft:grass_block"
+    },
+    "location": {
+     "type": "block_match",
+     "block": "minecraft:air"
+    },
+    "output": "minecraft:air"
+   }
+  ],
+  "minecraft:savanna_path_decay": [
+   {
+    "input": {
+     "type": "block_match",
+     "block": "minecraft:grass_block"
+    },
+    "location": {
+     "type": "block_match",
+     "block": "minecraft:water"
+    },
+    "output": "minecraft:acacia_planks"
+   },
+   {
+    "input": {
+     "type": "block_match",
+     "block": "minecraft:grass_block"
+    },
+    "location": {
+     "type": "block_match",
+     "block": "minecraft:air"
+    },
+    "output": "minecraft:air"
+   },
+   {
+    "input": {
+     "type": "random_block_match",
+     "block": "minecraft:grass_block",
+     "probability": 0.05
+    },
+    "output": "minecraft:grass_block"
+   },
+   {
+    "input": {
+     "type": "block_match",
+     "block": "minecraft:grass_block"
+    },
+    "location": {
+     "type": "block_match",
+     "block": "minecraft:water"
+    },
+    "output": "minecraft:water"
+   },
+   {
+    "input": {
+     "type": "block_match",
+     "block": "minecraft:dirt"
+    },
+    "location": {
+     "type": "block_match",
+     "block": "minecraft:water"
+    },
+    "output": "minecraft:water"
+   }
+  ],
+  "minecraft:snowy_path_decay": [
+   {
+    "input": {
+     "type": "block_match",
+     "block": "minecraft:grass_block"
+    },
+    "location": {
+     "type": "block_match",
+     "block": "minecraft:water"
+    },
+    "output": "minecraft:spruce_planks"
+   },
+   {
+    "input": {
+     "type": "block_match",
+     "block": "minecraft:grass_block"
+    },
+    "location": {
+     "type": "block_match",
+     "block": "minecraft:air"
+    },
+    "output": "minecraft:air"
+   },
+   {
+    "input": {
+     "type": "random_block_match",
+     "block": "minecraft:grass_block",
+     "probability": 0.05
+    },
+    "output": "minecraft:grass_block"
+   },
+   {
+    "input": {
+     "type": "block_match",
+     "block": "minecraft:grass_block"
+    },
+    "location": {
+     "type": "block_match",
+     "block": "minecraft:water"
+    },
+    "output": "minecraft:water"
+   },
+   {
+    "input": {
+     "type": "block_match",
+     "block": "minecraft:dirt"
+    },
+    "location": {
+     "type": "block_match",
+     "block": "minecraft:water"
+    },
+    "output": "minecraft:water"
+   }
+  ],
+  "minecraft:taiga_path_decay": [
+   {
+    "input": {
+     "type": "block_match",
+     "block": "minecraft:grass_block"
+    },
+    "location": {
+     "type": "block_match",
+     "block": "minecraft:water"
+    },
+    "output": "minecraft:spruce_planks"
+   },
+   {
+    "input": {
+     "type": "block_match",
+     "block": "minecraft:grass_block"
+    },
+    "location": {
+     "type": "block_match",
+     "block": "minecraft:air"
+    },
+    "output": "minecraft:air"
+   },
+   {
+    "input": {
+     "type": "random_block_match",
+     "block": "minecraft:grass_block",
+     "probability": 0.05
+    },
+    "output": "minecraft:grass_block"
+   },
+   {
+    "input": {
+     "type": "block_match",
+     "block": "minecraft:grass_block"
+    },
+    "location": {
+     "type": "block_match",
+     "block": "minecraft:water"
+    },
+    "output": "minecraft:water"
+   },
+   {
+    "input": {
+     "type": "block_match",
+     "block": "minecraft:dirt"
+    },
+    "location": {
+     "type": "block_match",
+     "block": "minecraft:water"
+    },
+    "output": "minecraft:water"
+   }
+  ],
+  "minecraft:wheat_wheat_farm": [
+   {
+    "input": {
+     "type": "block_match",
+     "block": "minecraft:carrots"
+    },
+    "output": "minecraft:wheat[growth=7]"
+   }
+  ],
+  "minecraft:wheat_potato_farm": [
+   {
+    "input": {
+     "type": "block_match",
+     "block": "minecraft:carrots"
+    },
+    "output": "minecraft:potatoes[growth=7]"
+   }
+  ],
+  "minecraft:wheat_beet_farm": [
+   {
+    "input": {
+     "type": "block_match",
+     "block": "minecraft:carrots"
+    },
+    "output": "minecraft:beetroot[growth=7]"
+   }
+  ],
+  "minecraft:potato_potato_farm": [
+   {
+    "input": {
+     "type": "block_match",
+     "block": "minecraft:wheat"
+    },
+    "output": "minecraft:potatoes[growth=7]"
+   },
+   {
+    "input": {
+     "type": "block_match",
+     "block": "minecraft:carrots"
+    },
+    "output": "minecraft:potatoes[growth=7]"
+   }
+  ],
+  "minecraft:potato_beet_farm": [
+   {
+    "input": {
+     "type": "block_match",
+     "block": "minecraft:wheat"
+    },
+    "output": "minecraft:potatoes[growth=7]"
+   },
+   {
+    "input": {
+     "type": "block_match",
+     "block": "minecraft:carrots"
+    },
+    "output": "minecraft:beetroot[growth=7]"
+   }
+  ],
+  "minecraft:potato_carrot_farm": [
+   {
+    "input": {
+     "type": "block_match",
+     "block": "minecraft:wheat"
+    },
+    "output": "minecraft:potatoes[growth=7]"
+   }
+  ],
+  "minecraft:beet_beet_farm": [
+   {
+    "input": {
+     "type": "block_match",
+     "block": "minecraft:wheat"
+    },
+    "output": "minecraft:beetroot[growth=7]"
+   },
+   {
+    "input": {
+     "type": "block_match",
+     "block": "minecraft:carrots"
+    },
+    "output": "minecraft:beetroot[growth=7]"
+   }
+  ],
+  "minecraft:beet_carrot_farm": [
+   {
+    "input": {
+     "type": "block_match",
+     "block": "minecraft:wheat"
+    },
+    "output": "minecraft:beetroot[growth=7]"
+   }
+  ],
+  "minecraft:carrot_carrot_farm": [
+   {
+    "input": {
+     "type": "block_match",
+     "block": "minecraft:wheat"
+    },
+    "output": "minecraft:carrots[growth=7]"
+   }
+  ],
+  "minecraft:abandoned_wheat_wheat_farm": [
+   {
+    "input": {
+     "type": "block_match",
+     "block": "minecraft:carrots"
+    },
+    "output": "minecraft:wheat[growth=7]"
+   },
+   {
+    "input": {
+     "type": "block_match",
+     "block": "minecraft:torch"
+    },
+    "output": "minecraft:air"
+   },
+   {
+    "input": {
+     "type": "block_match",
+     "block": "minecraft:lantern"
+    },
+    "output": "minecraft:air"
+   },
+   {
+    "input": {
+     "type": "random_block_match",
+     "block": "minecraft:sandstone",
+     "probability": 0.08
+    },
+    "output": "minecraft:web"
+   },
+   {
+    "input": {
+     "type": "random_block_match",
+     "block": "minecraft:oak_log",
+     "probability": 0.05
+    },
+    "output": "minecraft:web"
+   },
+   {
+    "input": {
+     "type": "random_block_match",
+     "block": "minecraft:acacia_log",
+     "probability": 0.05
+    },
+    "output": "minecraft:web"
+   },
+   {
+    "input": {
+     "type": "random_block_match",
+     "block": "minecraft:oak_planks",
+     "probability": 0.1
+    },
+    "output": "minecraft:web"
+   },
+   {
+    "input": {
+     "type": "random_block_match",
+     "block": "minecraft:acacia_stairs",
+     "probability": 0.2
+    },
+    "output": "minecraft:web"
+   },
+   {
+    "input": {
+     "type": "random_block_match",
+     "block": "minecraft:oak_wood",
+     "probability": 0.05
+    },
+    "output": "minecraft:web"
+   }
+  ],
+  "minecraft:abandoned_wheat_potato_farm": [
+   {
+    "input": {
+     "type": "block_match",
+     "block": "minecraft:carrots"
+    },
+    "output": "minecraft:potatoes[growth=7]"
+   },
+   {
+    "input": {
+     "type": "block_match",
+     "block": "minecraft:torch"
+    },
+    "output": "minecraft:air"
+   },
+   {
+    "input": {
+     "type": "block_match",
+     "block": "minecraft:lantern"
+    },
+    "output": "minecraft:air"
+   },
+   {
+    "input": {
+     "type": "random_block_match",
+     "block": "minecraft:sandstone",
+     "probability": 0.08
+    },
+    "output": "minecraft:web"
+   },
+   {
+    "input": {
+     "type": "random_block_match",
+     "block": "minecraft:oak_log",
+     "probability": 0.05
+    },
+    "output": "minecraft:web"
+   },
+   {
+    "input": {
+     "type": "random_block_match",
+     "block": "minecraft:acacia_log",
+     "probability": 0.05
+    },
+    "output": "minecraft:web"
+   },
+   {
+    "input": {
+     "type": "random_block_match",
+     "block": "minecraft:oak_planks",
+     "probability": 0.1
+    },
+    "output": "minecraft:web"
+   },
+   {
+    "input": {
+     "type": "random_block_match",
+     "block": "minecraft:acacia_stairs",
+     "probability": 0.2
+    },
+    "output": "minecraft:web"
+   },
+   {
+    "input": {
+     "type": "random_block_match",
+     "block": "minecraft:oak_wood",
+     "probability": 0.05
+    },
+    "output": "minecraft:web"
+   }
+  ],
+  "minecraft:abandoned_wheat_beet_farm": [
+   {
+    "input": {
+     "type": "block_match",
+     "block": "minecraft:carrots"
+    },
+    "output": "minecraft:beetroot[growth=7]"
+   },
+   {
+    "input": {
+     "type": "block_match",
+     "block": "minecraft:torch"
+    },
+    "output": "minecraft:air"
+   },
+   {
+    "input": {
+     "type": "block_match",
+     "block": "minecraft:lantern"
+    },
+    "output": "minecraft:air"
+   },
+   {
+    "input": {
+     "type": "random_block_match",
+     "block": "minecraft:sandstone",
+     "probability": 0.08
+    },
+    "output": "minecraft:web"
+   },
+   {
+    "input": {
+     "type": "random_block_match",
+     "block": "minecraft:oak_log",
+     "probability": 0.05
+    },
+    "output": "minecraft:web"
+   },
+   {
+    "input": {
+     "type": "random_block_match",
+     "block": "minecraft:acacia_log",
+     "probability": 0.05
+    },
+    "output": "minecraft:web"
+   },
+   {
+    "input": {
+     "type": "random_block_match",
+     "block": "minecraft:oak_planks",
+     "probability": 0.2
+    },
+    "output": "minecraft:web"
+   },
+   {
+    "input": {
+     "type": "random_block_match",
+     "block": "minecraft:acacia_stairs",
+     "probability": 0.2
+    },
+    "output": "minecraft:web"
+   },
+   {
+    "input": {
+     "type": "random_block_match",
+     "block": "minecraft:oak_wood",
+     "probability": 0.05
+    },
+    "output": "minecraft:web"
+   }
+  ],
+  "minecraft:abandoned_potato_potato_farm": [
+   {
+    "input": {
+     "type": "block_match",
+     "block": "minecraft:wheat"
+    },
+    "output": "minecraft:potatoes[growth=7]"
+   },
+   {
+    "input": {
+     "type": "block_match",
+     "block": "minecraft:carrots"
+    },
+    "output": "minecraft:potatoes[growth=7]"
+   },
+   {
+    "input": {
+     "type": "block_match",
+     "block": "minecraft:torch"
+    },
+    "output": "minecraft:air"
+   },
+   {
+    "input": {
+     "type": "block_match",
+     "block": "minecraft:lantern"
+    },
+    "output": "minecraft:air"
+   },
+   {
+    "input": {
+     "type": "random_block_match",
+     "block": "minecraft:sandstone",
+     "probability": 0.08
+    },
+    "output": "minecraft:web"
+   },
+   {
+    "input": {
+     "type": "random_block_match",
+     "block": "minecraft:oak_log",
+     "probability": 0.05
+    },
+    "output": "minecraft:web"
+   },
+   {
+    "input": {
+     "type": "random_block_match",
+     "block": "minecraft:acacia_log",
+     "probability": 0.05
+    },
+    "output": "minecraft:web"
+   },
+   {
+    "input": {
+     "type": "random_block_match",
+     "block": "minecraft:oak_planks",
+     "probability": 0.2
+    },
+    "output": "minecraft:web"
+   },
+   {
+    "input": {
+     "type": "random_block_match",
+     "block": "minecraft:acacia_stairs",
+     "probability": 0.2
+    },
+    "output": "minecraft:web"
+   },
+   {
+    "input": {
+     "type": "random_block_match",
+     "block": "minecraft:oak_wood",
+     "probability": 0.05
+    },
+    "output": "minecraft:web"
+   }
+  ],
+  "minecraft:abandoned_potato_beet_farm": [
+   {
+    "input": {
+     "type": "block_match",
+     "block": "minecraft:wheat"
+    },
+    "output": "minecraft:potatoes[growth=7]"
+   },
+   {
+    "input": {
+     "type": "block_match",
+     "block": "minecraft:carrots"
+    },
+    "output": "minecraft:beetroot[growth=7]"
+   },
+   {
+    "input": {
+     "type": "block_match",
+     "block": "minecraft:torch"
+    },
+    "output": "minecraft:air"
+   },
+   {
+    "input": {
+     "type": "block_match",
+     "block": "minecraft:lantern"
+    },
+    "output": "minecraft:air"
+   },
+   {
+    "input": {
+     "type": "random_block_match",
+     "block": "minecraft:sandstone",
+     "probability": 0.08
+    },
+    "output": "minecraft:web"
+   },
+   {
+    "input": {
+     "type": "random_block_match",
+     "block": "minecraft:oak_log",
+     "probability": 0.05
+    },
+    "output": "minecraft:web"
+   },
+   {
+    "input": {
+     "type": "random_block_match",
+     "block": "minecraft:acacia_log",
+     "probability": 0.05
+    },
+    "output": "minecraft:web"
+   },
+   {
+    "input": {
+     "type": "random_block_match",
+     "block": "minecraft:oak_planks",
+     "probability": 0.2
+    },
+    "output": "minecraft:web"
+   },
+   {
+    "input": {
+     "type": "random_block_match",
+     "block": "minecraft:acacia_stairs",
+     "probability": 0.2
+    },
+    "output": "minecraft:web"
+   },
+   {
+    "input": {
+     "type": "random_block_match",
+     "block": "minecraft:oak_wood",
+     "probability": 0.05
+    },
+    "output": "minecraft:web"
+   }
+  ],
+  "minecraft:abandoned_potato_carrot_farm": [
+   {
+    "input": {
+     "type": "block_match",
+     "block": "minecraft:wheat"
+    },
+    "output": "minecraft:potatoes[growth=7]"
+   },
+   {
+    "input": {
+     "type": "block_match",
+     "block": "minecraft:torch"
+    },
+    "output": "minecraft:air"
+   },
+   {
+    "input": {
+     "type": "block_match",
+     "block": "minecraft:lantern"
+    },
+    "output": "minecraft:air"
+   },
+   {
+    "input": {
+     "type": "random_block_match",
+     "block": "minecraft:sandstone",
+     "probability": 0.08
+    },
+    "output": "minecraft:web"
+   },
+   {
+    "input": {
+     "type": "random_block_match",
+     "block": "minecraft:oak_log",
+     "probability": 0.05
+    },
+    "output": "minecraft:web"
+   },
+   {
+    "input": {
+     "type": "random_block_match",
+     "block": "minecraft:acacia_log",
+     "probability": 0.05
+    },
+    "output": "minecraft:web"
+   },
+   {
+    "input": {
+     "type": "random_block_match",
+     "block": "minecraft:oak_planks",
+     "probability": 0.2
+    },
+    "output": "minecraft:web"
+   },
+   {
+    "input": {
+     "type": "random_block_match",
+     "block": "minecraft:acacia_stairs",
+     "probability": 0.2
+    },
+    "output": "minecraft:web"
+   },
+   {
+    "input": {
+     "type": "random_block_match",
+     "block": "minecraft:oak_wood",
+     "probability": 0.05
+    },
+    "output": "minecraft:web"
+   }
+  ],
+  "minecraft:abandoned_beet_beet_farm": [
+   {
+    "input": {
+     "type": "block_match",
+     "block": "minecraft:wheat"
+    },
+    "output": "minecraft:beetroot[growth=7]"
+   },
+   {
+    "input": {
+     "type": "block_match",
+     "block": "minecraft:carrots"
+    },
+    "output": "minecraft:beetroot[growth=7]"
+   },
+   {
+    "input": {
+     "type": "block_match",
+     "block": "minecraft:torch"
+    },
+    "output": "minecraft:air"
+   },
+   {
+    "input": {
+     "type": "block_match",
+     "block": "minecraft:lantern"
+    },
+    "output": "minecraft:air"
+   },
+   {
+    "input": {
+     "type": "random_block_match",
+     "block": "minecraft:sandstone",
+     "probability": 0.08
+    },
+    "output": "minecraft:web"
+   },
+   {
+    "input": {
+     "type": "random_block_match",
+     "block": "minecraft:oak_log",
+     "probability": 0.05
+    },
+    "output": "minecraft:web"
+   },
+   {
+    "input": {
+     "type": "random_block_match",
+     "block": "minecraft:acacia_log",
+     "probability": 0.05
+    },
+    "output": "minecraft:web"
+   },
+   {
+    "input": {
+     "type": "random_block_match",
+     "block": "minecraft:oak_planks",
+     "probability": 0.2
+    },
+    "output": "minecraft:web"
+   },
+   {
+    "input": {
+     "type": "random_block_match",
+     "block": "minecraft:acacia_stairs",
+     "probability": 0.2
+    },
+    "output": "minecraft:web"
+   },
+   {
+    "input": {
+     "type": "random_block_match",
+     "block": "minecraft:oak_wood",
+     "probability": 0.05
+    },
+    "output": "minecraft:web"
+   }
+  ],
+  "minecraft:abandoned_beet_carrot_farm": [
+   {
+    "input": {
+     "type": "block_match",
+     "block": "minecraft:wheat"
+    },
+    "output": "minecraft:beetroot[growth=7]"
+   },
+   {
+    "input": {
+     "type": "block_match",
+     "block": "minecraft:torch"
+    },
+    "output": "minecraft:air"
+   },
+   {
+    "input": {
+     "type": "block_match",
+     "block": "minecraft:lantern"
+    },
+    "output": "minecraft:air"
+   },
+   {
+    "input": {
+     "type": "random_block_match",
+     "block": "minecraft:sandstone",
+     "probability": 0.08
+    },
+    "output": "minecraft:web"
+   },
+   {
+    "input": {
+     "type": "random_block_match",
+     "block": "minecraft:oak_log",
+     "probability": 0.05
+    },
+    "output": "minecraft:web"
+   },
+   {
+    "input": {
+     "type": "random_block_match",
+     "block": "minecraft:acacia_log",
+     "probability": 0.05
+    },
+    "output": "minecraft:web"
+   },
+   {
+    "input": {
+     "type": "random_block_match",
+     "block": "minecraft:oak_planks",
+     "probability": 0.2
+    },
+    "output": "minecraft:web"
+   },
+   {
+    "input": {
+     "type": "random_block_match",
+     "block": "minecraft:acacia_stairs",
+     "probability": 0.2
+    },
+    "output": "minecraft:web"
+   },
+   {
+    "input": {
+     "type": "random_block_match",
+     "block": "minecraft:oak_wood",
+     "probability": 0.05
+    },
+    "output": "minecraft:web"
+   }
+  ],
+  "minecraft:abandoned_carrot_carrot_farm": [
+   {
+    "input": {
+     "type": "block_match",
+     "block": "minecraft:wheat"
+    },
+    "output": "minecraft:carrots[growth=7]"
+   },
+   {
+    "input": {
+     "type": "block_match",
+     "block": "minecraft:torch"
+    },
+    "output": "minecraft:air"
+   },
+   {
+    "input": {
+     "type": "block_match",
+     "block": "minecraft:lantern"
+    },
+    "output": "minecraft:air"
+   },
+   {
+    "input": {
+     "type": "random_block_match",
+     "block": "minecraft:sandstone",
+     "probability": 0.08
+    },
+    "output": "minecraft:web"
+   },
+   {
+    "input": {
+     "type": "random_block_match",
+     "block": "minecraft:oak_log",
+     "probability": 0.05
+    },
+    "output": "minecraft:web"
+   },
+   {
+    "input": {
+     "type": "random_block_match",
+     "block": "minecraft:acacia_log",
+     "probability": 0.05
+    },
+    "output": "minecraft:web"
+   },
+   {
+    "input": {
+     "type": "random_block_match",
+     "block": "minecraft:oak_planks",
+     "probability": 0.2
+    },
+    "output": "minecraft:web"
+   },
+   {
+    "input": {
+     "type": "random_block_match",
+     "block": "minecraft:acacia_stairs",
+     "probability": 0.2
+    },
+    "output": "minecraft:web"
+   },
+   {
+    "input": {
+     "type": "random_block_match",
+     "block": "minecraft:oak_wood",
+     "probability": 0.05
+    },
+    "output": "minecraft:web"
+   }
+  ]
+ }
 }

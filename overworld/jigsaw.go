@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"github.com/helix-bedrock/worldgen"
+	"strconv"
 	"strings"
 	"sync"
 
@@ -29,12 +30,13 @@ type jigsawData struct {
 
 // blockRule is one rule of a template's block rules: a block (or one of a
 // set) turns into output with a chance, unless the world already holds a
-// block of notIn there.
+// block of notIn there, or, with at set, only where the world holds at.
 type blockRule struct {
 	block  string
 	set    map[string]bool
 	chance float32
 	notIn  map[string]bool
+	at     string
 	output uint32
 }
 
@@ -295,7 +297,7 @@ func loadJigsawData(file string, reg blockLookup) (*jigsawData, error) {
 				Type, Block, Blocks string
 				Probability         float32
 			}
-			Location struct{ Type, Blocks string }
+			Location struct{ Type, Block, Blocks string }
 			Output   string
 		} `json:"block_rules"`
 		BlockSets map[string][]string `json:"block_sets"`
@@ -314,7 +316,7 @@ func loadJigsawData(file string, reg blockLookup) (*jigsawData, error) {
 	rules := map[string][]blockRule{}
 	for name, rs := range doc.BlockRules {
 		for _, r := range rs {
-			out, ok := reg.Default(r.Output)
+			out, ok := lookupState(reg, r.Output)
 			if !ok {
 				return nil, fmt.Errorf("worldgen: %s: rule %s outputs unknown block %s", file, name, r.Output)
 			}
@@ -324,11 +326,16 @@ func loadJigsawData(file string, reg blockLookup) (*jigsawData, error) {
 				br.block = r.Input.Block
 			case "random_blockset_match":
 				br.set = sets[r.Input.Blocks]
+			case "block_match":
+				br.block, br.chance = r.Input.Block, 1
 			default:
 				return nil, fmt.Errorf("worldgen: %s: rule %s has unknown input %s", file, name, r.Input.Type)
 			}
-			if r.Location.Type == "not_blocks" {
+			switch r.Location.Type {
+			case "not_blocks":
 				br.notIn = sets[r.Location.Blocks]
+			case "block_match":
+				br.at = r.Location.Block
 			}
 			rules[name] = append(rules[name], br)
 		}
@@ -374,6 +381,33 @@ func nbtInt(v any) int32 {
 // blockLookup finds a block's default state.
 type blockLookup interface {
 	Default(name string) (uint32, bool)
+	Lookup(name string, props map[string]any) (uint32, bool)
+}
+
+// lookupState finds a block written as name or name[key=value,...]: true
+// and false are booleans, numbers numbers, anything else a string.
+func lookupState(reg blockLookup, s string) (uint32, bool) {
+	name, rest, ok := strings.Cut(s, "[")
+	if !ok {
+		return reg.Default(s)
+	}
+	props := map[string]any{}
+	for _, kv := range strings.Split(strings.TrimSuffix(rest, "]"), ",") {
+		k, v, _ := strings.Cut(kv, "=")
+		switch v {
+		case "true":
+			props[k] = true
+		case "false":
+			props[k] = false
+		default:
+			if n, err := strconv.ParseFloat(v, 64); err == nil {
+				props[k] = n
+			} else {
+				props[k] = v
+			}
+		}
+	}
+	return reg.Lookup(name, props)
 }
 
 // template returns the prepared template of an element, nil if it has none
@@ -530,10 +564,24 @@ func jigsawDir(f string) [3]int32 {
 
 // tplBox is the box of a template placed at pos with rotation r.
 func tplBox(t *Template, pos [3]int32, r int) box {
-	a := rotatePos([3]int32{0, 0, 0}, r)
-	b := rotatePos([3]int32{t.Size[0] - 1, t.Size[1] - 1, t.Size[2] - 1}, r)
-	return box{min(a[0], b[0]) + pos[0], pos[1], min(a[2], b[2]) + pos[2],
-		max(a[0], b[0]) + pos[0], pos[1] + t.Size[1] - 1, max(a[2], b[2]) + pos[2]}
+	// BDS's piece box (sub_D2379D0): the size turned, then the box laid out
+	// from pos by the turn. A size of 0 (a feature element) gives an empty
+	// box, one block past pos, that holds nothing.
+	sx, sy, sz := t.Size[0], t.Size[1], t.Size[2]
+	if r&1 == 1 {
+		sx, sz = sz, sx
+	}
+	bb := box{pos[0], pos[1], pos[2], pos[0] + sx - 1, pos[1] + sy - 1, pos[2] + sz - 1}
+	switch r & 3 {
+	case 1:
+		bb.x0, bb.x1 = pos[0]+1-sx, pos[0]
+	case 2:
+		bb.x0, bb.x1 = pos[0]+1-sx, pos[0]
+		bb.z0, bb.z1 = pos[2]+1-sz, pos[2]
+	case 3:
+		bb.z0, bb.z1 = pos[2]+1-sz, pos[2]
+	}
+	return bb
 }
 
 // jigsawPiece is one placed element.
@@ -603,7 +651,7 @@ func (o *Overworld) assembleJigsaw(start *jigsawPool, pos [3]int32, rotation int
 		return nil
 	}
 	el := start.entries[r.IntN(int32(len(start.entries)))].el
-	tpl := o.template(el.template)
+	tpl := o.elementTemplate(el)
 	if tpl == nil {
 		return nil
 	}
@@ -663,7 +711,7 @@ func (a *jigsawAssembly) children(p *jigsawPiece) []*jigsawPiece {
 
 func (a *jigsawAssembly) fit(p *jigsawPiece, j jigsawBlock, target [3]int32, relY int32, rigid, insideParent bool, cands []*jigsawElement, surface *int32) *jigsawPiece {
 	for _, el := range cands {
-		tpl := a.o.template(el.template)
+		tpl := a.o.elementTemplate(el)
 		if tpl == nil {
 			continue
 		}
@@ -745,7 +793,7 @@ func (a *jigsawAssembly) reserveHeight(tpl *jigsawTemplate, cjs []jigsawBlock, r
 func (o *Overworld) poolMaxHeight(p *jigsawPool) int32 {
 	var h int32
 	for _, e := range p.entries {
-		if t := o.template(e.el.template); t != nil {
+		if t := o.elementTemplate(e.el); t != nil {
 			h = max(h, t.tpl.Size[1])
 		}
 	}
@@ -844,7 +892,7 @@ func (o *Overworld) placeVillages(cx, cz int32, c *Chunk, height func(x, z int32
 				continue
 			}
 			for _, p := range v.pieces {
-				if p.bb.intersects(chunkBox) {
+				if p.el.feature == "" && p.bb.intersects(chunkBox) {
 					o.placePiece(p, c, chunkBox, height)
 					if o.opts.houseChests {
 						o.placeHouseChest(p, c, chunkBox)
@@ -1249,4 +1297,54 @@ func abs32i(v int32) int32 {
 		return -v
 	}
 	return v
+}
+
+// villageFeatures places the feature pieces of the villages standing in
+// origin chunk (ox, oz) (hay, melon and pumpkin piles, trees, berry bushes),
+// in piece order, with the structure post-process random: a Mersenne
+// Twister seeded with the chunk's population seed. A template piece before
+// them draws one number per chest it places in the chunk, for the chest's
+// loot seed (sub_D2B7A10), as dataJigsawFeatures does for camps.
+// VERIFY: the order of villages against other structures in the chunk.
+func (o *Overworld) villageFeatures(w *featureWorld, ox, oz int32, pop uint32) {
+	if o.jigsaw == nil {
+		return
+	}
+	chunkBox := box{ox * 16, MinY, oz * 16, ox*16 + 15, MaxY - 1, oz*16 + 15}
+	var r *rand.MT
+	r0x, r1x := floorDivRegion(ox-6, villageSpacing), floorDivRegion(ox+6, villageSpacing)
+	r0z, r1z := floorDivRegion(oz-6, villageSpacing), floorDivRegion(oz+6, villageSpacing)
+	for rx := r0x; rx <= r1x; rx++ {
+		for rz := r0z; rz <= r1z; rz++ {
+			sx, sz, _ := o.villagePick(rx, rz)
+			v := o.villageAt(sx, sz)
+			if v == nil || !v.bb.intersects(chunkBox) {
+				continue
+			}
+			for _, p := range v.pieces {
+				if p.el.feature == "" {
+					if n := chestsInChunk(p, ox, oz); n > 0 {
+						if r == nil {
+							r = rand.NewMT(pop)
+						}
+						for range n {
+							r.Uint32()
+						}
+					}
+					continue
+				}
+				if p.pos[0]>>4 != ox || p.pos[2]>>4 != oz {
+					continue
+				}
+				f, ok := o.features.get(p.el.feature)
+				if !ok {
+					continue
+				}
+				if r == nil {
+					r = rand.NewMT(pop)
+				}
+				f.place(w, p.pos[0], p.pos[1], p.pos[2], r)
+			}
+		}
+	}
 }
