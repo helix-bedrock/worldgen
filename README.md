@@ -24,8 +24,8 @@
 >   and desert wells. Chests are still empty in game.
 > - **The Nether is in progress:** terrain, biomes, surfaces, bedrock, the cave carver, lava springs,
 >   fire, glowstone, ores (gold, quartz, magma, gravel, blackstone, ancient debris), basalt deltas,
->   basalt pillars, soul sand, Nether fossils and Nether fortresses match BDS; huge crimson and
->   warped fungi, fungi, roots and vines are close. Bastions and Nether ruined portals are not done
+>   basalt pillars, soul sand, Nether fossils, Nether fortresses and Nether ruined portals match
+>   BDS; huge crimson and warped fungi, fungi, roots and vines are close. Bastions are not done
 >   yet.
 > - **The End is not started.**
 > - **The API is not stable.** Names and behaviour change between commits.
@@ -129,12 +129,12 @@ The full list of what is and is not generated is in [STATUS.md](STATUS.md).
 | Shipwrecks (ocean and beached, random woods, chests) | 🟡 written from BDS; not yet compared with BDS |
 | Buried treasure, ocean monuments (all room types, sponge rooms, gold core) | 🟡 written from BDS; not yet compared with BDS |
 | Pillager outposts (watchtower, overgrown overlay, cages, tents, logs, targets) | 🟡 written from BDS; not yet compared with BDS |
-| Ruined portals (buried and surface, netherrack spread, aging) | 🟡 written from BDS; not yet compared with BDS |
+| Ruined portals (buried and surface, netherrack spread, aging) | 🟡 written from BDS; the same code matches BDS in the Nether, overworld portals not yet compared |
 | Woodland mansions (room grid, all floors and rooms, roofs, foundation, entrance steps) | 🟡 written from BDS; checked in game, close |
 | Strongholds (first three on village chunks, grid placement, all rooms, portal room fallback) | 🟡 placement matches BDS's locate; checked in game, close |
 | Trail ruins, trial chambers (placement matches BDS's locate; pools from BDS, buried terrain) | 🟡 written from BDS; trial chambers match BDS for the first 26 pieces, then drift |
 | Fossils, desert wells | 🟡 written from BDS; desert wells checked in game |
-| Nether (terrain, cave carver, ores, all five biomes' decorations, fortresses) | 🟡 matches BDS closely; fortresses match; fungus trees close; bastions and ruined portals not yet |
+| Nether (terrain, cave carver, ores, all five biomes' decorations, fortresses, ruined portals) | 🟡 matches BDS closely; fortresses and ruined portals match; fungus trees close; bastions not yet |
 | The End | ⬜ not started |
 
 **The goal is to match the latest Minecraft version exactly.** After that, every time Minecraft

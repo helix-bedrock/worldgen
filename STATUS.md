@@ -128,7 +128,7 @@ world seed and the template instead, so the same seed always gives the same colo
 | Witch huts (cauldron with a random potion) | Close |
 | Igloos (half with a basement: trapdoor, ladder, stone brick cells) | Exact (compared with BDS) |
 | Pillager outposts (watchtower, overgrown overlay, feature pieces, chest; no pillagers) | Close (one of two compared outposts exact; the other 1 block high) |
-| Ruined portals (buried and on the surface, netherrack spread, aging) | Close (not yet compared with BDS) |
+| Ruined portals (buried and on the surface, netherrack spread, aging) | Close: the same code matches BDS block for block in the Nether; overworld portals not yet compared |
 | Woodland mansions (all floors and rooms, roofs, foundation, entrance steps, joined windows) | Close (checked in game) |
 | Strongholds (all rooms, library, portal room with silverfish spawner, joined fences and bars) | Close (checked in game) |
 | Trail ruins (buried under a mound, with suspicious gravel) | Close (placement matches BDS) |
@@ -150,5 +150,6 @@ game.
 | Soul sand valley (basalt pillars, underground soul sand, Nether fossils with dried ghasts) | Matches BDS (both fossils in fully generated BDS chunks match block for block, dried ghast included) |
 | Nether cave carver | Matches BDS (lava that BDS let flow into the caves while ticking is not generation) |
 | Nether fortresses (all bridge and castle pieces, blaze spawners, chests, nether wart) | Matches BDS: every block of a fortress and the 110 chunks around it, fence connections included (fences join after decoration). Chests get their loot table; the test server has no fortress loot yet |
-| Bastions, Nether ruined portals | Not yet |
+| Nether ruined portals (blackstone aging, chains, netherrack and magma spread) | Matches BDS: two portals in fully generated BDS chunks match block for block except stair corner shapes, which BDS sets in a later pass (refinement). Where ores or a fortress reached the box before BDS built the portal, BDS's portal differs a little; here the portal always goes on the bare terrain first |
+| Bastions | Not yet |
 | The End | Not yet |

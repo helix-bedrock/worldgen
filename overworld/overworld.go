@@ -440,6 +440,9 @@ func NewOverworld(seed int64, reg *blocks.Registry, biomeIDs map[string]uint32, 
 // Seed returns the world seed.
 func (o *Overworld) Seed() int64 { return o.seed }
 
+// Registry returns the block list the generator places from.
+func (o *Overworld) Registry() *blocks.Registry { return o.reg }
+
 // GenerateChunk fills c with the chunk at (chunkX, chunkZ).
 func (o *Overworld) GenerateChunk(chunkX, chunkZ int32, c *Chunk) {
 	var cols [gridXZ * gridXZ]column

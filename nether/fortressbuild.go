@@ -87,6 +87,7 @@ func (b *nbBuild) put(s uint32, x, y, z int32) {
 	wx, wy, wz := b.p.worldPos(x, y, z)
 	if b.cbox.contains(wx, wy, wz) {
 		b.c.set(int(wx&15), int(wy), int(wz&15), s)
+		b.c.dropEntity(wx, wy, wz)
 	}
 }
 
@@ -148,6 +149,7 @@ func (b *nbBuild) chest(x, y, z int32) {
 		return
 	}
 	b.c.set(int(wx&15), int(wy), int(wz&15), b.n.nb.chest)
+	b.c.dropEntity(wx, wy, wz)
 	table := "loot_tables/chests/nether_bridge.json"
 	b.c.BlockEntities = append(b.c.BlockEntities, overworld.BlockEntity{X: wx, Y: wy, Z: wz, LootTable: table,
 		Data: map[string]any{"id": "Chest", "x": wx, "y": wy, "z": wz, "isMovable": uint8(1),

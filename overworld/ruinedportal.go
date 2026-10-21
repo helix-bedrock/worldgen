@@ -24,7 +24,7 @@ import (
 //     spot dripping a short netherrack column down;
 //   - the template, keeping its air (an air pocket) on the underground roll
 //     and half of the other times outside deserts, waterlogged when a box
-//     corner is in water;
+//     corner is in water; its chest draws a loot seed;
 //   - more drips under the netherrack of the template's bottom layer;
 //   - an aging pass over every block in the box, the terrain included:
 //     stone bricks (and plain stone) crack or turn to stairs, stairs to
@@ -35,6 +35,11 @@ import (
 // aging pass also reaches a row of terrain past the template.
 // Bedrock differs from Java: there is no biome filter or portal type; a
 // desert portal can still be buried, and Bedrock adds no vines or leaves.
+// In the Nether (the same code on its own grid) the portal sits 15 to 99
+// above the bottom before it is lowered, keeps no air below sea level and
+// gets no moss, and the aging pass turns stone bricks and stone into
+// polished blackstone blocks, slabs, stairs and walls, and iron bars into
+// chains.
 // VERIFY: heights and corners in BDS read the live world of the start
 // chunk and its neighbours; here the undecorated terrain. The underwater
 // test of the box corners runs only for worlds of a recent base game
@@ -47,6 +52,12 @@ const (
 	portalSalt       = 40552231
 	portalSpacing    = 40
 	portalSeparation = 15
+)
+
+// Nether ruined portals use the same salt on a smaller grid.
+const (
+	NetherPortalSpacing    = 25
+	NetherPortalSeparation = 10
 )
 
 // portalTemplates are BDS's template tables (off_F456D50, off_F456E40).
@@ -104,11 +115,22 @@ type ruinedPortal struct {
 
 // portalPick is the chunk a ruined portal region picks.
 func (o *Overworld) portalPick(rx, rz int32) (int32, int32) {
+	return pickPortal(o.seed, rx, rz, portalSpacing, portalSeparation)
+}
+
+func pickPortal(seed int64, rx, rz, spacing, separation int32) (int32, int32) {
 	var r rand.MT
-	structureSeed(&r, o.seed, rx, rz, portalSalt)
-	n := int32(portalSpacing - portalSeparation)
-	x := rx*portalSpacing + r.IntN(n)
-	return x, rz*portalSpacing + r.IntN(n)
+	structureSeed(&r, seed, rx, rz, portalSalt)
+	n := spacing - separation
+	x := rx*spacing + r.IntN(n)
+	return x, rz*spacing + r.IntN(n)
+}
+
+// NetherPortalPick is the start chunk of the Nether ruined portal of
+// placement region (rx, rz), NetherPortalSpacing chunks a side. Every
+// region has one.
+func NetherPortalPick(seed int64, rx, rz int32) (cx, cz int32) {
+	return pickPortal(seed, rx, rz, NetherPortalSpacing, NetherPortalSeparation)
 }
 
 // isPortalChunk reports whether a ruined portal starts in chunk (cx, cz).
@@ -182,43 +204,54 @@ func (o *Overworld) portalAt(cx, cz int32, raw func(cx, cz int32) *PackedChunk) 
 	}
 	var p *ruinedPortal
 	if o.isPortalChunk(cx, cz) {
-		p = o.buildPortal(cx, cz, raw)
+		p = o.buildPortal(cx, cz, o.portalSim(raw))
 	}
 	o.portals.Store(k, p)
 	return p
 }
 
-// portalSim is the world a portal is built in: undecorated terrain with
-// the portal's own blocks on top.
+// portalSim is the world a portal is built in: the world before it (in the
+// overworld, undecorated terrain) with the portal's own blocks on top.
 type portalSim struct {
-	o      *Overworld
-	raw    func(cx, cz int32) *PackedChunk
-	chunks map[[2]int32]*PackedChunk
-	set    map[[3]int32]portalWrite
+	o          *Overworld
+	read       func(x, y, z int32) uint32
+	minY, maxY int32
+	sea        int32
+	nether     bool
+	set        map[[3]int32]portalWrite
+}
+
+// portalSim is the overworld's: raw gives undecorated terrain.
+func (o *Overworld) portalSim(raw func(cx, cz int32) *PackedChunk) *portalSim {
+	chunks := map[[2]int32]*PackedChunk{}
+	read := func(x, y, z int32) uint32 {
+		k := [2]int32{x >> 4, z >> 4}
+		c, ok := chunks[k]
+		if !ok {
+			c = raw(k[0], k[1])
+			chunks[k] = c
+		}
+		if c == nil {
+			return o.ids.air
+		}
+		return c.at(int(y-MinY)<<8 | int(z&15)<<4 | int(x&15))
+	}
+	return &portalSim{o: o, read: read, minY: MinY, maxY: MaxY, sea: SeaLevel, set: map[[3]int32]portalWrite{}}
 }
 
 func (s *portalSim) get(x, y, z int32) uint32 {
-	if y < MinY || y >= MaxY {
+	if y < s.minY || y >= s.maxY {
 		return s.o.ids.air
 	}
 	if w, ok := s.set[[3]int32{x, y, z}]; ok {
 		return w.id
 	}
-	k := [2]int32{x >> 4, z >> 4}
-	c, ok := s.chunks[k]
-	if !ok {
-		c = s.raw(k[0], k[1])
-		s.chunks[k] = c
-	}
-	if c == nil {
-		return s.o.ids.air
-	}
-	return c.at(int(y-MinY)<<8 | int(z&15)<<4 | int(x&15))
+	return s.read(x, y, z)
 }
 
 // put is setBlock; the bottom bedrock is never replaced.
 func (s *portalSim) put(x, y, z int32, id uint32, water bool, be map[string]any) {
-	if y < MinY || y >= MaxY || s.o.floorBedrock(s.get(x, y, z), y) {
+	if y < s.minY || y >= s.maxY || (y < s.minY+5 && s.get(x, y, z) == s.o.ids.bedrock) {
 		return
 	}
 	s.set[[3]int32{x, y, z}] = portalWrite{x, y, z, id, water, be}
@@ -231,7 +264,18 @@ func (s *portalSim) isLava(b uint32) bool { return b == s.o.ids.lava || b == s.o
 // height is one above the top solid block of a column, or of water when
 // water is set, looking through leaves (sub_C9F7970).
 func (s *portalSim) height(x, z int32, water bool) int32 {
-	for y := int32(MaxY - 1); y >= MinY; y-- {
+	y := s.maxY - 1
+	if s.nether {
+		// Under a roof (the Nether's dimension flag, sub_C8D5D50) BDS first
+		// goes down through the solid roof, so it finds the floor under it.
+		for ; y >= s.minY; y-- {
+			b := s.get(x, y, z)
+			if b == s.o.ids.air || !(water && s.isWater(b)) && !s.o.solidMaterial(b) {
+				break
+			}
+		}
+	}
+	for ; y >= s.minY; y-- {
 		b := s.get(x, y, z)
 		if b == s.o.ids.air || s.o.hasBlockTag(b, "leaves") {
 			continue
@@ -240,7 +284,7 @@ func (s *portalSim) height(x, z int32, water bool) int32 {
 			return y + 1
 		}
 	}
-	return MinY
+	return s.minY
 }
 
 // biomeHas reports whether a biome has a tag.
@@ -252,12 +296,16 @@ func (o *Overworld) biomeHas(b uint32, tag string) bool {
 }
 
 // buildPortal is RuinedPortalPiece's postProcess in the start chunk.
-func (o *Overworld) buildPortal(cx, cz int32, raw func(cx, cz int32) *PackedChunk) *ruinedPortal {
-	s := &portalSim{o: o, raw: raw, chunks: map[[2]int32]*PackedChunk{}, set: map[[3]int32]portalWrite{}}
-	biome := o.BiomeAt(cx*16+8, o.structureY(cx, cz, 1), cz*16+8)
-	ocean := o.biomeHas(biome, "ocean") || o.biomeHas(biome, "swamp")
-	desert := o.biomeHas(biome, "desert")
-	cold := o.biomeHas(biome, "ice")
+func (o *Overworld) buildPortal(cx, cz int32, s *portalSim) *ruinedPortal {
+	// No Nether biome has the tags the portal looks for.
+	var biome uint32
+	var ocean, desert, cold bool
+	if !s.nether {
+		biome = o.BiomeAt(cx*16+8, o.structureY(cx, cz, 1), cz*16+8)
+		ocean = o.biomeHas(biome, "ocean") || o.biomeHas(biome, "swamp")
+		desert = o.biomeHas(biome, "desert")
+		cold = o.biomeHas(biome, "ice")
+	}
 
 	var r rand.MT
 	r.Seed(populationSeed(o.seed, cx, cz))
@@ -289,13 +337,15 @@ func (o *Overworld) buildPortal(cx, cz int32, raw func(cx, cz int32) *PackedChun
 	surface := s.height(mid(bb.x0, bb.x1), mid(bb.z0, bb.z1), !ocean)
 	y = surface - 1
 	switch {
+	case s.nether:
+		y = s.minY + 15 + r.IntN(85)
 	case !under:
 		if desert {
 			y = surface - (bb.y1 - bb.y0) + r.IntN(6)
 		}
 	default:
 		b := o.BiomeAt(mid(bb.x0, bb.x1), mid(bb.y0, bb.y1), mid(bb.z0, bb.z1))
-		low := int32(MinY + 15)
+		low := s.minY + 15
 		if o.biomeHas(b, "extreme_hills") || o.biomeHas(b, "mountain") {
 			low = SeaLevel + 7
 		}
@@ -314,7 +364,7 @@ func (o *Overworld) buildPortal(cx, cz int32, raw func(cx, cz int32) *PackedChun
 		}
 		return (!ocean && s.isWater(b)) || o.solidMaterial(b)
 	}
-	for bb.y0 > MinY+15 {
+	for bb.y0 > s.minY+15 {
 		n := 0
 		for _, c := range [4][2]int32{{bb.x0, bb.z0}, {bb.x0, bb.z1}, {bb.x1, bb.z0}, {bb.x1, bb.z1}} {
 			if standing(c[0], c[1]) {
@@ -363,7 +413,10 @@ func (o *Overworld) buildPortal(cx, cz int32, raw func(cx, cz int32) *PackedChun
 	}
 
 	keepAir := under
-	if !under && !desert {
+	switch {
+	case s.nether && bb.y0 < s.sea:
+		keepAir = false
+	case !under && !desert:
 		keepAir = r.Float() < 0.5
 	}
 	wet := false
@@ -376,7 +429,7 @@ func (o *Overworld) buildPortal(cx, cz int32, raw func(cx, cz int32) *PackedChun
 			break
 		}
 	}
-	o.portalTemplate(s, jt, ox, bb.y0, oz, rot, mirror, keepAir, wet)
+	o.portalTemplate(s, &r, jt, ox, bb.y0, oz, rot, mirror, keepAir, wet)
 
 	for x := bb.x0 + 1; x < bb.x1; x++ {
 		for z := bb.z0 + 1; z < bb.z1; z++ {
@@ -387,7 +440,9 @@ func (o *Overworld) buildPortal(cx, cz int32, raw func(cx, cz int32) *PackedChun
 	}
 
 	moss := float32(0.8)
-	if !wet {
+	if s.nether {
+		moss = 0
+	} else if !wet {
 		switch {
 		case desert:
 			moss = 0
@@ -411,7 +466,9 @@ func (o *Overworld) buildPortal(cx, cz int32, raw func(cx, cz int32) *PackedChun
 
 // portalTemplate places the template at the origin, mirrored along z then
 // turned. Air is skipped unless keepAir; wet waterlogs below sea level.
-func (o *Overworld) portalTemplate(s *portalSim, jt *jigsawTemplate, ox, oy, oz int32, rot int, mirror, keepAir, wet bool) {
+// Like every legacy template placement, a chest without a loot seed draws
+// one from r.
+func (o *Overworld) portalTemplate(s *portalSim, r *rand.MT, jt *jigsawTemplate, ox, oy, oz int32, rot int, mirror, keepAir, wet bool) {
 	m := mirrorNone
 	if mirror {
 		m = mirrorZ
@@ -434,18 +491,24 @@ func (o *Overworld) portalTemplate(s *portalSim, jt *jigsawTemplate, ox, oy, oz 
 		p = rotatePos(p, rot)
 		x, y, z := ox+p[0], oy+p[1], oz+p[2]
 		id, name := cs.id, o.blockName(cs.id)
-		below := wet && y < SeaLevel
+		below := wet && y < s.sea
 		if id == o.ids.air && below {
 			id, name = o.ids.water, "minecraft:water"
 		}
 		water := o.holdsLiquid[name] && (below || cs.water)
-		s.put(x, y, z, id, water, o.blockEntityFor(id, st.Name, x, y, z))
+		be := o.blockEntityFor(id, st.Name, x, y, z)
+		if be != nil && be["id"] == "Chest" {
+			be["LootTableSeed"] = int32(r.Uint32() >> 1)
+		}
+		s.put(x, y, z, id, water, be)
 	}
 }
 
 // portalIDs are the blocks the portal places.
 type portalIDs struct {
 	netherrack, magma, cracked, mossyBricks, crying, lava, slabMossy, wallMossy, stoneSlab, brickSlab uint32
+	// The Nether's aging blocks.
+	blackstone, chiseledBlackstone, blackBricks, crackedBlackBricks, blackSlab, blackWall, chain uint32
 }
 
 func (o *Overworld) portalIDs() portalIDs {
@@ -458,6 +521,10 @@ func (o *Overworld) portalIDs() portalIDs {
 		mossyBricks: id("mossy_stone_bricks"), crying: id("crying_obsidian"), lava: id("lava"),
 		slabMossy: id("mossy_stone_brick_slab"), wallMossy: id("mossy_stone_brick_wall"),
 		stoneSlab: id("normal_stone_slab"), brickSlab: id("stone_brick_slab"),
+		blackstone: id("polished_blackstone"), chiseledBlackstone: id("chiseled_polished_blackstone"),
+		blackBricks: id("polished_blackstone_bricks"), crackedBlackBricks: id("cracked_polished_blackstone_bricks"),
+		blackSlab: id("polished_blackstone_brick_slab"), blackWall: id("polished_blackstone_brick_wall"),
+		chain: id("iron_chain"),
 	}
 }
 
@@ -484,6 +551,17 @@ func (o *Overworld) agePortal(s *portalSim, r *rand.MT, bb box, ids portalIDs, m
 				name := o.blockName(b)
 				set := func(id uint32) { s.put(x, y, z, id, false, nil) }
 				switch {
+				case s.nether && portalFullStone[name]:
+					switch name {
+					case "minecraft:stone":
+						st := stairs("minecraft:polished_blackstone_stairs")
+						set([2]uint32{ids.blackstone, st}[r.IntN(2)])
+					case "minecraft:chiseled_stone_bricks":
+						set(ids.chiseledBlackstone)
+					default:
+						st := stairs("minecraft:polished_blackstone_brick_stairs")
+						set([3]uint32{ids.blackBricks, ids.crackedBlackBricks, st}[r.IntN(3)])
+					}
 				case portalFullStone[name]:
 					if r.Float() >= 0.5 {
 						normal := [2]uint32{ids.cracked, stairs("minecraft:stone_brick_stairs")}
@@ -492,20 +570,36 @@ func (o *Overworld) agePortal(s *portalSim, r *rand.MT, bb box, ids portalIDs, m
 					}
 				case name == "minecraft:stone_brick_stairs":
 					st, _ := o.reg.State(b)
-					if r.Float() >= 0.5 {
+					f := r.Float()
+					switch {
+					case s.nether && f < 0.5:
+						set(o.state("minecraft:polished_blackstone_brick_stairs", map[string]any{
+							"weirdo_direction": st.Props["weirdo_direction"], "upside_down_bit": st.Props["upside_down_bit"]}))
+					case s.nether:
+						set(ids.blackSlab)
+					case f >= 0.5:
 						ms := o.state("minecraft:mossy_stone_brick_stairs", map[string]any{
 							"weirdo_direction": st.Props["weirdo_direction"], "upside_down_bit": st.Props["upside_down_bit"]})
 						set(pick([2]uint32{ids.stoneSlab, ids.brickSlab}, [2]uint32{ms, ids.slabMossy}))
 					}
 				case portalSlabs[name]:
-					if moss > r.Float() {
+					switch {
+					case s.nether:
+						set(ids.blackSlab)
+					case moss > r.Float():
 						set(ids.slabMossy)
 					}
 				case portalWalls[name]:
-					if moss > r.Float() {
+					switch {
+					case s.nether:
+						set(ids.blackWall)
+					case moss > r.Float():
 						set(ids.wallMossy)
 					}
 				case name == "minecraft:iron_bars":
+					if s.nether {
+						set(ids.chain)
+					}
 				case b == ids.netherrack:
 					if !cold && r.Float() < 0.1 {
 						set(ids.magma)
@@ -635,4 +729,43 @@ func mirrorProps(p map[string]string, a, b string, half int) map[string]string {
 		}
 	}
 	return out
+}
+
+// NetherPortal is a built Nether ruined portal.
+type NetherPortal struct {
+	// X0 to Z1 is the portal's box, inclusive.
+	X0, Y0, Z0, X1, Y1, Z1 int32
+	// Blocks are the blocks it leaves, by chunk.
+	Blocks map[[2]int32][]StructureBlock
+}
+
+// StructureBlock is one block a structure leaves in the world.
+type StructureBlock struct {
+	X, Y, Z int32
+	ID      uint32
+	// Data is the block entity, nil for none.
+	Data map[string]any
+}
+
+// NetherRuinedPortal builds the Nether ruined portal starting in chunk
+// (cx, cz) (see NetherPortalPick) into a Nether of the given height and sea
+// level. block reads the Nether as it is before the portal. The Nether must
+// share o's seed and block registry. It returns nil if the template is
+// missing. It is safe for concurrent use.
+func (o *Overworld) NetherRuinedPortal(cx, cz, height, sea int32, block func(x, y, z int32) uint32) *NetherPortal {
+	s := &portalSim{o: o, read: block, maxY: height, sea: sea, nether: true, set: map[[3]int32]portalWrite{}}
+	p := o.buildPortal(cx, cz, s)
+	if p == nil {
+		return nil
+	}
+	np := &NetherPortal{X0: p.bb.x0, Y0: p.bb.y0, Z0: p.bb.z0, X1: p.bb.x1, Y1: p.bb.y1, Z1: p.bb.z1,
+		Blocks: make(map[[2]int32][]StructureBlock, len(p.writes))}
+	for k, ws := range p.writes {
+		bs := make([]StructureBlock, len(ws))
+		for i, w := range ws {
+			bs[i] = StructureBlock{w.x, w.y, w.z, w.id, w.be}
+		}
+		np.Blocks[k] = bs
+	}
+	return np
 }

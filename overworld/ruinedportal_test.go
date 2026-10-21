@@ -33,7 +33,7 @@ func TestListRuinedPortals(t *testing.T) {
 			for _, ws := range p.writes {
 				n += len(ws)
 			}
-			s := &portalSim{o: o, raw: tc.Raw, chunks: map[[2]int32]*PackedChunk{}}
+			s := o.portalSim(tc.Raw)
 			top := s.height((p.bb.x0+p.bb.x1)/2, (p.bb.z0+p.bb.z1)/2, true)
 			fmt.Printf("portal %d %d %s under=%v rot=%d mirror=%v box=%v surface=%d blocks=%d\n",
 				cx*16+8, cz*16+8, p.path, p.under, p.rot, p.mirror, p.bb, top, n)

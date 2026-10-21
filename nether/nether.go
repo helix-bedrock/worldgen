@@ -76,16 +76,25 @@ type Nether struct {
 	nb         fortressIDs
 	fenceJoin  []uint8  // by state: what it is to a nether brick fence
 	fortresses sync.Map // [2]int32 start chunk -> *fortress
+
+	// ow builds the structures BDS shares with the overworld (ruined
+	// portals); portals caches them by start chunk.
+	ow      *overworld.Overworld
+	portals sync.Map // [2]int32 start chunk -> *overworld.NetherPortal
 }
 
 // New builds the noises for a seed. reg must contain the vanilla blocks the
 // generator places; biomeIDs maps biome names (no "minecraft:" prefix) to
-// numeric IDs, as from biome.LoadIDs.
-func New(seed int64, reg *blocks.Registry, biomeIDs map[string]uint32) (*Nether, error) {
+// numeric IDs, as from biome.LoadIDs. ow is the overworld of the same seed
+// and block list: it builds the structures both dimensions share.
+func New(seed int64, reg *blocks.Registry, biomeIDs map[string]uint32, ow *overworld.Overworld) (*Nether, error) {
 	if reg.Len() > 1<<16 {
 		return nil, fmt.Errorf("worldgen: %d block states do not fit the 16-bit chunk storage", reg.Len())
 	}
-	n := &Nether{seed: seed, reg: reg}
+	if ow == nil || ow.Seed() != seed || ow.Registry() != reg {
+		return nil, fmt.Errorf("worldgen: the Nether needs the overworld of the same seed and block list")
+	}
+	n := &Nether{seed: seed, reg: reg, ow: ow}
 	for _, b := range []struct {
 		dst  *uint32
 		name string
@@ -153,6 +162,13 @@ func (n *Nether) Seed() int64 { return n.seed }
 // Fence connections across the chunk's sides need its neighbours: Decorate
 // sets them.
 func (n *Nether) GenerateChunk(chunkX, chunkZ int32, c *Chunk) {
+	n.baseChunk(chunkX, chunkZ, c)
+	n.placePortals(chunkX, chunkZ, c)
+	n.placeFortresses(chunkX, chunkZ, c)
+}
+
+// baseChunk is the chunk before its structures: the ruined portals read it.
+func (n *Nether) baseChunk(chunkX, chunkZ int32, c *Chunk) {
 	c.BlockEntities = c.BlockEntities[:0]
 	n.terrain(chunkX, chunkZ, c)
 	n.biomes.fill(chunkX, chunkZ, &c.Biomes)
@@ -160,7 +176,6 @@ func (n *Nether) GenerateChunk(chunkX, chunkZ int32, c *Chunk) {
 	n.bedrock(mt, c)
 	n.surface(chunkX, chunkZ, c, mt)
 	n.carver.carve(n.seed, chunkX, chunkZ, c)
-	n.placeFortresses(chunkX, chunkZ, c)
 }
 
 // ChunkBiomes writes the biome ID of every column of chunk (chunkX, chunkZ),
