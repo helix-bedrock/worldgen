@@ -1,0 +1,292 @@
+package nether
+
+import (
+	"fmt"
+
+	"github.com/helix-bedrock/worldgen/rand"
+)
+
+// fungusKind is one HugeFungusFeature registration (crimson or warped).
+type fungusKind struct {
+	stem, hat, decor uint32
+	// vines: the crimson fungus hangs weeping vines from its hat.
+	vines bool
+}
+
+// fungusIDs are the blocks the huge fungi look for or place.
+type fungusIDs struct {
+	crimsonNylium, warpedNylium, crimsonFungus, warpedFungus uint32
+	// weepingVines and twistingVines hold the vines by age.
+	weepingVines, twistingVines [26]uint32
+	netherWart, warpedWart      uint32
+	// dirt are the other blocks a fungus may grow on (BDS's list at
+	// xmmword_F60E180).
+	dirt []uint32
+	// solid is BDS's Block+113 flag, replaceable its can-be-replaced
+	// test (BlockLegacy vtable +672), by state.
+	solid, replaceable []bool
+}
+
+func (n *Nether) loadFungi() error {
+	look := func(name string, props map[string]any) (uint32, error) {
+		id, ok := n.reg.Lookup(name, props)
+		if !ok {
+			return 0, fmt.Errorf("worldgen: block %s %v missing from the block list", name, props)
+		}
+		return id, nil
+	}
+	var err error
+	kind := func(stem, hat string, vines bool) (k fungusKind) {
+		if err != nil {
+			return
+		}
+		if k.stem, err = look(stem, map[string]any{"pillar_axis": "y"}); err != nil {
+			return
+		}
+		if k.hat, err = look(hat, nil); err != nil {
+			return
+		}
+		k.decor, err = look("minecraft:shroomlight", nil)
+		k.vines = vines
+		return
+	}
+	n.crimson = kind("minecraft:crimson_stem", "minecraft:nether_wart_block", true)
+	n.warped = kind("minecraft:warped_stem", "minecraft:warped_wart_block", false)
+	if err != nil {
+		return err
+	}
+	f := &n.fungi
+	for _, b := range []struct {
+		dst  *uint32
+		name string
+	}{
+		{&f.crimsonNylium, "minecraft:crimson_nylium"}, {&f.warpedNylium, "minecraft:warped_nylium"},
+		{&f.crimsonFungus, "minecraft:crimson_fungus"}, {&f.warpedFungus, "minecraft:warped_fungus"},
+	} {
+		if *b.dst, err = look(b.name, nil); err != nil {
+			return err
+		}
+	}
+	for age := range int32(26) {
+		if f.weepingVines[age], err = look("minecraft:weeping_vines", map[string]any{"weeping_vines_age": float64(age)}); err != nil {
+			return err
+		}
+		if f.twistingVines[age], err = look("minecraft:twisting_vines", map[string]any{"twisting_vines_age": float64(age)}); err != nil {
+			return err
+		}
+	}
+	if f.netherWart, err = look("minecraft:nether_wart_block", nil); err != nil {
+		return err
+	}
+	if f.warpedWart, err = look("minecraft:warped_wart_block", nil); err != nil {
+		return err
+	}
+	for _, name := range []string{"minecraft:dirt", "minecraft:grass_block", "minecraft:podzol", "minecraft:coarse_dirt",
+		"minecraft:mycelium", "minecraft:dirt_with_roots", "minecraft:moss_block", "minecraft:pale_moss_block",
+		"minecraft:mud", "minecraft:muddy_mangrove_roots", "minecraft:farmland"} {
+		if id, ok := n.reg.Default(name); ok {
+			f.dirt = append(f.dirt, id)
+		}
+	}
+	// VERIFY: both flags are read from BDS per block; these name lists
+	// cover the blocks the Nether generates.
+	nonSolid := map[string]bool{
+		"minecraft:air": true, "minecraft:lava": true, "minecraft:flowing_lava": true, "minecraft:water": true,
+		"minecraft:flowing_water": true, "minecraft:fire": true, "minecraft:soul_fire": true,
+		"minecraft:crimson_roots": true, "minecraft:warped_roots": true, "minecraft:nether_sprouts": true,
+		"minecraft:crimson_fungus": true, "minecraft:warped_fungus": true, "minecraft:weeping_vines": true,
+		"minecraft:twisting_vines": true, "minecraft:brown_mushroom": true, "minecraft:red_mushroom": true,
+	}
+	replaceable := map[string]bool{
+		"minecraft:air": true, "minecraft:lava": true, "minecraft:flowing_lava": true, "minecraft:water": true,
+		"minecraft:flowing_water": true, "minecraft:fire": true, "minecraft:soul_fire": true,
+		"minecraft:crimson_roots": true, "minecraft:warped_roots": true, "minecraft:nether_sprouts": true,
+	}
+	f.solid = make([]bool, n.reg.Len())
+	f.replaceable = make([]bool, n.reg.Len())
+	for i := range f.solid {
+		s, ok := n.reg.State(uint32(i))
+		if !ok {
+			continue
+		}
+		f.solid[i] = !nonSolid[s.Name]
+		f.replaceable[i] = replaceable[s.Name]
+	}
+	return nil
+}
+
+func abs32(v int32) int32 {
+	if v < 0 {
+		return -v
+	}
+	return v
+}
+
+func (n *Nether) isLava(b uint32) bool { return b == n.ids.lava || b == n.ids.flowingLava }
+
+// growsFungus reports whether a huge fungus may stand on b.
+func (n *Nether) growsFungus(b uint32) bool {
+	f := &n.fungi
+	if b == n.deco.soulSoil || b == f.warpedNylium || b == f.crimsonNylium {
+		return true
+	}
+	for _, d := range f.dirt {
+		if b == d {
+			return true
+		}
+	}
+	return false
+}
+
+// hugeFungus is BDS's HugeFungusFeature (place: sub_D2E7040). From the
+// rule's position it walks down (up to 100 blocks) to a block it can grow
+// on, then builds a stem, one block or (6%) three wide, and a hat whose
+// lower three layers only fill the rim.
+func (n *Nether) hugeFungus(r *region, x, y, z int32, mt *rand.MT, k *fungusKind) {
+	f := &n.fungi
+	height := mt.IntN(10) + 4
+	if mt.IntN(12) == 0 {
+		height <<= 1
+	}
+	if y <= 0 || height+y+1 >= Height {
+		return
+	}
+	for tries := 0; ; tries++ {
+		if n.isLava(r.at(x, y, z)) || n.isLava(r.at(x, y-1, z)) {
+			return
+		}
+		if n.growsFungus(r.at(x, y-1, z)) {
+			break
+		}
+		if tries == 100 {
+			return
+		}
+		y--
+		if y <= 0 || height+y+1 >= Height {
+			return
+		}
+	}
+	thick := mt.Float() < 0.06
+	t := int32(0)
+	if thick {
+		t = 1
+	}
+	for dx := -t; dx <= t; dx++ {
+		for dz := -t; dz <= t; dz++ {
+			corner := thick && abs32(dx) == t && abs32(dz) == t
+			for i := range height {
+				px, py, pz := x+dx, y+i, z+dz
+				b := r.at(px, py, pz)
+				if !f.replaceable[b] && b != f.crimsonFungus && b != f.warpedFungus {
+					continue
+				}
+				if !corner || mt.Float() < 0.1 {
+					r.set(px, py, pz, k.stem)
+				}
+			}
+		}
+	}
+	hatHeight := min(mt.IntN(height/3+1)+5, height)
+	start := height - hatHeight
+	for yy := start; yy <= height; yy++ {
+		rad := int32(1)
+		if yy < height-mt.IntN(3) {
+			rad = 2
+		}
+		if hatHeight >= 9 && yy < start+4 {
+			rad = 3
+		}
+		R := rad + t
+		lower := yy < start+3
+		for dx := -R; dx <= R; dx++ {
+			for dz := -R; dz <= R; dz++ {
+				px, py, pz := x+dx, y+yy, z+dz
+				b := r.at(px, py, pz)
+				if f.solid[b] || !f.replaceable[b] {
+					continue
+				}
+				edgeX, edgeZ, top := abs32(dx) == R, abs32(dz) == R, yy == height
+				if lower {
+					if !edgeX && !edgeZ && !top {
+						continue
+					}
+					if r.at(px, py-1, pz) == k.hat {
+						r.set(px, py, pz, k.hat)
+					} else if mt.Float() < 0.15 {
+						r.set(px, py, pz, k.hat)
+						if k.vines && mt.IntN(11) == 0 {
+							n.hangVines(r, px, py-1, pz, mt)
+						}
+					}
+					continue
+				}
+				v := mt.Float()
+				switch {
+				case !edgeX && !edgeZ && !top:
+					if v < 0.1 {
+						r.set(px, py, pz, k.decor)
+					} else if mt.Float() < 0.2 {
+						r.set(px, py, pz, k.hat)
+						if k.vines && mt.IntN(10) == 0 {
+							n.hangVines(r, px, py-1, pz, mt)
+						}
+					}
+				case edgeX && edgeZ:
+					if v < 0.7 {
+						r.set(px, py, pz, k.hat)
+						if k.vines && mt.IntN(12) == 0 {
+							n.hangVines(r, px, py-1, pz, mt)
+						}
+					} else if mt.Float() < 0.02 {
+						r.set(px, py, pz, k.decor)
+					}
+				default:
+					if v < 0.98 {
+						r.set(px, py, pz, k.hat)
+						if k.vines && mt.IntN(14) == 0 {
+							n.hangVines(r, px, py-1, pz, mt)
+						}
+					} else if mt.Float() < 0.02 {
+						r.set(px, py, pz, k.decor)
+					}
+				}
+			}
+		}
+	}
+}
+
+// hangVines hangs weeping vines from under a hat block at (x, y, z) if it
+// is air: usually up to four more below it, now and then twice that, a
+// fifth of the time just one.
+func (n *Nether) hangVines(r *region, x, y, z int32, mt *rand.MT) {
+	if r.at(x, y, z) != n.ids.air {
+		return
+	}
+	length := mt.IntN(5)
+	if mt.IntN(6) == 0 {
+		length <<= 1
+	}
+	if mt.IntN(5) == 0 {
+		length = 1
+	}
+	n.weepingColumn(r, x, y, z, length, 23, 25, mt)
+}
+
+// weepingColumn places a weeping vine column (sub_CE61DF0) from (x, y, z)
+// down: length+1 blocks at most, each of an age in [minAge, maxAge),
+// stopping above the first block that is not air.
+func (n *Nether) weepingColumn(r *region, x, y, z, length, minAge, maxAge int32, mt *rand.MT) {
+	for i := int32(0); i <= length; i, y = i+1, y-1 {
+		if r.at(x, y, z) != n.ids.air {
+			continue
+		}
+		age := minAge
+		if maxAge > minAge {
+			age += mt.IntN(maxAge - minAge)
+		}
+		r.set(x, y, z, n.fungi.weepingVines[age])
+		if i == length || r.at(x, y-1, z) != n.ids.air {
+			return
+		}
+	}
+}

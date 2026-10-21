@@ -45,6 +45,10 @@ type Surface struct {
 	Amplitudes                          []float32
 	NonReplaceable                      []Block
 	Specifiers                          []Specifier
+	// FloorMaterials, CeilingMaterials and BeachMaterial are the capped
+	// (Nether) builder's.
+	FloorMaterials, CeilingMaterials []Block
+	BeachMaterial                    Block
 }
 
 // Specifier picks a block for a noise_gradient builder when the noise is in
@@ -118,6 +122,9 @@ type rawBuilder struct {
 		Amplitudes  []float32 `json:"amplitudes"`
 	} `json:"noise_descriptor"`
 	NonReplaceable []Block `json:"non_replaceable_blocks"`
+	FloorMaterials []Block `json:"floor_materials"`
+	CeilMaterials  []Block `json:"ceiling_materials"`
+	Beach          Block   `json:"beach_material"`
 	Specifiers     []struct {
 		Range struct {
 			Min float32 `json:"min"`
@@ -178,6 +185,7 @@ func (b rawBuilder) surface() *Surface {
 		BrycePillars: b.BrycePillars, HasForest: b.HasForest,
 		NoiseName: b.Noise.Name, FirstOctave: b.Noise.FirstOctave, Amplitudes: b.Noise.Amplitudes,
 		NonReplaceable: b.NonReplaceable,
+		FloorMaterials: b.FloorMaterials, CeilingMaterials: b.CeilMaterials, BeachMaterial: b.Beach,
 	}
 	for _, sp := range b.Specifiers {
 		s.Specifiers = append(s.Specifiers, Specifier{Min: sp.Range.Min, Max: sp.Range.Max, Block: sp.Block})

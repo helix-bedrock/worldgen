@@ -795,7 +795,7 @@ func (o *Overworld) dataJigsawBeards(cx, cz int32) []beardBox {
 // non-air block, water included) of the terrain fill without structure
 // terrain adjustments.
 func (o *Overworld) surfaceNoStructures(x, z int32) int32 {
-	h := o.plainHeights.get([2]int32{x >> 4, z >> 4}, func() *[256]int16 { return o.plainHeightMap(x>>4, z>>4) })
+	h := o.plainHeights.Get([2]int32{x >> 4, z >> 4}, func() *[256]int16 { return o.plainHeightMap(x>>4, z>>4) })
 	return int32(h[(z&15)<<4|x&15])
 }
 

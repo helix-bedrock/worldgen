@@ -142,5 +142,12 @@ game.
 
 | What | Status |
 | --- | --- |
-| The Nether | Not yet |
+| Nether terrain, biomes, bedrock and surfaces | Close: biomes match BDS; some ceilings get nylium where BDS has netherrack |
+| Nether lava springs, fire, glowstone, mushrooms | Matches BDS |
+| Nether ores: gold, quartz, magma, gravel, blackstone, ancient debris | Matches BDS (debris 85%: one unexplained random draw, see the code) |
+| Huge crimson and warped fungi, fungi, roots, sprouts, weeping and twisting vines | Close: crimson trees match BDS where the terrain does; warped not yet compared |
+| Basalt deltas (deltas, basalt columns) | Not yet |
+| Soul sand valley (basalt pillars, soul sand, fossils) | Not yet |
+| Nether cave carver | Not yet |
+| Nether fortresses, bastions, Nether ruined portals | Not yet |
 | The End | Not yet |

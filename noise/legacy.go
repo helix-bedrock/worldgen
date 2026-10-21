@@ -11,7 +11,7 @@ type legacyOctave struct {
 	p          [512]int32
 }
 
-func newLegacyOctave(r *rand.Xoroshiro) legacyOctave {
+func newLegacyOctave(r Random) legacyOctave {
 	var n legacyOctave
 	n.ox = r.Float() * 256
 	n.oy = r.Float() * 256
@@ -48,7 +48,7 @@ type GridValues [GridXZ * GridY * GridXZ]float32
 //     gradient products are not recomputed: the previous corner's are reused,
 //     even across columns. BDS never resets this between columns, so the
 //     lowest octaves carry values over from one column to the next.
-func (n *legacyOctave) addGrid(out *GridValues, x0, y0, z0 float32, sx, sy, sz, invAmp float32) {
+func (n *legacyOctave) addGrid(out []float32, ny int, x0, y0, z0 float32, sx, sy, sz, invAmp float32) {
 	start := 0*sy + n.oy
 	startCell := int32(start)
 	startFrac := start - float32(int32(start))
@@ -67,7 +67,7 @@ func (n *legacyOctave) addGrid(out *GridValues, x0, y0, z0 float32, sx, sy, sz, 
 			zi := int32(uint8(int32(flz)))
 			zf := fz - flz
 			zs := smooth(zf)
-			for j := range GridY {
+			for j := range ny {
 				fy := (float32(j)+y0)*sy + n.oy
 				fly := floor32(fy)
 				yi := int32(uint8(int32(fly)))
@@ -143,7 +143,7 @@ const (
 func addOctaves(octs []legacyOctave, out *GridValues, x0, y0, z0, sxz, sy float32) {
 	a := float32(1)
 	for i := range octs {
-		octs[i].addGrid(out, x0, y0, z0, sxz*a, sy*a, sxz*a, 1/a)
+		octs[i].addGrid(out[:], GridY, x0, y0, z0, sxz*a, sy*a, sxz*a, 1/a)
 		a *= 0.5
 	}
 }
@@ -167,4 +167,75 @@ func (b *Blended) Grid(out *GridValues, x0, y0, z0 float32) {
 		}
 		out[i] = v
 	}
+}
+
+// LegacyOctaves is a sum of old-style Perlin octaves, sampled on a whole
+// grid of GridXZ x ny x GridXZ corners at once, as the Nether's and the
+// End's terrain noises are. It is immutable after creation and safe for
+// concurrent use.
+type LegacyOctaves struct {
+	octs  []legacyOctave
+	scale float32
+}
+
+// NewLegacyOctaves draws n octaves from r, in order (BDS's sub_D241B00).
+func NewLegacyOctaves(r Random, n int) *LegacyOctaves {
+	o := &LegacyOctaves{octs: make([]legacyOctave, n)}
+	var sum float32
+	a := float32(1)
+	for i := range o.octs {
+		o.octs[i] = newLegacyOctave(r)
+		sum += 1 / a
+		a *= 0.5
+	}
+	if sum != 0 {
+		o.scale = 1 / sum
+	}
+	return o
+}
+
+// Scale is 1 over the octaves' summed weights, which callers multiply a
+// sample by to bring it to about [-1, 1].
+func (o *LegacyOctaves) Scale() float32 { return o.scale }
+
+// AddGrid adds the octave sum to out, a grid of GridXZ x ny x GridXZ
+// corners, index (x*GridXZ+z)*ny + y, whose first corner is (x0, y0, z0)
+// in cell units. Octave i is sampled at input scale s*2^-i and weighted
+// 2^i (BDS's sub_D23EF10 per octave).
+func (o *LegacyOctaves) AddGrid(out []float32, ny int, x0, y0, z0, sxz, sy float32) {
+	a := float32(1)
+	for i := range o.octs {
+		o.octs[i].addGrid(out, ny, x0, y0, z0, sxz*a, sy*a, sxz*a, 1/a)
+		a *= 0.5
+	}
+}
+
+// Sample returns the octave sum at one point: octave i at input scale 2^-i,
+// weighted 2^i (BDS's sub_D242930). The caller applies the set's scale.
+func (o *LegacyOctaves) Sample(x, y, z float32) float32 {
+	var v float32
+	a := float32(1)
+	for i := range o.octs {
+		v += o.octs[i].sample(x*a, y*a, z*a) / a
+		a *= 0.5
+	}
+	return v
+}
+
+// sample is one octave at one point, lerped along x, then y, then z.
+func (n *legacyOctave) sample(x, y, z float32) float32 {
+	x, y, z = x+n.ox, y+n.oy, z+n.oz
+	flx, fly, flz := floor32(x), floor32(y), floor32(z)
+	xi, yi, zi := int32(uint8(int32(flx))), int32(uint8(int32(fly))), int32(uint8(int32(flz)))
+	xf, yf, zf := x-flx, y-fly, z-flz
+	xs, ys, zs := smooth(xf), smooth(yf), smooth(zf)
+	a := n.p[xi] + yi
+	aa, ab := n.p[a], n.p[a+1]
+	b := n.p[xi+1] + yi
+	ba, bb := n.p[b], n.p[b+1]
+	l0 := lerp(ys, lerp(xs, grad(int(n.p[aa+zi]), xf, yf, zf), grad(int(n.p[ba+zi]), xf-1, yf, zf)),
+		lerp(xs, grad(int(n.p[ab+zi]), xf, yf-1, zf), grad(int(n.p[bb+zi]), xf-1, yf-1, zf)))
+	l1 := lerp(ys, lerp(xs, grad(int(n.p[aa+zi+1]), xf, yf, zf-1), grad(int(n.p[ba+zi+1]), xf-1, yf, zf-1)),
+		lerp(xs, grad(int(n.p[ab+zi+1]), xf, yf-1, zf-1), grad(int(n.p[bb+zi+1]), xf-1, yf-1, zf-1)))
+	return lerp(zs, l0, l1)
 }

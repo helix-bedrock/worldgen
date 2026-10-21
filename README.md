@@ -22,7 +22,12 @@
 >   witch huts, igloos, ocean ruins, shipwrecks, buried treasure, ocean monuments, pillager outposts,
 >   ruined portals, woodland mansions, strongholds, trail ruins, trial chambers, abandoned camps, fossils
 >   and desert wells. Chests are still empty in game.
-> - **The Nether and the End are not started.**
+> - **The Nether is in progress:** terrain, biomes, surfaces, bedrock, lava springs, fire, glowstone,
+>   ores (gold, quartz, magma, gravel, blackstone, ancient debris), huge crimson and warped fungi,
+>   fungi, roots and weeping vines match BDS closely (warped forests and twisting vines are not yet
+>   compared). Basalt deltas, soul sand
+>   valley features, the cave carver and Nether structures are not done yet.
+> - **The End is not started.**
 > - **The API is not stable.** Names and behaviour change between commits.
 >
 > **[STATUS.md](STATUS.md) lists everything that is generated and everything that is missing.**
@@ -80,8 +85,8 @@ cache.Generate(chunkX, chunkZ, &c) // terrain + features, safe from many gorouti
 
 The generator returns indices into the block list; your server maps them to its own block IDs.
 
-Each dimension has its own package: [`overworld`](overworld) today, with the Nether and the End to
-follow. The shared vanilla data and the `biome`, `blocks`, `noise` and `rand` packages stay at the top.
+Each dimension has its own package: [`overworld`](overworld) and [`nether`](nether) today, with the
+End to follow. The shared vanilla data and the `biome`, `blocks`, `noise` and `rand` packages stay at the top.
 
 ## Features
 

@@ -191,11 +191,17 @@ func (o *SimplexOctaves) Sum3(x, y, z float32) float32 {
 // chunk whose first block is (x0, z0): octave i with a_i = 2^-i adds
 // simplex((x0+x)*0.125*a + ox, (z0+z)*0.125*a + oy) * 0.55 / a.
 func (o *SimplexOctaves) SurfaceDepth(buf *[256]float32, x0, z0 int32) {
+	o.SurfaceNoise(buf, x0, z0, 0.125)
+}
+
+// SurfaceNoise is SurfaceDepth with base frequency freq in place of 0.125:
+// the Nether samples its surface noise at 0.0625.
+func (o *SimplexOctaves) SurfaceNoise(buf *[256]float32, x0, z0 int32, freq float32) {
 	*buf = [256]float32{}
 	a := float32(1)
 	for i := range o.octs {
 		s := &o.octs[i]
-		f, amp := 0.125*a, 0.55/a
+		f, amp := freq*a, 0.55/a
 		for z := range int32(16) {
 			zz := (float32(z)+float32(z0))*f + s.oy
 			for x := range int32(16) {

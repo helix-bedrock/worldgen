@@ -5,13 +5,14 @@ package overworld
 
 import (
 	"fmt"
-	"github.com/helix-bedrock/worldgen"
 	"math"
 	"strings"
 	"sync"
 
+	"github.com/helix-bedrock/worldgen"
 	"github.com/helix-bedrock/worldgen/biome"
 	"github.com/helix-bedrock/worldgen/blocks"
+	"github.com/helix-bedrock/worldgen/internal/lru"
 	"github.com/helix-bedrock/worldgen/noise"
 	"github.com/helix-bedrock/worldgen/overworld/terrain"
 	"github.com/helix-bedrock/worldgen/rand"
@@ -177,7 +178,7 @@ type Overworld struct {
 	city   *jigsawData
 	cities sync.Map
 	// plainHeights caches surfaceNoStructures height maps by chunk.
-	plainHeights lru[*[256]int16]
+	plainHeights lru.LRU[*[256]int16]
 	// kernel is the beard kernel of terrain adjustments.
 	kernel []float32
 	// mineshafts holds assembled mineshafts by start chunk.
@@ -227,7 +228,7 @@ func NewOverworld(seed int64, reg *blocks.Registry, biomeIDs map[string]uint32, 
 	if reg.Len() > 1<<16 {
 		return nil, fmt.Errorf("worldgen: %d block states do not fit the 16-bit chunk storage", reg.Len())
 	}
-	o := &Overworld{seed: seed, reg: reg, shape: terrain.NewShape(), plainHeights: newLRU[*[256]int16](1024)}
+	o := &Overworld{seed: seed, reg: reg, shape: terrain.NewShape(), plainHeights: lru.New[*[256]int16](1024)}
 	for _, opt := range opts {
 		opt(&o.opts)
 	}

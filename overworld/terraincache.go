@@ -1,8 +1,9 @@
 package overworld
 
 import (
-	"container/list"
 	"sync"
+
+	"github.com/helix-bedrock/worldgen/internal/lru"
 )
 
 // TerrainCache keeps recently generated undecorated chunks and the feature
@@ -15,9 +16,9 @@ type TerrainCache struct {
 
 	// scratch pools full chunks to generate into before packing.
 	scratch    sync.Pool
-	terrain    lru[*PackedChunk]
-	structured lru[*PackedChunk]
-	features   lru[*featureWrites]
+	terrain    lru.LRU[*PackedChunk]
+	structured lru.LRU[*PackedChunk]
+	features   lru.LRU[*featureWrites]
 }
 
 // NewTerrainCache returns a cache holding at most size chunks of terrain,
@@ -29,8 +30,8 @@ type TerrainCache struct {
 // 2048 no faster.
 func NewTerrainCache(gen *Overworld, size int) *TerrainCache {
 	size = max(size, 64)
-	return &TerrainCache{gen: gen, terrain: newLRU[*PackedChunk](size), structured: newLRU[*PackedChunk](size),
-		features: newLRU[*featureWrites](size)}
+	return &TerrainCache{gen: gen, terrain: lru.New[*PackedChunk](size), structured: lru.New[*PackedChunk](size),
+		features: lru.New[*featureWrites](size)}
 }
 
 // Get returns the undecorated chunk at (chunkX, chunkZ) with the structures
@@ -38,7 +39,7 @@ func NewTerrainCache(gen *Overworld, size int) *TerrainCache {
 // places structures first. The chunk is shared: callers must not modify it.
 // A chunk no structure reaches is the raw terrain itself.
 func (t *TerrainCache) Get(chunkX, chunkZ int32) *PackedChunk {
-	return t.structured.get([2]int32{chunkX, chunkZ}, func() *PackedChunk {
+	return t.structured.Get([2]int32{chunkX, chunkZ}, func() *PackedChunk {
 		raw := t.Raw(chunkX, chunkZ)
 		height := func(x, z int32) int32 { return t.gen.surfaceHeight(t.Raw, x, z) }
 		if !t.gen.structuresReach(chunkX, chunkZ, height, t.Raw) {
@@ -58,7 +59,7 @@ func (t *TerrainCache) Get(chunkX, chunkZ int32) *PackedChunk {
 
 // Raw returns the terrain of chunk (chunkX, chunkZ) without structures.
 func (t *TerrainCache) Raw(chunkX, chunkZ int32) *PackedChunk {
-	return t.terrain.get([2]int32{chunkX, chunkZ}, func() *PackedChunk {
+	return t.terrain.Get([2]int32{chunkX, chunkZ}, func() *PackedChunk {
 		full, _ := t.scratch.Get().(*Chunk)
 		if full == nil {
 			full = new(Chunk)
@@ -75,11 +76,11 @@ func (t *TerrainCache) Raw(chunkX, chunkZ int32) *PackedChunk {
 // them, they are dropped: a chunk made again later recomputes them.
 func (t *TerrainCache) originFeatures(ox, oz int32) *featureWrites {
 	pos := [2]int32{ox, oz}
-	fw := t.features.get(pos, func() *featureWrites {
+	fw := t.features.Get(pos, func() *featureWrites {
 		return t.gen.originFeatures(ox, oz, t.Get)
 	})
 	if fw != nil && fw.uses.Add(1) == 16 {
-		t.features.remove(pos)
+		t.features.Remove(pos)
 	}
 	return fw
 }
@@ -91,64 +92,6 @@ func (t *TerrainCache) Generate(chunkX, chunkZ int32, c *Chunk) {
 	base.Unpack(c)
 	t.gen.decorate(chunkX, chunkZ, c, base, t.originFeatures)
 	t.gen.connectBlocks(c, chunkX, chunkZ, t.Get)
-}
-
-// lru is a least-recently-used cache of values made on first request.
-type lru[V any] struct {
-	size    int
-	mu      sync.Mutex
-	entries map[[2]int32]*list.Element
-	order   *list.List // front = most recently used
-}
-
-type lruEntry[V any] struct {
-	pos   [2]int32
-	ready chan struct{}
-	v     V
-}
-
-func newLRU[V any](size int) lru[V] {
-	return lru[V]{size: size, entries: map[[2]int32]*list.Element{}, order: list.New()}
-}
-
-// remove drops the value at pos.
-func (l *lru[V]) remove(pos [2]int32) {
-	l.mu.Lock()
-	if el, ok := l.entries[pos]; ok {
-		l.order.Remove(el)
-		delete(l.entries, pos)
-	}
-	l.mu.Unlock()
-}
-
-// get returns the value at pos, calling build for it if it is not cached.
-// Callers asking for a value being made wait for it.
-func (l *lru[V]) get(pos [2]int32, build func() V) V {
-	l.mu.Lock()
-	if el, ok := l.entries[pos]; ok {
-		l.order.MoveToFront(el)
-		e, _ := el.Value.(*lruEntry[V])
-		l.mu.Unlock()
-		if e == nil {
-			var zero V
-			return zero
-		}
-		<-e.ready
-		return e.v
-	}
-	e := &lruEntry[V]{pos: pos, ready: make(chan struct{})}
-	l.entries[pos] = l.order.PushFront(e)
-	for l.order.Len() > l.size {
-		old := l.order.Back()
-		l.order.Remove(old)
-		if oe, ok := old.Value.(*lruEntry[V]); ok {
-			delete(l.entries, oe.pos)
-		}
-	}
-	l.mu.Unlock()
-	e.v = build()
-	close(e.ready)
-	return e.v
 }
 
 // Spawner is a monster spawner block a structure or feature placed.
