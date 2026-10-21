@@ -90,6 +90,7 @@ func (t *TerrainCache) Generate(chunkX, chunkZ int32, c *Chunk) {
 	base := t.Get(chunkX, chunkZ)
 	base.Unpack(c)
 	t.gen.decorate(chunkX, chunkZ, c, base, t.originFeatures)
+	t.gen.connectBlocks(c, chunkX, chunkZ, t.Get)
 }
 
 // lru is a least-recently-used cache of values made on first request.

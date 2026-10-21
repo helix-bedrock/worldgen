@@ -968,44 +968,7 @@ func (o *Overworld) placeMansions(cx, cz int32, c *Chunk, raw func(cx, cz int32)
 		}
 		b.mansionFoundation(m)
 		b.mansionSteps(m)
-		b.connectPanes(m)
 	})
-}
-
-// connectPanes sets the connections of the mansion's glass panes and iron
-// bars. The templates store them all unconnected; BDS joins them to the
-// blocks beside them as it places them, as it does for any pane: to other
-// panes and bars and to full block faces.
-func (b *scBuild) connectPanes(m *mansion) {
-	o := b.o
-	area := box{max(b.cbox.x0, m.bb.x0), m.bb.y0, max(b.cbox.z0, m.bb.z0), min(b.cbox.x1, m.bb.x1), m.bb.y1, min(b.cbox.z1, m.bb.z1)}
-	at := func(x, y, z int32) uint32 {
-		if b.cbox.contains([3]int32{x, y, z}) {
-			return b.get(x, y, z)
-		}
-		return o.mansionBlockAt(m, [3]int32{x, y, z})
-	}
-	for x := area.x0; x <= area.x1; x++ {
-		for z := area.z0; z <= area.z1; z++ {
-			for y := area.y0; y <= area.y1; y++ {
-				id := b.get(x, y, z)
-				if !o.isPane(id) {
-					continue
-				}
-				nid := id
-				for _, side := range [4]struct {
-					name   string
-					dx, dz int32
-				}{{"north", 0, -1}, {"east", 1, 0}, {"south", 0, 1}, {"west", -1, 0}} {
-					nb := at(x+side.dx, y, z+side.dz)
-					nid = o.withProp(nid, "minecraft:connection_"+side.name, o.isPane(nb) || o.sturdyFace(nb, 0))
-				}
-				if nid != id {
-					b.put(nid, x, y, z)
-				}
-			}
-		}
-	}
 }
 
 // isPane reports whether a block is a glass pane or iron bars.

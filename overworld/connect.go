@@ -2,68 +2,103 @@ package overworld
 
 import "strings"
 
-// joinFences sets the connections of the fences, panes and iron bars in
-// area, which lies in chunk (cx, cz). Pieces built in code place them
-// unconnected; BDS joins them to the blocks beside them as it places them
-// (the connection rule): fences to fences of their kind, fence gates and
-// full faces, panes and bars to panes, bars and full faces. A block in
-// another chunk is read from that chunk's terrain (raw) with the
-// structure built in by build.
-// VERIFY: whether BDS sees the neighbouring chunk's structure blocks or
-// only what is there when this chunk is built.
-func (o *Overworld) joinFences(c *Chunk, cx, cz int32, area box, raw func(cx, cz int32) *PackedChunk, build func(cx, cz int32, n *Chunk)) {
-	cbox := box{cx * 16, MinY, cz * 16, cx*16 + 15, MaxY - 1, cz*16 + 15}
-	var others map[[2]int32]*Chunk
+// Connection kinds of joinKind.
+const (
+	joinFence = 1 + iota
+	joinPane
+)
+
+// joinKindOf sorts a block name for connectBlocks.
+func joinKindOf(name string) uint8 {
+	switch {
+	case strings.HasSuffix(name, "_fence"):
+		return joinFence
+	case strings.HasSuffix(name, "glass_pane"), name == "minecraft:iron_bars":
+		return joinPane
+	}
+	return 0
+}
+
+// connectBlocks sets the connections of every fence, pane and iron bar in
+// chunk (cx, cz). BDS sets them when a structure template is placed: it
+// recomputes the connections in the template's box and the ring of blocks
+// around it (sub_D262990), so blocks from later pieces join earlier ones.
+// Features never trigger it, so a fence does not join a tree or plant
+// decorated next to it. connectBlocks reads every neighbour from near, the
+// chunk's terrain with its structures and without features (nil: air).
+// Fences join fences of their kind, fence gates along their wall and
+// full faces; panes and bars join panes, bars and full faces.
+// VERIFY: blocks code-built pieces (strongholds, mineshafts) set without a
+// template are joined the same way here; their placement path was not read.
+func (o *Overworld) connectBlocks(c *Chunk, cx, cz int32, near func(cx, cz int32) *PackedChunk) {
+	var others [3][3]*PackedChunk
+	var asked [3][3]bool
 	at := func(x, y, z int32) uint32 {
-		if cbox.contains([3]int32{x, y, z}) {
-			return c.Block(int(x&15), int(y), int(z&15))
+		dx, dz := x>>4-cx+1, z>>4-cz+1
+		if !asked[dx][dz] {
+			asked[dx][dz] = true
+			others[dx][dz] = near(x>>4, z>>4)
 		}
-		k := [2]int32{x >> 4, z >> 4}
-		n, ok := others[k]
+		if p := others[dx][dz]; p != nil {
+			return p.at(int((y-MinY)<<8 | (z&15)<<4 | x&15))
+		}
+		return o.ids.air
+	}
+	for i, b := range c.Blocks {
+		if int(b) >= len(o.joinKind) || o.joinKind[b] == 0 {
+			continue
+		}
+		id := uint32(b)
+		kind := o.joinKind[b]
+		x, y, z := cx*16+int32(i&15), int32(i>>8)+MinY, cz*16+int32(i>>4&15)
+		nid := id
+		for _, side := range joinSides {
+			nb := at(x+side.dx, y, z+side.dz)
+			join := o.faceSturdy(nb, side.facing)
+			if kind == joinFence {
+				join = join || o.gateAccepts(nb, side.dx != 0) || (o.isFence(nb) && o.netherFence(nb) == o.netherFence(id))
+			} else {
+				join = join || int(nb) < len(o.joinKind) && o.joinKind[nb] == joinPane
+			}
+			nid = o.withProp(nid, "minecraft:connection_"+side.name, join)
+		}
+		if nid != id {
+			c.Blocks[i] = uint16(nid)
+		}
+	}
+}
+
+// joinSides are the four sides a block joins on, with the face of the
+// neighbour that touches it (the stairs' weirdo_direction of a full back
+// face on that side).
+var joinSides = [4]struct {
+	name   string
+	dx, dz int32
+	facing int32
+}{{"north", 0, -1, 2}, {"east", 1, 0, 1}, {"south", 0, 1, 3}, {"west", -1, 0, 0}}
+
+// faceSturdy reports whether the face of nb that touches a fence or pane is
+// a full face. Stairs have one: their back, on the side weirdo_direction
+// names (0 east, 1 west, 2 south, 3 north). A bell has none.
+func (o *Overworld) faceSturdy(nb uint32, facing int32) bool {
+	name := o.blockName(nb)
+	switch {
+	case strings.HasSuffix(name, "_stairs"):
+		st, ok := o.reg.State(nb)
 		if !ok {
-			if others == nil {
-				others = map[[2]int32]*Chunk{}
-			}
-			if pc := raw(k[0], k[1]); pc != nil {
-				n = &Chunk{}
-				pc.Unpack(n)
-				build(k[0], k[1], n)
-			}
-			others[k] = n
+			return false
 		}
-		if n == nil || y < MinY || y >= MaxY {
-			return o.ids.air
+		switch d := st.Props["weirdo_direction"].(type) {
+		case int32:
+			return d == facing
+		case uint8:
+			return int32(d) == facing
 		}
-		return n.Block(int(x&15), int(y), int(z&15))
+		return false
+	case name == "minecraft:bell":
+		return false
 	}
-	for x := area.x0; x <= area.x1; x++ {
-		for z := area.z0; z <= area.z1; z++ {
-			for y := max(area.y0, MinY); y <= min(area.y1, MaxY-1); y++ {
-				id := c.Block(int(x&15), int(y), int(z&15))
-				fence, pane := o.isFence(id), o.isPane(id)
-				if !fence && !pane {
-					continue
-				}
-				nid := id
-				for _, side := range [4]struct {
-					name   string
-					dx, dz int32
-				}{{"north", 0, -1}, {"east", 1, 0}, {"south", 0, 1}, {"west", -1, 0}} {
-					nb := at(x+side.dx, y, z+side.dz)
-					join := o.sturdyFace(nb, 0)
-					if fence {
-						join = join || o.gateAccepts(nb, side.dx != 0) || (o.isFence(nb) && o.netherFence(nb) == o.netherFence(id))
-					} else {
-						join = join || o.isPane(nb)
-					}
-					nid = o.withProp(nid, "minecraft:connection_"+side.name, join)
-				}
-				if nid != id {
-					c.set(int(x&15), int(y), int(z&15), nid)
-				}
-			}
-		}
-	}
+	return o.sturdyFace(nb, 0)
 }
 
 // gateAccepts reports whether a fence gate joins a fence beside it: only

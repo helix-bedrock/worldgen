@@ -629,8 +629,8 @@ func (l *shLayout) children(p *shPiece, r *rand.MT) {
 }
 
 // placeStrongholds writes the pieces of nearby strongholds that reach
-// chunk (cx, cz) into c, then joins their fences and iron bars. raw gives
-// the terrain of neighbouring chunks.
+// chunk (cx, cz) into c (connectBlocks joins their fences and iron bars).
+// raw gives the terrain of neighbouring chunks.
 func (o *Overworld) placeStrongholds(cx, cz int32, c *Chunk, raw func(cx, cz int32) *PackedChunk) {
 	cbox := box{cx * 16, MinY, cz * 16, cx*16 + 15, MaxY - 1, cz*16 + 15}
 	o.strongholdsNear(cx, cz, shReach, func(sx, sz int32) {
@@ -639,7 +639,6 @@ func (o *Overworld) placeStrongholds(cx, cz int32, c *Chunk, raw func(cx, cz int
 			return
 		}
 		o.buildStronghold(s, cx, cz, c)
-		o.connectStronghold(s, cx, cz, c, raw)
 	})
 }
 
@@ -656,15 +655,6 @@ func (o *Overworld) buildStronghold(s *stronghold, cx, cz int32, c *Chunk) {
 			b.build()
 		}
 	}
-}
-
-// connectStronghold joins the fences and iron bars s put in chunk
-// (cx, cz), reading other chunks as their terrain with the stronghold
-// built in.
-func (o *Overworld) connectStronghold(s *stronghold, cx, cz int32, c *Chunk, raw func(cx, cz int32) *PackedChunk) {
-	cbox := box{cx * 16, MinY, cz * 16, cx*16 + 15, MaxY - 1, cz*16 + 15}
-	area := box{max(cbox.x0, s.bb.x0), s.bb.y0, max(cbox.z0, s.bb.z0), min(cbox.x1, s.bb.x1), s.bb.y1, min(cbox.z1, s.bb.z1)}
-	o.joinFences(c, cx, cz, area, raw, func(nx, nz int32, n *Chunk) { o.buildStronghold(s, nx, nz, n) })
 }
 
 // strongholdReaches reports whether a stronghold has a piece in chunk

@@ -122,6 +122,9 @@ type Overworld struct {
 	features     *featureSet
 	// names is each block state's block name, for feature replace rules.
 	names []string
+	// joinKind sorts each block state for connectBlocks (joinFence,
+	// joinPane, or 0 for blocks that take no connections).
+	joinKind []uint8
 	// villageBiome marks the biomes with a minecraft:village_type;
 	// villageType holds its type.
 	villageBiome []bool
@@ -367,10 +370,12 @@ func NewOverworld(seed int64, reg *blocks.Registry, biomeIDs map[string]uint32, 
 	}
 	o.soilPlant = make([]bool, reg.Len())
 	o.names = make([]string, reg.Len())
+	o.joinKind = make([]uint8, reg.Len())
 	for i := range o.names {
 		st, _ := reg.State(uint32(i))
 		o.names[i] = st.Name
 		o.soilPlant[i] = soilPlants[st.Name]
+		o.joinKind[i] = joinKindOf(st.Name)
 	}
 	o.blockTags = map[string][]string{}
 	for _, n := range o.names {
