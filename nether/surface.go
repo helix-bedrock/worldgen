@@ -264,13 +264,17 @@ func (n *Nether) overworldSurface(c *Chunk, mt *rand.MT, col *column, b *biomeSu
 	depth := int32(mt.Float()*0.25 + (float32(float64(col.noise)/3) + 3))
 	depthSea := depth + b.seaFloorDepth
 	run := int32(-1)
-	cur := b.mats
+	// The materials carried down start as the adjusted ones at the top of
+	// the world.
+	cur := n.adjusted(b, col, Height-1)
 	prevTop, prevMid := cur.top, cur.mid
 	surfaceY := int32(SeaLevel)
-	// The walk starts at the column's height map, which in the Nether is
-	// below the roof: the roof's underside is never capped.
-	// VERIFY: the height map BDS passes (taken as the first air from the
-	// top; matches BDS on the comparison seed).
+	// BDS starts the walk at the chunk's height map, which the Nether
+	// generator never fills: what it holds decides whether the roof's
+	// underside is capped, and on the comparison world about a fifth of
+	// the columns are, in no pattern the terrain explains. The walk here
+	// starts at the first air from the top, so the roof is never capped.
+	// VERIFY: what that height map holds when a Nether chunk is generated.
 	top := int32(Height - 1)
 	for top > 0 && c.Block(x, int(top), z) != n.ids.air {
 		top--

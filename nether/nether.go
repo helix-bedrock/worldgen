@@ -65,7 +65,8 @@ type Nether struct {
 	crimson, warped fungusKind
 	fungi           fungusIDs
 	// rules[biome][pass] are the biome's feature rules.
-	rules map[uint32][][]*netherRule
+	rules  map[uint32][][]*netherRule
+	carver netherCarver
 }
 
 // New builds the noises for a seed. reg must contain the vanilla blocks the
@@ -123,6 +124,9 @@ func New(seed int64, reg *blocks.Registry, biomeIDs map[string]uint32) (*Nether,
 	if err := n.loadRules(biomeIDs); err != nil {
 		return nil, err
 	}
+	if err := n.loadCarver(); err != nil {
+		return nil, err
+	}
 	return n, nil
 }
 
@@ -137,6 +141,14 @@ func (n *Nether) GenerateChunk(chunkX, chunkZ int32, c *Chunk) {
 	mt := rand.NewMT(chunkSeed(chunkX, chunkZ))
 	n.bedrock(mt, c)
 	n.surface(chunkX, chunkZ, c, mt)
+	n.carver.carve(n.seed, chunkX, chunkZ, c)
+}
+
+// ChunkBiomes writes the biome ID of every column of chunk (chunkX, chunkZ),
+// index z<<4 | x, without generating its blocks. It is safe for concurrent
+// use.
+func (n *Nether) ChunkBiomes(chunkX, chunkZ int32, out *[256]uint16) {
+	n.biomes.fill(chunkX, chunkZ, out)
 }
 
 // chunkSeed seeds the chunk's Mersenne Twister. It differs from the

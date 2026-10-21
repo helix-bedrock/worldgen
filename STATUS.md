@@ -142,12 +142,12 @@ game.
 
 | What | Status |
 | --- | --- |
-| Nether terrain, biomes, bedrock and surfaces | Close: biomes match BDS; some ceilings get nylium where BDS has netherrack |
+| Nether terrain, biomes, bedrock and surfaces | Close: biomes match BDS; BDS caps about a fifth of the roof undersides with nylium, from a height map its Nether generation never fills, and worldgen caps none (see `nether/surface.go`) |
 | Nether lava springs, fire, glowstone, mushrooms | Matches BDS |
 | Nether ores: gold, quartz, magma, gravel, blackstone, ancient debris | Matches BDS (debris 85%: one unexplained random draw, see the code) |
 | Huge crimson and warped fungi, fungi, roots, sprouts, weeping and twisting vines | Close: crimson trees match BDS where the terrain does; warped not yet compared |
 | Basalt deltas (deltas, basalt columns) | Not yet |
 | Soul sand valley (basalt pillars, soul sand, fossils) | Not yet |
-| Nether cave carver | Not yet |
+| Nether cave carver | Matches BDS (lava that BDS let flow into the caves while ticking is not generation) |
 | Nether fortresses, bastions, Nether ruined portals | Not yet |
 | The End | Not yet |
