@@ -1,5 +1,7 @@
 <div align="center">
 
+<img src=".github/helix-mark.svg" alt="Helix" width="120">
+
 <h1>worldgen</h1>
 
 <p>
