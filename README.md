@@ -1,51 +1,5 @@
 # worldgen — Bedrock world generation in Go, built from Bedrock's own code
 
-> [!WARNING]
-> **This is early and not finished.** It is under active, heavy development, and it will take a
-> while before it is complete.
->
-> Status as of 2026-10-22:
->
-> - **The base Overworld matches BDS:** terrain, all biomes, surface layers, caves and canyons,
->   underground water and lava, ores and stone patches, and an unbroken bedrock floor.
-> - **Caves:** lush caves, dripstone caves, the deep dark's sculk (with sensors and shriekers), glow
->   lichen, amethyst geodes, water and lava springs, and the sulfur caves' spikes, pools and
->   surface springs.
-> - **Trees and plants:** every tree, including cherry and mangrove, huge mushrooms, grass and
->   ferns, flowers in every flower biome, sunflowers, wildflowers, pink petals, leaf litter, sweet
->   berries, pumpkins, sugar cane, mushrooms, bamboo, lily pads, cactus, dead bushes, melons, vines,
->   firefly bushes, dry grass, red shrubs, lilacs, rose bushes and peonies.
-> - **Biome features:** ice spikes, forest rocks in giant taigas and grass patches in mangrove swamps.
-> - **Oceans:** seagrass, kelp, coral reefs, coral crusts, sea anemones, icebergs, and magma with
->   bubble columns.
-> - **Structures:** villages, mineshafts, dungeons, ancient cities, desert pyramids, jungle temples,
->   witch huts, igloos, ocean ruins, shipwrecks, buried treasure, ocean monuments, pillager outposts,
->   ruined portals, woodland mansions, strongholds, trail ruins, trial chambers, abandoned camps, fossils
->   and desert wells. Chests are still empty in game.
-> - **The Nether is generated:** terrain, biomes, surfaces, bedrock, the cave carver, lava springs,
->   fire, glowstone, ores (gold, quartz, magma, gravel, blackstone, ancient debris), basalt deltas,
->   basalt pillars, soul sand, Nether fossils, Nether fortresses, Nether ruined portals and
->   bastion remnants match BDS; huge crimson and warped fungi, fungi, roots and vines are close.
-> - **The End matches BDS:** terrain, the obsidian pillars with their End crystals, small islands,
->   chorus plants, end gateways and End cities with their ships. The exit portal is provided for the
->   engine's dragon fight, which builds it in BDS.
-> - **Every dimension's major parts are in place.** What is left is a refinement pass over all three
->   (small differences listed in [STATUS.md](STATUS.md)), and mobs in structures, which worldgen hands
->   to the engine as spawn records (only the End crystals so far).
-> - **The API is not stable.** Names and behaviour change between commits.
->
-> **[STATUS.md](STATUS.md) lists everything that is generated and everything that is missing.**
-> Most parts are close to BDS but not block for block yet; a refinement pass comes last.
->
-> Bug reports and ideas are welcome, but do not depend on it yet.
-
-> [!IMPORTANT]
-> **Verified against Bedrock itself.** The generation comes from the decompiled Bedrock Dedicated
-> Server (BDS): the same noises, the same rules, and the same random draws in the same order.
-> Parts are checked against chunks that BDS itself generated from the same seed; the rest is checked
-> in game, and a final refinement pass makes everything match block for block.
-> The decompiled code is **not** in this repo; it was only used to read how the game works.
-
 ---
 
 <div align="center">
@@ -60,9 +14,40 @@
 [![Minecraft](https://img.shields.io/badge/minecraft-v1.26.52_(Bedrock)-black)](https://feedback.minecraft.net/hc/en-us/sections/360001186971-Release-Changelogs)
 [![Go](https://img.shields.io/badge/go-1.26-00ADD8?logo=go&logoColor=white)](https://go.dev/)
 [![License](https://img.shields.io/badge/license-GPL--3.0-blue)](LICENSE)
-[![Status](https://img.shields.io/badge/status-early_development-orange)](#roadmap)
+[![Status](https://img.shields.io/badge/status-refinement_pass-yellow)](#status)
 
 </div>
+
+## Status
+
+Status as of 2026-10-22: **all three dimensions are generated**, built from BDS 1.26.52.
+
+- **Overworld:** terrain, every biome, surfaces, caves and canyons, aquifers, ores, every tree and
+  plant, oceans and reefs, and every structure (villages, mineshafts, dungeons, ancient cities,
+  temples, igloos, witch huts, ocean ruins, shipwrecks, buried treasure, monuments, outposts, ruined
+  portals, mansions, strongholds, trail ruins, trial chambers, abandoned camps, fossils, wells).
+- **Nether:** terrain, the five biomes and their decorations, ores, fossils, fortresses, ruined
+  portals and bastion remnants.
+- **End:** terrain, the obsidian pillars with their End crystals, small islands, chorus plants, end
+  gateways and End cities with their ships. The exit portal is provided for the engine's dragon
+  fight, which builds it in BDS.
+
+Most parts match BDS block for block; the rest are close. What is left:
+
+- **A refinement pass** over all three dimensions for the small differences that remain (stair
+  corner shapes, some cross-chunk decoration order, a few structures not yet compared).
+  [STATUS.md](STATUS.md) lists every part and how well it matches.
+- **Mobs in structures:** worldgen hands them to the engine as spawn records; only the End crystals
+  so far.
+- **Loot:** chests get their loot table and seed; filling them is up to the server.
+- **The API is not stable yet.** Names and behaviour may still change between commits.
+
+## How it is checked
+
+The generation comes from the decompiled Bedrock Dedicated Server (BDS): the same noises, the same
+rules and the same random draws in the same order. Each part is compared with chunks BDS itself
+generated from the same seed (or checked in game where that is not possible yet). The decompiled
+code is **not** in this repo; it was only used to read how the game works.
 
 ## Why worldgen?
 
