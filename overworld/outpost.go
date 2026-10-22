@@ -35,14 +35,53 @@ const (
 )
 
 // outpostBiomes are the biomes an outpost starts in (sub_4E82040).
-var outpostBiomes = []string{"plains", "sunflower_plains", "savanna", "ice_plains", "taiga", "taiga_hills",
-	"cold_taiga", "cold_taiga_hills", "desert", "meadow", "frozen_peaks", "jagged_peaks", "stony_peaks",
-	"snowy_slopes", "cherry_grove", "grove"}
+func outpostBiomes() []string {
+	return []string{"plains", "sunflower_plains", "savanna", "ice_plains", "taiga", "taiga_hills",
+		"cold_taiga", "cold_taiga_hills", "desert", "meadow", "frozen_peaks", "jagged_peaks", "stony_peaks",
+		"snowy_slopes", "cherry_grove", "grove"}
+}
 
 // outpostFeatures are the feature templates in BDS's table order
 // (off_EE8E5B8).
-var outpostFeatures = []string{"feature_cage1", "feature_cage2", "feature_cage_with_allays", "feature_logs",
-	"feature_targets", "feature_tent1", "feature_tent2"}
+func outpostFeatures() [7]string {
+	return [...]string{"feature_cage1", "feature_cage2", "feature_cage_with_allays", "feature_logs",
+		"feature_targets", "feature_tent1", "feature_tent2"}
+}
+
+// Pillager outpost layout (sub_4E83390, sub_4E84CE0).
+const (
+	// outpostSpreadDraws is how many draws the region spread made before
+	// the start continues the same random.
+	outpostSpreadDraws = 4
+	// outpostOvergrownIntegrity is the overgrown overlay's integrity.
+	outpostOvergrownIntegrity = 0.05
+	// outpostSpotInset is how far inside the turned tower's corner the
+	// feature spots are measured from.
+	outpostSpotInset = 8
+	// outpostSpotNear and outpostSpotFar are a feature spot's offset on an
+	// axis from that point, toward the high or the low side.
+	outpostSpotNear = 12
+	outpostSpotFar  = -20
+	// outpostSpotJitter bounds the random shift of each spot on each axis.
+	outpostSpotJitter = 8
+	// outpostFeatureChance is the chance a feature spot is kept.
+	outpostFeatureChance = 0.9
+	// outpostProbeY is the placeholder height BDS checks for liquid under
+	// a feature's samples, plus one.
+	outpostProbeY = 90
+	// outpostFeatureSpread is the most the samples under a feature may
+	// differ.
+	outpostFeatureSpread = 8
+	// outpostTowerSpread is the sample spread from which the tower stops
+	// sitting midway and sits outpostTowerDrop under the highest sample.
+	outpostTowerSpread = 9
+	outpostTowerDrop   = 4
+	// outpostAllayDraws is the bound the allay marker draws its count with.
+	outpostAllayDraws = 3
+	// outpostReachChunks is how far, in chunks, an outpost's pieces reach
+	// from its start.
+	outpostReachChunks = 3
+)
 
 // outpostPiece is one template of an outpost.
 type outpostPiece struct {
@@ -71,7 +110,7 @@ func (o *Overworld) isOutpostChunk(cx, cz int32) bool {
 	if x != cx || z != cz {
 		return false
 	}
-	b := o.BiomeAt(cx*16+8, o.structureY(cx, cz, 1), cz*16+8)
+	b := o.BiomeAt(cx*16+8, o.structureY(cx, cz, noSurfaceY), cz*16+8)
 	return int(b) < len(o.outpostBiome) && o.outpostBiome[b]
 }
 
@@ -89,28 +128,29 @@ func (o *Overworld) outpostAt(cx, cz int32) []outpostPiece {
 		// as villages do (the rotation matches BDS's outposts).
 		var r rand.MT
 		structureSeed(&r, o.seed, structure.Region(cx, outpostSpacing), structure.Region(cz, outpostSpacing), outpostSalt)
-		for range 4 {
+		for range outpostSpreadDraws {
 			r.IntN(outpostSpacing - outpostSeparation)
 		}
-		rot := int(r.IntN(4))
+		rot := int(r.IntN(structRotations))
 		x, z := cx*16, cz*16
 		pieces = append(pieces,
 			outpostPiece{"pillageroutpost/watchtower", x, z, rot, 1, false},
-			outpostPiece{"pillageroutpost/watchtower_overgrown", x, z, rot, 0.05, false})
-		// The spots are measured from the turned tower's corner, plus 8.
-		mx, mz := min(x, x+ruinMainX[rot])+8, min(z, z+ruinMainZ[rot])+8
+			outpostPiece{"pillageroutpost/watchtower_overgrown", x, z, rot, outpostOvergrownIntegrity, false})
+		// The spots are measured from inside the turned tower's corner.
+		mx, mz := min(x, x+ruinMainX()[rot])+outpostSpotInset, min(z, z+ruinMainZ()[rot])+outpostSpotInset
 		var spots [4][2]int32
-		for i, s := range [4][2]int32{{12, 12}, {-20, 12}, {12, -20}, {-20, -20}} {
-			a := r.IntN(8)
-			b := r.IntN(8)
+		for i, s := range [4][2]int32{{outpostSpotNear, outpostSpotNear}, {outpostSpotFar, outpostSpotNear},
+			{outpostSpotNear, outpostSpotFar}, {outpostSpotFar, outpostSpotFar}} {
+			a := r.IntN(outpostSpotJitter)
+			b := r.IntN(outpostSpotJitter)
 			spots[i] = [2]int32{a + s[0], b + s[1]}
 		}
 		for _, s := range spots {
-			if r.Float() >= 0.9 {
+			if r.Float() >= outpostFeatureChance {
 				continue
 			}
-			frot := int(r.IntN(4))
-			pieces = append(pieces, outpostPiece{"pillageroutpost/" + outpostFeatures[r.IntN(7)], mx + s[0], mz + s[1], frot, 1, true})
+			frot := int(r.IntN(structRotations))
+			pieces = append(pieces, outpostPiece{"pillageroutpost/" + outpostFeatures()[r.IntN(int32(len(outpostFeatures())))], mx + s[0], mz + s[1], frot, 1, true})
 		}
 	}
 	o.outposts.Store(k, pieces)
@@ -131,10 +171,10 @@ func (o *Overworld) outpostBox(p outpostPiece) (structure.Box, *structure.Jigsaw
 // Pieces reach at most 3 chunks from the start.
 func (o *Overworld) outpostsReach(cx, cz int32, f func(pieces []outpostPiece)) {
 	chunk := structure.NewBox(cx*16, MinY, cz*16, cx*16+15, MaxY-1, cz*16+15)
-	for rx := structure.Region(cx-3, outpostSpacing); rx <= structure.Region(cx+3, outpostSpacing); rx++ {
-		for rz := structure.Region(cz-3, outpostSpacing); rz <= structure.Region(cz+3, outpostSpacing); rz++ {
+	for rx := structure.Region(cx-outpostReachChunks, outpostSpacing); rx <= structure.Region(cx+outpostReachChunks, outpostSpacing); rx++ {
+		for rz := structure.Region(cz-outpostReachChunks, outpostSpacing); rz <= structure.Region(cz+outpostReachChunks, outpostSpacing); rz++ {
 			sx, sz := o.outpostPick(rx, rz)
-			if sx < cx-3 || sx > cx+3 || sz < cz-3 || sz > cz+3 {
+			if sx < cx-outpostReachChunks || sx > cx+outpostReachChunks || sz < cz-outpostReachChunks || sz > cz+outpostReachChunks {
 				continue
 			}
 			pieces := o.outpostAt(sx, sz)
@@ -171,21 +211,21 @@ func (o *Overworld) outpostY(p outpostPiece, bb structure.Box, raw func(cx, cz i
 	}
 	lo = max(lo, SeaLevel)
 	if p.feature {
-		// BDS looks under the samples at its placeholder height 90.
+		// BDS looks under the samples at its placeholder height.
 		for _, s := range samples {
-			if o.liquidMaterial(o.rawBlock(raw, s[0], 89, s[1])) {
+			if o.liquidMaterial(o.rawBlock(raw, s[0], outpostProbeY-1, s[1])) {
 				return 0, false
 			}
 		}
-		if hi-lo > 8 {
+		if hi-lo > outpostFeatureSpread {
 			return 0, false
 		}
 		return hs[0], true
 	}
-	if hi-lo < 9 {
+	if hi-lo < outpostTowerSpread {
 		return (hi + lo) / 2, true
 	}
-	return hi - 4, true
+	return hi - outpostTowerDrop, true
 }
 
 // placeOutposts writes the outposts that reach chunk (cx, cz) into c. raw
@@ -244,7 +284,7 @@ func (b *scBuild) outpostPiece(p outpostPiece, raw func(cx, cz int32) *PackedChu
 		b.dropEntity(pos)
 		if cs.Water && o.holdsLiquid[o.blockName(cs.ID)] {
 			i := (pos[1]-MinY)<<8 | (pos[2]&15)<<4 | pos[0]&15
-			b.c.Water[i>>6] |= 1 << (i & 63)
+			b.c.Water[i>>waterWordShift] |= 1 << (i & waterBitMask)
 		}
 		if d := o.st.BlockEntityFor(cs.ID, st.Name, pos[0], pos[1], pos[2]); d != nil {
 			b.c.BlockEntities = append(b.c.BlockEntities, structure.BlockEntity{X: pos[0], Y: pos[1], Z: pos[2], Data: d})
@@ -263,7 +303,7 @@ func (b *scBuild) outpostPiece(p outpostPiece, raw func(cx, cz int32) *PackedChu
 			if b.setWorld(m.pos[0], m.pos[1], m.pos[2], b.air) {
 				b.dropEntity(m.pos)
 			}
-			b.r.IntN(3)
+			b.r.IntN(outpostAllayDraws)
 		case "topChest":
 			cp := [3]int32{m.pos[0], m.pos[1] - 1, m.pos[2]}
 			for i := range b.c.BlockEntities {

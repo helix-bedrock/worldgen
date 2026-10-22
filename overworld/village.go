@@ -16,6 +16,11 @@ const (
 	// (sub_523B5C0, version constant written by sub_6C01520).
 	villageSpacing    = 34
 	villageSeparation = 8
+	// villageBiomeReach is the radius of the start biome test, in blocks.
+	villageBiomeReach = 2
+	// villageNoSurfaceY is the height the biome test uses when the corner
+	// column has no preliminary surface.
+	villageNoSurfaceY = 1
 )
 
 // structureSeed seeds r for the placement region (rx, rz) of a structure
@@ -33,11 +38,11 @@ func (o *Overworld) IsVillageChunk(chunkX, chunkZ int32) bool {
 	if !o.isVillageSpreadPick(chunkX, chunkZ) {
 		return false
 	}
-	y := prelimSurface(o.column(chunkX*4, chunkZ*4))
+	y := prelimSurface(o.column(chunkX*quartsPerChunk, chunkZ*quartsPerChunk))
 	if y == noSurface {
-		y = 1
+		y = villageNoSurfaceY
 	}
-	return o.biomesOnly(chunkX*16+8, y, chunkZ*16+8, 2, o.villageBiome)
+	return o.biomesOnly(chunkX*16+8, y, chunkZ*16+8, villageBiomeReach, o.villageBiome)
 }
 
 // isVillageSpreadPick reports whether the chunk is its placement region's
@@ -58,9 +63,9 @@ func (o *Overworld) isVillageSpreadPick(chunkX, chunkZ int32) bool {
 // (x, y, z), y clamped to the world, is in the set (sub_493B030).
 func (o *Overworld) biomesOnly(x, y, z, r int32, set []bool) bool {
 	y0, y1 := max(y-r, MinY), min(y+r, MaxY-1)
-	for bx := x - r; bx <= x+r; bx += 4 {
-		for bz := z - r; bz <= z+r; bz += 4 {
-			for by := y0; by <= y1; by += 4 {
+	for bx := x - r; bx <= x+r; bx += biomeCellBlocks {
+		for bz := z - r; bz <= z+r; bz += biomeCellBlocks {
+			for by := y0; by <= y1; by += biomeCellBlocks {
 				if b := o.BiomeAt(bx, by, bz); int(b) >= len(set) || !set[b] {
 					return false
 				}

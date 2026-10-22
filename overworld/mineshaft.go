@@ -509,7 +509,7 @@ func (b *msBuild) set(x, y, z int32, s uint32) {
 	}
 	b.c.set(int(x&15), int(y), int(z&15), s)
 	i := (y-MinY)<<8 | (z&15)<<4 | x&15
-	b.c.Water[i>>6] &^= 1 << (i & 63)
+	b.c.Water[i>>waterWordShift] &^= 1 << (i & waterBitMask)
 }
 
 // height is the chunk's height map: one above the highest fully opaque

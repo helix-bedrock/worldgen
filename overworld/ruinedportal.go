@@ -67,7 +67,7 @@ func (o *Overworld) placePortals(cx, cz int32, c *Chunk, raw func(cx, cz int32) 
 			b.dropEntity([3]int32{w.X, w.Y, w.Z})
 			if w.Water {
 				i := (w.Y-MinY)<<8 | (w.Z&15)<<4 | w.X&15
-				c.Water[i>>6] |= 1 << (i & 63)
+				c.Water[i>>waterWordShift] |= 1 << (i & waterBitMask)
 			}
 			if w.Data != nil {
 				c.BlockEntities = append(c.BlockEntities, structure.BlockEntity{X: w.X, Y: w.Y, Z: w.Z, Data: w.Data})
@@ -109,7 +109,7 @@ func (o *Overworld) portalWorld(cx, cz int32, raw func(cx, cz int32) *PackedChun
 		Solid:    o.solidMaterial,
 		Leaves:   func(b uint32) bool { return o.hasBlockTag(b, "leaves") },
 		BiomeHas: func(x, y, z int32, tag string) bool { return o.biomeHas(o.BiomeAt(x, y, z), tag) },
-		StartY:   o.structureY(cx, cz, 1),
+		StartY:   o.structureY(cx, cz, noSurfaceY),
 	}
 }
 
