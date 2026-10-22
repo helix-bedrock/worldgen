@@ -184,6 +184,10 @@ type decoIDs struct {
 	ironBars [16]uint32
 	// frames are item frames by facing_direction.
 	frames [6]uint32
+	// endPortal and the exit portal's torches, by chorusDirs side of the
+	// pillar.
+	endPortal uint32
+	torches   [4]uint32
 }
 
 func (e *End) loadDecoIDs() error {
@@ -226,6 +230,19 @@ func (e *End) loadDecoIDs() error {
 			return errMissing("minecraft:frame")
 		}
 		e.deco.frames[f] = id
+	}
+	id, ok := e.reg.Default("minecraft:end_portal")
+	if !ok {
+		return errMissing("minecraft:end_portal")
+	}
+	e.deco.endPortal = id
+	// A torch names the side it hangs from: the one toward the pillar.
+	for i, side := range [4]string{"south", "west", "north", "east"} {
+		id, ok := e.reg.Lookup("minecraft:torch", map[string]any{"torch_facing_direction": side})
+		if !ok {
+			return errMissing("minecraft:torch")
+		}
+		e.deco.torches[i] = id
 	}
 	return nil
 }
@@ -495,14 +512,15 @@ func (e *End) originWrites(ox, oz int32, neighbour func(cx, cz int32) *Chunk) *o
 }
 
 // Decorate adds the decoration to c, the GenerateChunk output for chunk
-// (chunkX, chunkZ), then the End city pieces in it: BDS builds them after
-// the chorus. neighbour must return the unchanged GenerateChunk output of
+// (chunkX, chunkZ), then the End city pieces in it (BDS builds them after
+// the chorus), then the pillars' crystals. neighbour must return the unchanged GenerateChunk output of
 // any chunk within 2 chunks, the target's own included (nil for one it
 // cannot provide: it reads as air). Cache does the same with the
 // neighbours kept. It is safe to call from many goroutines if neighbour is.
 func (e *End) Decorate(chunkX, chunkZ int32, c *Chunk, neighbour func(cx, cz int32) *Chunk) {
 	e.decorateWith(chunkX, chunkZ, c, func(ox, oz int32) *originWrites { return e.originWrites(ox, oz, neighbour) })
 	e.placeCities(chunkX, chunkZ, c)
+	e.placeCrystals(chunkX, chunkZ, c)
 }
 
 // decorateWith applies the placements of the nine origins around chunk
@@ -549,6 +567,7 @@ func (c *Cache) Generate(chunkX, chunkZ int32, out *Chunk) {
 	out.Blocks = t.Blocks
 	out.Biomes = t.Biomes
 	out.BlockEntities = out.BlockEntities[:0]
+	out.Entities = out.Entities[:0]
 	for _, be := range t.BlockEntities {
 		be.Data = maps.Clone(be.Data)
 		out.BlockEntities = append(out.BlockEntities, be)
@@ -564,4 +583,5 @@ func (c *Cache) Generate(chunkX, chunkZ int32, out *Chunk) {
 		return ow
 	})
 	c.e.placeCities(chunkX, chunkZ, out)
+	c.e.placeCrystals(chunkX, chunkZ, out)
 }

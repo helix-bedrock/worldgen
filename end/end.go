@@ -26,6 +26,9 @@ type Chunk struct {
 	Biomes [16 * 16]uint16
 	// BlockEntities are the block entities of blocks structures placed.
 	BlockEntities []structure.BlockEntity
+	// Entities are the entities to spawn with the chunk: the End crystals
+	// on the pillars.
+	Entities []structure.EntitySpawn
 }
 
 // Biome returns the biome ID at local (x, z).
@@ -128,6 +131,7 @@ func (e *End) GenerateChunk(chunkX, chunkZ int32, c *Chunk) {
 // baseChunk is the chunk's terrain.
 func (e *End) baseChunk(chunkX, chunkZ int32, c *Chunk) {
 	c.BlockEntities = c.BlockEntities[:0]
+	c.Entities = c.Entities[:0]
 	for i := range c.Blocks {
 		c.Blocks[i] = uint16(e.ids.air)
 	}
