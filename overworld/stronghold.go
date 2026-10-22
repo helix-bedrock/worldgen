@@ -3,6 +3,8 @@ package overworld
 import (
 	"math"
 
+	"github.com/helix-bedrock/worldgen/internal/mathx"
+
 	"github.com/helix-bedrock/worldgen/rand"
 	"github.com/helix-bedrock/worldgen/structure"
 )
@@ -162,7 +164,7 @@ func (o *Overworld) isStrongholdChunk(cx, cz int32) bool {
 // of chunk (cx, cz).
 func (o *Overworld) strongholdsNear(cx, cz, reach int32, f func(sx, sz int32)) {
 	for _, c := range o.strongholdFirst() {
-		if abs32i(c[0]-cx) <= reach && abs32i(c[1]-cz) <= reach {
+		if mathx.Abs(c[0]-cx) <= reach && mathx.Abs(c[1]-cz) <= reach {
 			f(c[0], c[1])
 		}
 	}
@@ -171,7 +173,7 @@ func (o *Overworld) strongholdsNear(cx, cz, reach int32, f func(sx, sz int32)) {
 	for gx := g0x; gx <= g1x; gx++ {
 		for gz := g0z; gz <= g1z; gz++ {
 			x, z, ok := o.strongholdCell(gx*200, gz*200)
-			if !ok || abs32i(x-cx) > reach || abs32i(z-cz) > reach || uint32(x*x+z*z) < 100 {
+			if !ok || mathx.Abs(x-cx) > reach || mathx.Abs(z-cz) > reach || uint32(x*x+z*z) < 100 {
 				continue
 			}
 			first := false
@@ -391,7 +393,7 @@ func (l *shLayout) factory(k uint8, r *rand.MT, x, y, z, o, depth int32) *shPiec
 // next is the child picker: the imposed piece, else up to five weighted
 // tries, else a filler corridor up to the piece in the way.
 func (l *shLayout) next(r *rand.MT, x, y, z, o, depth int32) {
-	if depth > 50 || abs32i(x-l.start.X0) > 112 || abs32i(z-l.start.Z0) > 112 {
+	if depth > 50 || mathx.Abs(x-l.start.X0) > 112 || mathx.Abs(z-l.start.Z0) > 112 {
 		return
 	}
 	cp := *r

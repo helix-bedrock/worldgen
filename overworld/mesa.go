@@ -3,6 +3,8 @@ package overworld
 import (
 	"math"
 
+	"github.com/helix-bedrock/worldgen/internal/mathx"
+
 	"github.com/helix-bedrock/worldgen/noise"
 	"github.com/helix-bedrock/worldgen/rand"
 )
@@ -114,9 +116,9 @@ func (o *Overworld) mesaSurface(c *Chunk, mt *rand.MT, col *surfaceColumn, b *bi
 	wx, wz := float32(col.wx), float32(col.wz)
 	var spike float32
 	if b.pillars {
-		e := min(abs32(m.surface.Sample(wx, 0, wz)*8.25), m.pillar.Sample(wx*0.2, 0, 0.2*wz)*15)
+		e := min(mathx.AbsFloat(m.surface.Sample(wx, 0, wz)*8.25), m.pillar.Sample(wx*0.2, 0, 0.2*wz)*15)
 		if e > 0 {
-			roof := abs32(m.roof.Sample(wx*0.75, 0, wz*0.75)*1.5) * 50
+			roof := mathx.AbsFloat(m.roof.Sample(wx*0.75, 0, wz*0.75)*1.5) * 50
 			ceil := float32(int32(roof))
 			if ceil < roof {
 				ceil++

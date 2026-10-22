@@ -2,6 +2,7 @@ package overworld
 
 import (
 	"github.com/helix-bedrock/worldgen/biome"
+	"github.com/helix-bedrock/worldgen/internal/mathx"
 	"github.com/helix-bedrock/worldgen/rand"
 )
 
@@ -184,8 +185,8 @@ func (t *treeFeature) cherryBranch(w *featureWorld, x, y, z, h, dx, dz, start in
 		step = 1
 	}
 	for mx != tx || my != ty || mz != tz {
-		dist := absI(tx-mx) + absI(ty-my) + absI(tz-mz)
-		f := float32(absI(ty-my)) / float32(dist)
+		dist := mathx.Abs(tx-mx) + mathx.Abs(ty-my) + mathx.Abs(tz-mz)
+		f := float32(mathx.Abs(ty-my)) / float32(dist)
 		if f <= r.Float() {
 			mx, mz = mx+dx, mz+dz
 			put(sideLog)
@@ -223,7 +224,7 @@ func (t *treeFeature) cherryPut(w *featureWorld, x, y, z int32, leaf uint32) boo
 func (t *treeFeature) cherryRow(w *featureWorld, c *cherryCanopy, p blockPos, ly, rng int32, r *rand.MT) {
 	for dx := -rng; dx <= rng; dx++ {
 		for dz := -rng; dz <= rng; dz++ {
-			ax, az := absI(dx), absI(dz)
+			ax, az := mathx.Abs(dx), mathx.Abs(dz)
 			if ly == -1 && (ax == rng || az == rng) && c.wideHole.roll(r) {
 				continue
 			}

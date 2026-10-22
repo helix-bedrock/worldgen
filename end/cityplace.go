@@ -3,6 +3,8 @@ package end
 import (
 	"slices"
 
+	"github.com/helix-bedrock/worldgen/internal/mathx"
+
 	"github.com/helix-bedrock/worldgen/rand"
 	"github.com/helix-bedrock/worldgen/structure"
 )
@@ -37,10 +39,10 @@ func (e *End) cityAt(cx, cz int32) *city {
 func (e *End) placeCities(cx, cz int32, c *Chunk) {
 	box := structure.NewBox(cx*16, 0, cz*16, cx*16+15, Height-1, cz*16+15)
 	var r *rand.MT
-	for rx := cityRegion(cx - cityReach); rx <= cityRegion(cx+cityReach); rx++ {
-		for rz := cityRegion(cz - cityReach); rz <= cityRegion(cz+cityReach); rz++ {
+	for rx := structure.Region(cx-cityReach, citySpacing); rx <= structure.Region(cx+cityReach, citySpacing); rx++ {
+		for rz := structure.Region(cz-cityReach, citySpacing); rz <= structure.Region(cz+cityReach, citySpacing); rz++ {
 			sx, sz := e.cityPick(rx, rz)
-			if abs32(sx-cx) > cityReach || abs32(sz-cz) > cityReach {
+			if mathx.Abs(sx-cx) > cityReach || mathx.Abs(sz-cz) > cityReach {
 				continue
 			}
 			ct := e.cityAt(sx, sz)

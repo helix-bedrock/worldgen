@@ -3,6 +3,8 @@ package overworld
 import (
 	"math"
 
+	"github.com/helix-bedrock/worldgen/internal/mathx"
+
 	"github.com/helix-bedrock/worldgen/rand"
 )
 
@@ -36,7 +38,7 @@ func (t *treeFeature) fancyLine(w *featureWorld, x0, y0, z0, x1, y1, z1 int32) b
 		return true
 	}
 	dx, dy, dz := float32(x1-x0), float32(y1-y0), float32(z1-z0)
-	steps := max(max(abs32(dx), abs32(dy)), abs32(dz))
+	steps := max(max(mathx.AbsFloat(dx), mathx.AbsFloat(dy)), mathx.AbsFloat(dz))
 	n := int32(steps)
 	if n == 0 {
 		// VERIFY: BDS divides by zero here and probes a far-off position;
@@ -101,7 +103,7 @@ func (t *treeFeature) fancyTrunk(w *featureWorld, x, y, z, h int32, r *rand.MT) 
 		switch {
 		case adj == 0:
 			dist = half
-		case half <= abs32(adj):
+		case half <= mathx.AbsFloat(adj):
 			dist = 0
 		default:
 			dist = float32(math.Sqrt(float64(half*half - adj*adj)))
@@ -156,7 +158,7 @@ func (t *treeFeature) fancyTrunk(w *featureWorld, x, y, z, h int32, r *rand.MT) 
 			continue
 		}
 		dx, dy, dz := float32(n.x-bx), float32(n.y-n.branchY), float32(n.z-bz)
-		steps := max(max(abs32(dx), abs32(dy)), abs32(dz))
+		steps := max(max(mathx.AbsFloat(dx), mathx.AbsFloat(dy)), mathx.AbsFloat(dz))
 		cnt := int32(steps)
 		if cnt == 0 {
 			// BDS divides by zero and places off in the void.
@@ -167,7 +169,7 @@ func (t *treeFeature) fancyTrunk(w *featureWorld, x, y, z, h int32, r *rand.MT) 
 			fi := float32(i)
 			ox, oz := int32(fi*rx+0.5), int32(fi*rz+0.5)
 			log := t.log
-			switch ax, az := absI(ox), absI(oz); {
+			switch ax, az := mathx.Abs(ox), mathx.Abs(oz); {
 			case ax == 0 && az == 0:
 			case ax >= az:
 				log = logX
@@ -205,10 +207,10 @@ func (t *treeFeature) fancyDisk(w *featureWorld, x, y, z, r int32) bool {
 	placed := false
 	r2 := float64(r * r)
 	for dx := -r; dx <= r; dx++ {
-		fx := float32(absI(dx)) + 0.5
+		fx := float32(mathx.Abs(dx)) + 0.5
 		ex := float64(fx * fx)
 		for dz := -r; dz <= r; dz++ {
-			fz := float32(absI(dz)) + 0.5
+			fz := float32(mathx.Abs(dz)) + 0.5
 			if r2 < float64(fz*fz)+ex {
 				continue
 			}

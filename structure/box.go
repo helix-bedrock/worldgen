@@ -162,12 +162,5 @@ func mirrorProps(p map[string]string, a, b string, half int) map[string]string {
 	return out
 }
 
-func abs32(v int32) int32 {
-	if v < 0 {
-		return -v
-	}
-	return v
-}
-
 // NewBox returns the box with corners (x0, y0, z0) and (x1, y1, z1).
 func NewBox(x0, y0, z0, x1, y1, z1 int32) Box { return Box{x0, y0, z0, x1, y1, z1} }

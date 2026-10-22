@@ -5,6 +5,10 @@ import (
 	"math"
 	"sync/atomic"
 
+	"github.com/helix-bedrock/worldgen/internal/mathx"
+
+	"github.com/helix-bedrock/worldgen/blocks"
+	"github.com/helix-bedrock/worldgen/cube"
 	"github.com/helix-bedrock/worldgen/internal/lru"
 	"github.com/helix-bedrock/worldgen/rand"
 	"github.com/helix-bedrock/worldgen/structure"
@@ -27,6 +31,50 @@ import (
 
 // regionSize is the width of the 3x3 chunks an origin decorates.
 const regionSize = 48
+
+// The decoration's numbers (sub_5196E80 and the features it runs).
+const (
+	// spikeCount is the number of obsidian pillars; spikeRing is the radius
+	// of the circle they stand on.
+	spikeCount = 10
+	spikeRing  = 42
+	// spikeClearFrom is the lowest height cleared around a pillar, and
+	// spikeClearAbove how far above its top the clearing reaches.
+	spikeClearFrom  = 66
+	spikeClearAbove = 10
+	// cageReach is the cage's half width around a guarded pillar's top;
+	// cageLid is the layer of its lid, above three layers of ring.
+	cageReach = 2
+	cageLid   = 3
+
+	// A small island grows, one origin in smallIslandChance, where the
+	// island height is below smallIslandBelow, smallIslandY to 15 above it;
+	// one in four of those has a second one.
+	smallIslandBelow  = -20
+	smallIslandChance = 14
+	smallIslandY      = 55
+
+	// highGround is the island height above which chorus and gateways grow.
+	highGround = 40
+	// chorusTries bounds the chorus plants an origin tries; chorusSpread is
+	// how far a plant's branches reach from its root, and chorusDepth the
+	// deepest branch level that branches again.
+	chorusTries  = 5
+	chorusSpread = 8
+	chorusDepth  = 3
+	// deadFlowerAge is the age of the flower ending a branch.
+	deadFlowerAge = 5
+
+	// One origin in gatewayChance gets a gateway, gatewayRise plus up to
+	// gatewayRiseRange-1 blocks above the ground.
+	gatewayChance    = 700
+	gatewayRise      = 3
+	gatewayRiseRange = 7
+)
+
+// gatewayExit is the End's default exit point, which BDS gives a new
+// gateway before it first ticks.
+var gatewayExit = [3]int32{100, 50, 0}
 
 // region is the block view one origin's features read and write: the
 // undecorated terrain of the 3x3 chunks around it, plus its placements.
@@ -180,71 +228,45 @@ func (ow *originWrites) apply(c *Chunk, slot int, cx, cz int32) {
 // decoIDs are the blocks the decoration places.
 type decoIDs struct {
 	obsidian, chorusPlant, chorusFlower, bedrock, gateway uint32
-	// ironBars by the sides they join: bit i for chorusDirs[i].
+	// ironBars by the sides they join: bit d for cube.Direction d.
 	ironBars [16]uint32
 	// frames are item frames by facing_direction.
 	frames [6]uint32
-	// endPortal and the exit portal's torches, by chorusDirs side of the
-	// pillar.
+	// endPortal and the exit portal's torches, by the side of the pillar
+	// they are on.
 	endPortal uint32
 	torches   [4]uint32
 }
 
 func (e *End) loadDecoIDs() error {
-	for _, b := range []struct {
-		dst   *uint32
-		name  string
-		props map[string]any
-	}{
-		{&e.deco.obsidian, "minecraft:obsidian", nil},
-		{&e.deco.chorusPlant, "minecraft:chorus_plant", nil},
+	wants := make([]blocks.Want, 0, 6+len(e.deco.ironBars)+len(e.deco.frames)+len(e.deco.torches))
+	wants = append(wants, []blocks.Want{
+		{Dst: &e.deco.obsidian, Name: "minecraft:obsidian"},
+		{Dst: &e.deco.chorusPlant, Name: "minecraft:chorus_plant"},
 		// A branch that ends grows a dead flower.
-		{&e.deco.chorusFlower, "minecraft:chorus_flower", map[string]any{"age": int32(5)}},
+		{Dst: &e.deco.chorusFlower, Name: "minecraft:chorus_flower", Props: map[string]any{"age": int32(deadFlowerAge)}},
 		// The gateway's bedrock burns forever (BDS sets the state to 1).
-		{&e.deco.bedrock, "minecraft:bedrock", map[string]any{"infiniburn_bit": true}},
-		{&e.deco.gateway, "minecraft:end_gateway", nil},
-	} {
-		id, ok := e.reg.Default(b.name)
-		if b.props != nil {
-			id, ok = e.reg.Lookup(b.name, b.props)
-		}
-		if !ok {
-			return errMissing(b.name)
-		}
-		*b.dst = id
-	}
+		{Dst: &e.deco.bedrock, Name: "minecraft:bedrock", Props: map[string]any{"infiniburn_bit": true}},
+		{Dst: &e.deco.gateway, Name: "minecraft:end_gateway"},
+		{Dst: &e.deco.endPortal, Name: "minecraft:end_portal"},
+	}...)
 	for join := range e.deco.ironBars {
 		props := map[string]any{}
-		for i, side := range [4]string{"north", "east", "south", "west"} {
-			props["minecraft:connection_"+side] = join>>i&1 == 1
+		for _, d := range cube.Directions() {
+			props["minecraft:connection_"+d.String()] = join>>d&1 == 1
 		}
-		id, ok := e.reg.Lookup("minecraft:iron_bars", props)
-		if !ok {
-			return errMissing("minecraft:iron_bars")
-		}
-		e.deco.ironBars[join] = id
+		wants = append(wants, blocks.Want{Dst: &e.deco.ironBars[join], Name: "minecraft:iron_bars", Props: props})
 	}
-	for f := range e.deco.frames {
-		id, ok := e.reg.Lookup("minecraft:frame", map[string]any{"facing_direction": int32(f)})
-		if !ok {
-			return errMissing("minecraft:frame")
-		}
-		e.deco.frames[f] = id
+	for _, f := range cube.Faces() {
+		wants = append(wants, blocks.Want{Dst: &e.deco.frames[f], Name: "minecraft:frame",
+			Props: map[string]any{"facing_direction": int32(f)}})
 	}
-	id, ok := e.reg.Default("minecraft:end_portal")
-	if !ok {
-		return errMissing("minecraft:end_portal")
-	}
-	e.deco.endPortal = id
 	// A torch names the side it hangs from: the one toward the pillar.
-	for i, side := range [4]string{"south", "west", "north", "east"} {
-		id, ok := e.reg.Lookup("minecraft:torch", map[string]any{"torch_facing_direction": side})
-		if !ok {
-			return errMissing("minecraft:torch")
-		}
-		e.deco.torches[i] = id
+	for _, d := range cube.Directions() {
+		wants = append(wants, blocks.Want{Dst: &e.deco.torches[d], Name: "minecraft:torch",
+			Props: map[string]any{"torch_facing_direction": d.Opposite().String()}})
 	}
-	return nil
+	return e.reg.Resolve(wants...)
 }
 
 // spike is one of the ten obsidian pillars around the main island.
@@ -254,35 +276,50 @@ type spike struct {
 	guarded bool
 }
 
-// spikes are the pillars of a seed (sub_497D900): ten spots on a circle of
-// radius 42, each given a size from 0 to 9 in an order shuffled from the
-// world seed.
-func spikes(seed int64) [10]spike {
+// spikes are the pillars of a seed (sub_497D900): spikeCount spots on a
+// circle of radius spikeRing, each given a size from 0 to 9 in an order
+// shuffled from the world seed. Size s has radius s/3+2 and height 3s+76;
+// sizes 1 and 2 are guarded.
+func spikes(seed int64) [spikeCount]spike {
 	mt := rand.NewMT(uint32(seed))
-	ids := [10]int32{0, 1, 2, 3, 4, 5, 6, 7, 8, 9}
-	// BDS swaps forward: entry i trades with one of entries 0..i.
-	for i := uint32(1); i < 10; i++ {
-		j := mt.Uint32() % (i + 1)
-		ids[i], ids[j] = ids[j], ids[i]
+	var sizes [spikeCount]int32
+	for i := range sizes {
+		sizes[i] = int32(i)
 	}
-	var out [10]spike
+	// BDS swaps forward: entry i trades with one of entries 0..i.
+	for i := uint32(1); i < spikeCount; i++ {
+		j := mt.Uint32() % (i + 1)
+		sizes[i], sizes[j] = sizes[j], sizes[i]
+	}
+	var out [spikeCount]spike
 	for i := range out {
+		// The angle steps by 2pi/spikeCount from -pi, in BDS's float32
+		// constants, then goes through the sine table.
 		a := float32(float32(i)*0.31415927) + -3.1415927
-		t := float32(a+a) * 10430.378
+		t := float32(a+a) * sineScale
 		sin := sineTable(uint16(int32(t)))
-		cos := sineTable(uint16(int32(float32(t + 16384))))
-		id := ids[i]
+		cos := sineTable(uint16(int32(float32(t + sineQuarter))))
+		size := sizes[i]
 		out[i] = spike{
-			x: int32(float32(cos * 42)), z: int32(float32(sin * 42)),
-			radius: id/3 + 2, height: 3*id + 76, guarded: id == 1 || id == 2,
+			x: int32(float32(cos * spikeRing)), z: int32(float32(sin * spikeRing)),
+			radius: size/3 + 2, height: 3*size + 76, guarded: size == 1 || size == 2,
 		}
 	}
 	return out
 }
 
-// sineTable is BDS's 65536-entry sine table.
+// BDS's sine table has sineEntries entries over a full turn: sineScale
+// turns half-angles in radians into entries, and sineQuarter entries are a
+// quarter turn (the cosine's offset).
+const (
+	sineEntries = 65536
+	sineScale   = 10430.378
+	sineQuarter = sineEntries / 4
+)
+
+// sineTable is entry i of BDS's sine table.
 func sineTable(i uint16) float32 {
-	return float32(math.Sin(float64(i) * (2 * math.Pi / 65536)))
+	return float32(math.Sin(float64(i) * (2 * math.Pi / sineEntries)))
 }
 
 // populationSeed is BDS's decoration seed of a chunk.
@@ -307,24 +344,24 @@ func (e *End) decorate(r *region, ox, oz int32) {
 			e.placeSpike(r, s)
 		}
 	}
-	if int64(ox)*int64(ox)+int64(oz)*int64(oz) <= 4096 {
+	if int64(ox)*int64(ox)+int64(oz)*int64(oz) <= outerIslandChunks2 {
 		return
 	}
 	x0, z0 := ox*16, oz*16
 	h := e.ChunkIslandHeight(ox, oz)
-	if h < -20 && mt.Uint32()%14 == 0 {
+	if h < smallIslandBelow && mt.Uint32()%smallIslandChance == 0 {
 		x := int32(mt.Uint32()&15) + x0 + 8
-		y := int32(mt.Uint32()&15) + 55
+		y := int32(mt.Uint32()&15) + smallIslandY
 		z := int32(mt.Uint32()&15) + z0 + 8
 		e.smallIsland(r, x, y, z, mt)
 		if mt.Uint32()&3 == 0 {
 			e.smallIsland(r, x, y, z, mt)
 		}
 	}
-	if h <= 40 {
+	if h <= highGround {
 		return
 	}
-	for n := mt.Uint32() % 5; n > 0; n-- {
+	for n := mt.Uint32() % chorusTries; n > 0; n-- {
 		x := (x0 | 8) + int32(mt.Uint32()&15)
 		z := (z0 | 8) + int32(mt.Uint32()&15)
 		y := r.height(x, z)
@@ -332,13 +369,13 @@ func (e *End) decorate(r *region, ox, oz int32) {
 			continue
 		}
 		r.set(x, y, z, e.deco.chorusPlant)
-		e.growChorus(r, x, y, z, x, z, mt, 8, 0)
+		e.growChorus(r, x, y, z, x, z, mt, chorusSpread, 0)
 	}
-	if mt.Uint32()%700 == 0 {
+	if mt.Uint32()%gatewayChance == 0 {
 		x := int32(mt.Uint32()&15) + x0 + 8
 		z := int32(mt.Uint32()&15) + z0 + 8
 		if y := r.height(x, z); y > 0 {
-			y += 3 + int32(mt.Uint32()%7)
+			y += gatewayRise + int32(mt.Uint32()%gatewayRiseRange)
 			e.gateway(r, x, y, z)
 		}
 	}
@@ -346,9 +383,10 @@ func (e *End) decorate(r *region, ox, oz int32) {
 
 // placeSpike builds a pillar (sub_49C44B0): an obsidian disk from the
 // bottom up to its height, the square around it cleared of everything
-// from y 66 to ten above the top, and the cage of a guarded one.
+// from spikeClearFrom to spikeClearAbove above the top, and the cage of a
+// guarded one.
 func (e *End) placeSpike(r *region, s spike) {
-	top := s.height + 10
+	top := s.height + spikeClearAbove
 	for x := s.x - s.radius; x <= s.x+s.radius; x++ {
 		for y := min(int32(0), top); y <= max(top, 0); y++ {
 			for z := s.z - s.radius; z <= s.z+s.radius; z++ {
@@ -356,7 +394,7 @@ func (e *End) placeSpike(r *region, s spike) {
 				switch {
 				case dx*dx+dz*dz <= s.radius*s.radius+1 && y < s.height:
 					r.set(x, y, z, e.deco.obsidian)
-				case y >= 66:
+				case y >= spikeClearFrom:
 					r.set(x, y, z, e.ids.air)
 				}
 			}
@@ -368,28 +406,32 @@ func (e *End) placeSpike(r *region, s spike) {
 	// The ring around the top three layers, then a full lid. Each bar
 	// joins the bars beside it: BDS sets the joins once the cage stands,
 	// and the cage has nothing else around it but air.
-	bar := func(dx, dy, dz int32) bool {
-		if dx < -2 || dx > 2 || dz < -2 || dz > 2 || dy < 0 || dy > 3 {
-			return false
-		}
-		return dy == 3 || abs32(dx) == 2 || abs32(dz) == 2
-	}
-	for dx := int32(-2); dx <= 2; dx++ {
-		for dz := int32(-2); dz <= 2; dz++ {
-			for dy := range int32(4) {
-				if !bar(dx, dy, dz) {
+	for dx := int32(-cageReach); dx <= cageReach; dx++ {
+		for dz := int32(-cageReach); dz <= cageReach; dz++ {
+			for dy := range int32(cageLid + 1) {
+				if !cageBar(dx, dy, dz) {
 					continue
 				}
 				var join uint8
-				for i, d := range chorusDirs {
-					if bar(dx+d[0], dy, dz+d[1]) {
-						join |= 1 << i
+				for _, d := range cube.Directions() {
+					sx, sz := d.Step()
+					if cageBar(dx+sx, dy, dz+sz) {
+						join |= 1 << d
 					}
 				}
 				r.set(s.x+dx, s.height+dy, s.z+dz, e.deco.ironBars[join])
 			}
 		}
 	}
+}
+
+// cageBar reports whether a guarded pillar's cage has a bar at (dx, dy, dz)
+// from the middle of the pillar's top.
+func cageBar(dx, dy, dz int32) bool {
+	if mathx.Abs(dx) > cageReach || mathx.Abs(dz) > cageReach || dy < 0 || dy > cageLid {
+		return false
+	}
+	return dy == cageLid || mathx.Abs(dx) == cageReach || mathx.Abs(dz) == cageReach
 }
 
 // smallIsland is a small floating island (EndIslandFeature, sub_D40FBF0): end
@@ -411,39 +453,37 @@ func (e *End) smallIsland(r *region, x, y, z int32, mt *rand.MT) {
 	}
 }
 
-// chorusDirs are the sides a chorus branch may grow toward (byte_1ADA5C1):
-// north, east, south, west, as x and z steps.
-var chorusDirs = [4][2]int32{{0, -1}, {1, 0}, {0, 1}, {-1, 0}}
-
 // growChorus grows a chorus plant up from (x, y, z) (sub_C5B70C0): a stem,
 // then up to four side branches that each grow the same way, within
 // spread blocks of the root (rx, rz) and four levels deep; a stem that
 // branches nowhere ends in a dead flower. A stem whose side is blocked
-// stops without one.
+// stops without one. A branch's side is drawn as a cube.Direction (BDS's
+// byte_1ADA5C1 lists them in that order).
 func (e *End) growChorus(r *region, x, y, z, rx, rz int32, mt *rand.MT, spread, depth int32) {
 	h := mt.IntN(4) + 1
 	if depth == 0 {
 		h++
 	}
 	for i := int32(1); i <= h; i++ {
-		if !e.chorusClear(r, x, y+i, z, -1) {
+		if !e.sidesClear(r, x, y+i, z) {
 			return
 		}
 		r.set(x, y+i, z, e.deco.chorusPlant)
 	}
 	placed := false
-	if depth <= 3 {
+	if depth <= chorusDepth {
 		n := mt.IntN(4)
 		if depth == 0 {
 			n++
 		}
 		for range n {
-			d := mt.IntN(4)
-			bx, bz := x+chorusDirs[d][0], z+chorusDirs[d][1]
+			d := cube.Direction(mt.IntN(4))
+			sx, sz := d.Step()
+			bx, bz := x+sx, z+sz
 			by := y + h
-			if abs32(bx-rx) >= spread || abs32(bz-rz) >= spread ||
+			if mathx.Abs(bx-rx) >= spread || mathx.Abs(bz-rz) >= spread ||
 				r.at(bx, by, bz) != e.ids.air || r.at(bx, by-1, bz) != e.ids.air ||
-				!e.chorusClear(r, bx, by, bz, (d+2)%4) {
+				!e.sidesClearBut(r, bx, by, bz, d.Opposite()) {
 				continue
 			}
 			r.set(bx, by, bz, e.deco.chorusPlant)
@@ -456,22 +496,37 @@ func (e *End) growChorus(r *region, x, y, z, rx, rz int32, mt *rand.MT, spread, 
 	}
 }
 
-// chorusClear reports whether the four sides of a block are air, but the
-// side toward direction except (-1 for none).
-func (e *End) chorusClear(r *region, x, y, z, except int32) bool {
-	for d, s := range chorusDirs {
-		if int32(d) != except && r.at(x+s[0], y, z+s[1]) != e.ids.air {
+// sidesClear reports whether the four sides of a block are air.
+func (e *End) sidesClear(r *region, x, y, z int32) bool {
+	for _, d := range cube.Directions() {
+		if !e.sideClear(r, x, y, z, d) {
 			return false
 		}
 	}
 	return true
 }
 
+// sidesClearBut reports whether the sides of a block are air, but the side
+// toward except.
+func (e *End) sidesClearBut(r *region, x, y, z int32, except cube.Direction) bool {
+	for _, d := range cube.Directions() {
+		if d != except && !e.sideClear(r, x, y, z, d) {
+			return false
+		}
+	}
+	return true
+}
+
+// sideClear reports whether the block beside (x, y, z) toward d is air.
+func (e *End) sideClear(r *region, x, y, z int32, d cube.Direction) bool {
+	sx, sz := d.Step()
+	return r.at(x+sx, y, z+sz) == e.ids.air
+}
+
 // gateway places an end gateway (EndGatewayFeature, sub_D40F3A0) in a
 // bedrock frame: the gateway block in the middle, bedrock above and below
 // it and around the layers next to it, air elsewhere in the 3x5x3 box. Its
-// exit is the End's default exit point, (100, 50, 0), the value BDS gives
-// a new gateway before it first ticks.
+// exit is gatewayExit.
 func (e *End) gateway(r *region, x, y, z int32) {
 	for dx := int32(-1); dx <= 1; dx++ {
 		for dy := int32(-2); dy <= 2; dy++ {
@@ -481,9 +536,9 @@ func (e *End) gateway(r *region, x, y, z int32) {
 				case dx == 0 && dz == 0 && dy == 0:
 					b = e.deco.gateway
 				case dy == 0:
-				case dx == 0 && dz == 0 && abs32(dy) == 2:
+				case dx == 0 && dz == 0 && mathx.Abs(dy) == 2:
 					b = e.deco.bedrock
-				case (dx == 0 || dz == 0) && abs32(dy) != 2:
+				case (dx == 0 || dz == 0) && mathx.Abs(dy) != 2:
 					b = e.deco.bedrock
 				}
 				r.set(x+dx, y+dy, z+dz, b)
@@ -493,7 +548,7 @@ func (e *End) gateway(r *region, x, y, z int32) {
 	if _, ok := r.index(x, y, z); ok {
 		r.be = append(r.be, structure.BlockEntity{X: x, Y: y, Z: z, Data: map[string]any{
 			"id": "EndGateway", "x": x, "y": y, "z": z, "Age": int32(0),
-			"ExitPortal": []any{int32(100), int32(50), int32(0)},
+			"ExitPortal": []any{gatewayExit[0], gatewayExit[1], gatewayExit[2]},
 		}})
 	}
 }
@@ -513,9 +568,9 @@ func (e *End) originWrites(ox, oz int32, neighbour func(cx, cz int32) *Chunk) *o
 
 // Decorate adds the decoration to c, the GenerateChunk output for chunk
 // (chunkX, chunkZ), then the End city pieces in it (BDS builds them after
-// the chorus), then the pillars' crystals. neighbour must return the unchanged GenerateChunk output of
-// any chunk within 2 chunks, the target's own included (nil for one it
-// cannot provide: it reads as air). Cache does the same with the
+// the chorus), then the pillars' crystals. neighbour must return the
+// unchanged GenerateChunk output of any chunk within 2 chunks, the target's
+// own included (nil for one it cannot provide: it reads as air). Cache does the same with the
 // neighbours kept. It is safe to call from many goroutines if neighbour is.
 func (e *End) Decorate(chunkX, chunkZ int32, c *Chunk, neighbour func(cx, cz int32) *Chunk) {
 	e.decorateWith(chunkX, chunkZ, c, func(ox, oz int32) *originWrites { return e.originWrites(ox, oz, neighbour) })

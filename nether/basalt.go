@@ -1,6 +1,9 @@
 package nether
 
-import "github.com/helix-bedrock/worldgen/rand"
+import (
+	"github.com/helix-bedrock/worldgen/internal/mathx"
+	"github.com/helix-bedrock/worldgen/rand"
+)
 
 // msolid is the solid flag of a block's material (Material+5), which the
 // basalt features use to decide which way to search; solid is the block's
@@ -61,7 +64,7 @@ func (n *Nether) deltaFeature(r *region, x, y, z int32, mt *rand.MT) {
 	_ = f
 	for dx := -sizeX; dx <= sizeX; dx++ {
 		for dz := -sizeZ; dz <= sizeZ; dz++ {
-			if abs32(dx)+abs32(dz) > reach {
+			if mathx.Abs(dx)+mathx.Abs(dz) > reach {
 				continue
 			}
 			px, pz := x+dx, z+dz
@@ -105,7 +108,7 @@ func (n *Nether) basaltColumns(r *region, x, y, z int32, mt *rand.MT) {
 	for range count {
 		cx := x + off + mt.IntN(spread)
 		cz := z + off + mt.IntN(spread)
-		left := height - (abs32(cx-x) + abs32(cz-z))
+		left := height - (mathx.Abs(cx-x) + mathx.Abs(cz-z))
 		if left <= 0 {
 			continue
 		}
@@ -122,7 +125,7 @@ func (n *Nether) columnCluster(r *region, cx, y0, cz, rad, left int32) {
 	for ddx := -rad; ddx <= rad; ddx++ {
 		for ddz := -rad; ddz <= rad; ddz++ {
 			px, pz := cx+ddx, cz+ddz
-			k := abs32(ddx) + abs32(ddz)
+			k := mathx.Abs(ddx) + mathx.Abs(ddz)
 			step := int32(-1)
 			if n.msolid(r.at(px, y0, pz)) {
 				step = 1
@@ -200,7 +203,7 @@ func (n *Nether) basaltPillar(r *region, x, y, z int32, mt *rand.MT) {
 	}
 	for i := int32(-3); i <= 3; i++ {
 		for j := int32(-3); j <= 3; j++ {
-			if mt.IntN(10) < abs32(i*j) {
+			if mt.IntN(10) < mathx.Abs(i*j) {
 				continue
 			}
 			for py, k := y, 0; k < 3; py, k = py-1, k+1 {

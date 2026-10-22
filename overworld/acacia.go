@@ -1,6 +1,7 @@
 package overworld
 
 import (
+	"github.com/helix-bedrock/worldgen/internal/mathx"
 	"github.com/helix-bedrock/worldgen/rand"
 )
 
@@ -235,7 +236,7 @@ func (c *acaciaCanopy) place(t *treeFeature, w *featureWorld, x, y, z int32) {
 	}
 	for dx := -s; dx <= s; dx++ {
 		for dz := -s; dz <= s; dz++ {
-			if absI(dx) == s && absI(dz) == s {
+			if mathx.Abs(dx) == s && mathx.Abs(dz) == s {
 				continue
 			}
 			put(x+dx, y, z+dz)
@@ -290,7 +291,7 @@ func (c *roofedCanopy) place(w *featureWorld, x, y, z, width int32, r *rand.MT) 
 					dx == ri+cx-1 && (dz == ri+cz-1 || dz == -ri):
 					continue
 				}
-				if absI(dx) >= ri && absI(dz) >= ri {
+				if mathx.Abs(dx) >= ri && mathx.Abs(dz) >= ri {
 					continue
 				}
 				put(x+dx, y+layer, z+dz)

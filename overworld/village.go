@@ -1,6 +1,9 @@
 package overworld
 
-import "github.com/helix-bedrock/worldgen/rand"
+import (
+	"github.com/helix-bedrock/worldgen/rand"
+	"github.com/helix-bedrock/worldgen/structure"
+)
 
 // Village placement, from BDS 1.26.52: the feature is built by sub_4FBB600
 // (called from sub_523B5C0) and a chunk is checked by sub_4FBB850.
@@ -16,7 +19,7 @@ const (
 // structureSeed seeds r for the placement region (rx, rz) of a structure
 // (StructureFeature::setRandomSeedFor).
 func structureSeed(r *rand.MT, seed int64, rx, rz, salt int32) {
-	r.Seed(uint32(seed) + uint32(salt) - 245998635*uint32(rz) - 1724254968*uint32(rx))
+	r.Seed(structure.RegionSeed(seed, uint32(salt), rx, rz))
 }
 
 // floorDivRegion is chunk / spacing rounded down, as BDS computes it.

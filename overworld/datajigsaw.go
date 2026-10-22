@@ -10,6 +10,8 @@ import (
 	"strings"
 	"sync"
 
+	"github.com/helix-bedrock/worldgen/internal/mathx"
+
 	"github.com/helix-bedrock/worldgen"
 
 	"github.com/helix-bedrock/worldgen/biome"
@@ -449,7 +451,7 @@ func (d *djDef) near(o *Overworld, cx, cz int32, f func(s *djStructure)) {
 	for rx := r0x; rx <= r1x; rx++ {
 		for rz := r0z; rz <= r1z; rz++ {
 			sx, sz := d.pick(o, rx, rz)
-			if abs32i(sx-cx) > d.reach || abs32i(sz-cz) > d.reach {
+			if mathx.Abs(sx-cx) > d.reach || mathx.Abs(sz-cz) > d.reach {
 				continue
 			}
 			if s := d.at(o, sx, sz); s != nil {

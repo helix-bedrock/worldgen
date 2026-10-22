@@ -197,7 +197,7 @@ func (n *Nether) ChunkBiomes(chunkX, chunkZ int32, out *[256]uint16) {
 // chunkSeed seeds the chunk's Mersenne Twister. It differs from the
 // overworld's and, like it, leaves out the world seed.
 func chunkSeed(chunkX, chunkZ int32) uint32 {
-	return uint32(-1724254968*chunkX - 245998635*chunkZ)
+	return structure.RegionSeed(0, 0, chunkX, chunkZ)
 }
 
 // bedrock draws the floor (two to five layers) and the roof (one to five),

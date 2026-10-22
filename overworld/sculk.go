@@ -4,6 +4,8 @@ import (
 	"encoding/json"
 	"math"
 
+	"github.com/helix-bedrock/worldgen/internal/mathx"
+
 	"github.com/helix-bedrock/worldgen/rand"
 )
 
@@ -411,7 +413,7 @@ func (o *Overworld) sculkMove(w *featureWorld, sb *sculkBlocks, x, y, z int32, o
 		if kind == sculkDefault {
 			continue
 		}
-		if abs32i(d[0])+abs32i(d[1])+abs32i(d[2]) == 2 && !o.sculkUnobstructed(w, x, y, z, d) {
+		if mathx.Abs(d[0])+mathx.Abs(d[1])+mathx.Abs(d[2]) == 2 && !o.sculkUnobstructed(w, x, y, z, d) {
 			continue
 		}
 		mx, my, mz, found = nx, ny, nz, true

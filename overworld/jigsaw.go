@@ -3,6 +3,8 @@ package overworld
 import (
 	"strings"
 
+	"github.com/helix-bedrock/worldgen/internal/mathx"
+
 	"github.com/helix-bedrock/worldgen/rand"
 	"github.com/helix-bedrock/worldgen/structure"
 )
@@ -508,7 +510,7 @@ func (o *Overworld) NearestVillage(x, z int32, kind string, maxRings int32) (vx,
 	for ring := int32(0); ring <= maxRings; ring++ {
 		for rx := rx0 - ring; rx <= rx0+ring; rx++ {
 			for rz := rz0 - ring; rz <= rz0+ring; rz++ {
-				if max(abs32i(rx-rx0), abs32i(rz-rz0)) != ring {
+				if max(mathx.Abs(rx-rx0), mathx.Abs(rz-rz0)) != ring {
 					continue
 				}
 				cx, cz, _ := o.villagePick(rx, rz)
@@ -529,13 +531,6 @@ func (o *Overworld) NearestVillage(x, z int32, kind string, maxRings int32) (vx,
 		}
 	}
 	return vx, vy, vz, best >= 0
-}
-
-func abs32i(v int32) int32 {
-	if v < 0 {
-		return -v
-	}
-	return v
 }
 
 // villageFeatures places the feature pieces of the villages standing in

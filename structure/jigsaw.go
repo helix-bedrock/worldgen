@@ -7,6 +7,8 @@ import (
 	"strings"
 	"sync"
 
+	"github.com/helix-bedrock/worldgen/internal/mathx"
+
 	"github.com/helix-bedrock/worldgen"
 	"github.com/helix-bedrock/worldgen/rand"
 )
@@ -50,7 +52,7 @@ func (l *Lib) ApplyRules(rules []BlockRule, cs ConvertedState, x, y, z int32, wo
 				seeded = true
 			}
 			d := [3]int32{x - pivot[0], y - pivot[1], z - pivot[2]}[ru.pos.axis]
-			if !ru.pos.passes(abs32(d), r.Float()) {
+			if !ru.pos.passes(mathx.Abs(d), r.Float()) {
 				continue
 			}
 		}
@@ -89,7 +91,7 @@ func (l *Lib) applyLegacyRules(rules []BlockRule, cs ConvertedState, x, y, z int
 		}
 		if ru.pos != nil {
 			d := [3]int32{x - pivot[0], y - pivot[1], z - pivot[2]}[ru.pos.axis]
-			if !ru.pos.passes(abs32(d), r.Float()) {
+			if !ru.pos.passes(mathx.Abs(d), r.Float()) {
 				continue
 			}
 		}

@@ -1,8 +1,28 @@
 package end
 
 import (
+	"github.com/helix-bedrock/worldgen/cube"
 	"github.com/helix-bedrock/worldgen/structure"
 )
+
+// The exit portal's shape (EndPodiumFeature): every block within
+// podiumReach on each axis, from one below the ground to podiumAir above,
+// whose squared distance from the middle is at most podiumOuter2. Below
+// the ground those within podiumInner2 are bedrock, the rest end stone; on
+// the ground those within podiumInner2 are the portal, the rest bedrock.
+// The pillar in the middle is podiumPillar tall, with the torches on its
+// side at podiumTorchY.
+const (
+	podiumReach  = 4
+	podiumAir    = 4
+	podiumOuter2 = 12
+	podiumInner2 = 7
+	podiumPillar = 4
+	podiumTorchY = 2
+)
+
+// crystalIdentifier is the entity standing on each pillar.
+const crystalIdentifier = "minecraft:ender_crystal"
 
 // placeCrystals is TheEndGenerator's mob pass (sub_5197E50) for chunk
 // (cx, cz): each pillar whose middle is in the chunk gets a bedrock block on
@@ -17,7 +37,7 @@ func (e *End) placeCrystals(cx, cz int32, c *Chunk) {
 		c.set(int(s.x&15), int(s.height), int(s.z&15), e.deco.bedrock)
 		c.Entities = append(c.Entities, structure.EntitySpawn{
 			X: float64(s.x) + 0.5, Y: float64(s.height + 1), Z: float64(s.z) + 0.5,
-			Identifier: "minecraft:ender_crystal",
+			Identifier: crystalIdentifier,
 			NBT:        map[string]any{"ShowBottom": uint8(1)},
 			Source:     "end_spike",
 		})
@@ -49,36 +69,47 @@ func (e *End) ExitPortal(open bool) []PodiumBlock {
 			break
 		}
 	}
-	var out []PodiumBlock
-	add := func(x, y, z int32, id uint32) { out = append(out, PodiumBlock{x, y0 + y, z, id}) }
-	for dx := int32(-4); dx <= 4; dx++ {
-		for dy := int32(-1); dy <= 4; dy++ {
-			for dz := int32(-4); dz <= 4; dz++ {
+	p := podium{y0: y0}
+	for dx := int32(-podiumReach); dx <= podiumReach; dx++ {
+		for dy := int32(-1); dy <= podiumAir; dy++ {
+			for dz := int32(-podiumReach); dz <= podiumReach; dz++ {
 				d := dx*dx + dy*dy + dz*dz
 				switch {
-				case d > 12:
-				case dy < 0 && d < 7:
-					add(dx, dy, dz, e.deco.bedrock)
+				case d > podiumOuter2:
+				case dy < 0 && d < podiumInner2:
+					p.add(dx, dy, dz, e.deco.bedrock)
 				case dy < 0:
-					add(dx, dy, dz, e.ids.endStone)
+					p.add(dx, dy, dz, e.ids.endStone)
 				case dy > 0:
-					add(dx, dy, dz, e.ids.air)
-				case d >= 7:
-					add(dx, dy, dz, e.deco.bedrock)
+					p.add(dx, dy, dz, e.ids.air)
+				case d >= podiumInner2:
+					p.add(dx, dy, dz, e.deco.bedrock)
 				case open:
-					add(dx, dy, dz, e.deco.endPortal)
+					p.add(dx, dy, dz, e.deco.endPortal)
 				default:
-					add(dx, dy, dz, e.ids.air)
+					p.add(dx, dy, dz, e.ids.air)
 				}
 			}
 		}
 	}
-	for dy := range int32(4) {
-		add(0, dy, 0, e.deco.bedrock)
+	for dy := range int32(podiumPillar) {
+		p.add(0, dy, 0, e.deco.bedrock)
 	}
 	// The torches hang on the pillar, each on the side away from it.
-	for i, d := range chorusDirs {
-		add(d[0], 2, d[1], e.deco.torches[i])
+	for _, d := range cube.Directions() {
+		dx, dz := d.Step()
+		p.add(dx, podiumTorchY, dz, e.deco.torches[d])
 	}
-	return out
+	return p.out
+}
+
+// podium collects the exit portal's blocks, by offsets from the middle of
+// the ground at height y0.
+type podium struct {
+	y0  int32
+	out []PodiumBlock
+}
+
+func (p *podium) add(dx, dy, dz int32, id uint32) {
+	p.out = append(p.out, PodiumBlock{dx, p.y0 + dy, dz, id})
 }

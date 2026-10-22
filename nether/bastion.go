@@ -5,6 +5,8 @@ import (
 	"fmt"
 	"slices"
 
+	"github.com/helix-bedrock/worldgen/internal/mathx"
+
 	"github.com/helix-bedrock/worldgen/rand"
 	"github.com/helix-bedrock/worldgen/structure"
 )
@@ -77,7 +79,7 @@ func (n *Nether) loadBastions(biomeIDs map[string]uint32) error {
 // bastionChunk reports whether a bastion starts in chunk (cx, cz) and
 // leaves r where the start goes on.
 func (n *Nether) bastionChunk(cx, cz int32, r *rand.MT) bool {
-	sx, sz := n.complexStart(floorDiv(cx, complexSpacing), floorDiv(cz, complexSpacing), r)
+	sx, sz := n.complexStart(mathx.FloorDiv(cx, complexSpacing), mathx.FloorDiv(cz, complexSpacing), r)
 	if sx != cx || sz != cz {
 		return false
 	}
@@ -139,11 +141,11 @@ func (n *Nether) assembleBastion(cx, cz int32, r *rand.MT) *bastion {
 // bastionsReach calls f with each bastion that may have blocks in chunk
 // (cx, cz).
 func (n *Nether) bastionsReach(cx, cz int32, f func(b *bastion)) {
-	for rx := floorDiv(cx-bastionReach, complexSpacing); rx <= floorDiv(cx+bastionReach, complexSpacing); rx++ {
-		for rz := floorDiv(cz-bastionReach, complexSpacing); rz <= floorDiv(cz+bastionReach, complexSpacing); rz++ {
+	for rx := mathx.FloorDiv(cx-bastionReach, complexSpacing); rx <= mathx.FloorDiv(cx+bastionReach, complexSpacing); rx++ {
+		for rz := mathx.FloorDiv(cz-bastionReach, complexSpacing); rz <= mathx.FloorDiv(cz+bastionReach, complexSpacing); rz++ {
 			var r rand.MT
 			sx, sz := n.complexStart(rx, rz, &r)
-			if abs32(sx-cx) > bastionReach || abs32(sz-cz) > bastionReach {
+			if mathx.Abs(sx-cx) > bastionReach || mathx.Abs(sz-cz) > bastionReach {
 				continue
 			}
 			if b := n.bastionAt(sx, sz); b != nil {
@@ -202,7 +204,7 @@ func (n *Nether) NearestBastion(x, z, maxRings int32, kind string) (bx, by, bz i
 		d      int64
 	}
 	var cands []cand
-	rx0, rz0 := floorDiv(x>>4, complexSpacing), floorDiv(z>>4, complexSpacing)
+	rx0, rz0 := mathx.FloorDiv(x>>4, complexSpacing), mathx.FloorDiv(z>>4, complexSpacing)
 	for rx := rx0 - maxRings; rx <= rx0+maxRings; rx++ {
 		for rz := rz0 - maxRings; rz <= rz0+maxRings; rz++ {
 			var r rand.MT

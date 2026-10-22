@@ -1,5 +1,7 @@
 package terrain
 
+import "github.com/helix-bedrock/worldgen/internal/mathx"
+
 // The three terrain splines. Their layout and constants were read from BDS
 // 1.26.52; they match the vanilla 1.18 terrain design point for point.
 
@@ -28,14 +30,7 @@ func (s *Shape) Jaggedness(p *Point) float32 { return s.jaggedness.eval(p) }
 
 // PeaksValleys folds weirdness into the peaks-and-valleys value.
 func PeaksValleys(w float32) float32 {
-	return -(abs32(abs32(w)-0.6666667) - 0.33333334) * 3
-}
-
-func abs32(v float32) float32 {
-	if v < 0 {
-		return -v
-	}
-	return v
+	return -(mathx.AbsFloat(mathx.AbsFloat(w)-0.6666667) - 0.33333334) * 3
 }
 
 func lerpf(t, a, b float32) float32 { return a + t*(b-a) }

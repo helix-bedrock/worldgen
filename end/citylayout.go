@@ -220,7 +220,7 @@ func (l *cityLayout) houseTower(depth int32, parent cityPiece, offset [3]int32) 
 // generators draw from the placement random, after the four draws that
 // picked the chunk (sub_4E400E0 hands it on to the start).
 func (e *End) layCity(cx, cz int32, rot int, y int32) *city {
-	l := &cityLayout{e: e, r: e.cityRandom(cityRegion(cx), cityRegion(cz))}
+	l := &cityLayout{e: e, r: e.cityRandom(structure.Region(cx, citySpacing), structure.Region(cz, citySpacing))}
 	for range 4 {
 		l.r.IntN(citySpacing - citySeparation)
 	}

@@ -3,6 +3,8 @@ package overworld
 import (
 	"math"
 
+	"github.com/helix-bedrock/worldgen/internal/mathx"
+
 	"github.com/helix-bedrock/worldgen/rand"
 )
 
@@ -74,9 +76,9 @@ func (f *iceSpikeFeature) place(w *featureWorld, x, y, z int32, r *rand.MT) (blo
 		ff := fr * fr
 		mirror := k != 0 && l >= 2
 		for i := -l; i <= l; i++ {
-			fi := float32(absI(i)) - 0.25
+			fi := float32(mathx.Abs(i)) - 0.25
 			for jz := -l; jz <= l; jz++ {
-				fj := float32(absI(jz)) - 0.25
+				fj := float32(mathx.Abs(jz)) - 0.25
 				if (i != 0 || jz != 0) && fi*fi+fj*fj > ff {
 					continue
 				}
@@ -97,7 +99,7 @@ func (f *iceSpikeFeature) place(w *featureWorld, x, y, z int32, r *rand.MT) (blo
 		for dz := -k1; dz <= k1; dz++ {
 			cy := y - 1
 			n := int32(50)
-			if absI(dx) == 1 && absI(dz) == 1 {
+			if mathx.Abs(dx) == 1 && mathx.Abs(dz) == 1 {
 				n = r.IntN(5)
 			}
 			for cy > SeaLevel-13 {

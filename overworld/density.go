@@ -1,6 +1,7 @@
 package overworld
 
 import (
+	"github.com/helix-bedrock/worldgen/internal/mathx"
 	"github.com/helix-bedrock/worldgen/noise"
 	"github.com/helix-bedrock/worldgen/rand"
 	"github.com/helix-bedrock/worldgen/structure"
@@ -205,8 +206,8 @@ func (o *Overworld) fillBlock(g *grids, aq *aquifer, adj []beardShaver, beards [
 				th = t*0.05 + 0.05
 			}
 		}
-		a := abs32(interp(&g.aux[auxRidgeA], i, j, k, dx, dy, dz)*1.5) - th
-		b := abs32(interp(&g.aux[auxRidgeB], i, j, k, dx, dy, dz)*1.5) - th
+		a := mathx.AbsFloat(interp(&g.aux[auxRidgeA], i, j, k, dx, dy, dz)*1.5) - th
+		b := mathx.AbsFloat(interp(&g.aux[auxRidgeB], i, j, k, dx, dy, dz)*1.5) - th
 		d = min(max(b, a), d)
 	}
 	if adj != nil || beards != nil || bury != nil {
@@ -257,7 +258,7 @@ func (o *Overworld) oreVein(g *grids, i, j, k, dx, dy, dz int, x, y, z int32, bl
 	if !(1 < e) {
 		edge = e*0.2 + -0.2
 	}
-	av := abs32(v)
+	av := mathx.AbsFloat(v)
 	if !(edge+av >= 0.4) {
 		return block
 	}
@@ -265,8 +266,8 @@ func (o *Overworld) oreVein(g *grids, i, j, k, dx, dy, dz int, x, y, z int32, bl
 	if !(r.Float() <= 0.7) {
 		return block
 	}
-	a := abs32(interp(&g.aux[auxVeinA], i, j, k, dx, dy, dz)) + -0.08
-	b := abs32(interp(&g.aux[auxVeinB], i, j, k, dx, dy, dz)) + -0.08
+	a := mathx.AbsFloat(interp(&g.aux[auxVeinA], i, j, k, dx, dy, dz)) + -0.08
+	b := mathx.AbsFloat(interp(&g.aux[auxVeinB], i, j, k, dx, dy, dz)) + -0.08
 	if !(max(a, b) < 0) {
 		return block
 	}

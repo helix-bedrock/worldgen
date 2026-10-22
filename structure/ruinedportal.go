@@ -1,6 +1,7 @@
 package structure
 
 import (
+	"github.com/helix-bedrock/worldgen/internal/mathx"
 	"github.com/helix-bedrock/worldgen/rand"
 )
 
@@ -57,7 +58,7 @@ const (
 // region has one.
 func PortalPick(seed int64, rx, rz, spacing, separation int32) (cx, cz int32) {
 	var r rand.MT
-	r.Seed(uint32(seed) + uint32(portalSalt) - 245998635*uint32(rz) - 1724254968*uint32(rx))
+	r.Seed(RegionSeed(seed, portalSalt, rx, rz))
 	n := spacing - separation
 	cx = rx*spacing + r.IntN(n)
 	return cx, rz*spacing + r.IntN(n)
@@ -298,7 +299,7 @@ func (l *Lib) RuinedPortal(cx, cz int32, w PortalWorld) *RuinedPortal {
 	mx, mz := mid(bb.X0, bb.X1), mid(bb.Z0, bb.Z1)
 	for x := mx - 14; x <= mx+14; x++ {
 		for dz := int32(-14); dz <= 14; dz++ {
-			d := spread + iabs(mx-x) + iabs(dz)
+			d := spread + mathx.Abs(mx-x) + mathx.Abs(dz)
 			if d > 13 || float64(portalSpread[d]) <= r.Float64() {
 				continue
 			}
@@ -307,7 +308,7 @@ func (l *Lib) RuinedPortal(cx, cz int32, w PortalWorld) *RuinedPortal {
 			if buried {
 				hy = min(hy, bb.Y0)
 			}
-			if iabs(bb.Y0-hy) <= 3 {
+			if mathx.Abs(bb.Y0-hy) <= 3 {
 				netherrack(x, hy, z)
 				drip(x, hy-1, z)
 			}
@@ -534,11 +535,4 @@ func (l *Lib) agePortal(s *portalSim, r *rand.MT, bb Box, ids portalIDs, moss fl
 			}
 		}
 	}
-}
-
-func iabs(v int32) int32 {
-	if v < 0 {
-		return -v
-	}
-	return v
 }

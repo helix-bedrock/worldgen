@@ -17,6 +17,9 @@ import (
 // structures reach higher.
 const Height = 256
 
+// biomeName is the End's one biome.
+const biomeName = "the_end"
+
 // Chunk is the generator output for one 16x16 column. Blocks holds
 // registry indices, index y<<8 | z<<4 | x.
 type Chunk struct {
@@ -68,10 +71,6 @@ type End struct {
 	cities sync.Map
 }
 
-func errMissing(name string) error {
-	return fmt.Errorf("worldgen: block %s missing from the block list", name)
-}
-
 // New builds the noises for a seed. reg must contain the vanilla blocks the
 // generator places; biomeIDs maps biome names (no "minecraft:" prefix) to
 // numeric IDs, as from biome.LoadIDs.
@@ -80,23 +79,16 @@ func New(seed int64, reg *blocks.Registry, biomeIDs map[string]uint32) (*End, er
 		return nil, fmt.Errorf("worldgen: %d block states do not fit the 16-bit chunk storage", reg.Len())
 	}
 	e := &End{seed: seed, reg: reg}
-	b, ok := biomeIDs["the_end"]
+	b, ok := biomeIDs[biomeName]
 	if !ok {
-		return nil, fmt.Errorf("worldgen: biome the_end missing from the biome list")
+		return nil, fmt.Errorf("worldgen: biome %s missing from the biome list", biomeName)
 	}
 	e.biome = uint16(b)
-	for _, b := range []struct {
-		dst  *uint32
-		name string
-	}{
-		{&e.ids.air, "minecraft:air"},
-		{&e.ids.endStone, "minecraft:end_stone"},
-	} {
-		id, ok := reg.Default(b.name)
-		if !ok {
-			return nil, errMissing(b.name)
-		}
-		*b.dst = id
+	if err := reg.Resolve(
+		blocks.Want{Dst: &e.ids.air, Name: "minecraft:air"},
+		blocks.Want{Dst: &e.ids.endStone, Name: "minecraft:end_stone"},
+	); err != nil {
+		return nil, err
 	}
 	// Every noise is drawn in turn from one Mersenne Twister on the low 32
 	// bits of the seed. A last 3-octave noise follows that the terrain

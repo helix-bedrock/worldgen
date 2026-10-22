@@ -3,6 +3,8 @@ package overworld
 import (
 	"math"
 
+	"github.com/helix-bedrock/worldgen/internal/mathx"
+
 	"github.com/helix-bedrock/worldgen/rand"
 )
 
@@ -115,7 +117,7 @@ func (t *treeFeature) megaTrunk(w *featureWorld, x, y, z, h int32, r *rand.MT) (
 	for k := int32(0); k < h+2; k++ {
 		rad := m.width
 		if k == 0 {
-			rad = max(absI(m.width-1), 1)
+			rad = max(mathx.Abs(m.width-1), 1)
 		}
 		ly := y + k
 		if ly < MinY || ly >= MaxY {
@@ -207,7 +209,7 @@ func (t *treeFeature) baseClusters(w *featureWorld, x, y, z, width int32, r *ran
 		rad := t.clusterRadius
 		for dx := -rad; dx <= rad; dx++ {
 			for dz := -rad; dz <= rad; dz++ {
-				if absI(dx) == rad && absI(dz) == rad {
+				if mathx.Abs(dx) == rad && mathx.Abs(dz) == rad {
 					continue
 				}
 				t.clusterColumn(w, cx+dx, y, cz+dz)

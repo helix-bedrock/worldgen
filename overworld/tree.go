@@ -4,6 +4,8 @@ import (
 	"encoding/json"
 	"fmt"
 
+	"github.com/helix-bedrock/worldgen/internal/mathx"
+
 	"github.com/helix-bedrock/worldgen/biome"
 	"github.com/helix-bedrock/worldgen/rand"
 )
@@ -905,7 +907,7 @@ func (t *treeFeature) simpleCanopy(w *featureWorld, x, top, z int32, r *rand.MT)
 		rad := radius(dy)
 		for bx := x - rad; bx <= x+rad; bx++ {
 			for bz := z - rad; bz <= z+rad; bz++ {
-				if absI(bx-x) == rad && absI(bz-z) == rad {
+				if mathx.Abs(bx-x) == rad && mathx.Abs(bz-z) == rad {
 					i := dy - t.offMin
 					if int(i) < len(t.variation) && t.variation[i].skipCorner(r) {
 						continue
@@ -993,7 +995,7 @@ func (t *treeFeature) disk(w *featureWorld, x, y, z, rad int32, cutCorners, repl
 	placed := false
 	for bx := x - rad; bx <= x+rad; bx++ {
 		for bz := z - rad; bz <= z+rad; bz++ {
-			if cutCorners && rad != 0 && absI(bx-x) == rad && absI(bz-z) == rad {
+			if cutCorners && rad != 0 && mathx.Abs(bx-x) == rad && mathx.Abs(bz-z) == rad {
 				continue
 			}
 			b, ok := w.block(bx, y, bz)
@@ -1035,13 +1037,6 @@ func (t *treeFeature) pineCanopy(w *featureWorld, x, top, z int32, r *rand.MT) b
 		rad = next
 	}
 	return placed
-}
-
-func absI(v int32) int32 {
-	if v < 0 {
-		return -v
-	}
-	return v
 }
 
 type rawMegaCanopy struct {

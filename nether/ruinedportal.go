@@ -4,6 +4,8 @@ import (
 	"cmp"
 	"slices"
 
+	"github.com/helix-bedrock/worldgen/internal/mathx"
+
 	"github.com/helix-bedrock/worldgen/structure"
 )
 
@@ -49,10 +51,10 @@ func (n *Nether) portalPick(rx, rz int32) (int32, int32) {
 // blocks in chunk (cx, cz).
 func (n *Nether) portalsReach(cx, cz int32, f func(sx, sz int32)) {
 	sp := int32(structure.NetherPortalSpacing)
-	for rx := floorDiv(cx-portalReach, sp); rx <= floorDiv(cx+portalReach, sp); rx++ {
-		for rz := floorDiv(cz-portalReach, sp); rz <= floorDiv(cz+portalReach, sp); rz++ {
+	for rx := mathx.FloorDiv(cx-portalReach, sp); rx <= mathx.FloorDiv(cx+portalReach, sp); rx++ {
+		for rz := mathx.FloorDiv(cz-portalReach, sp); rz <= mathx.FloorDiv(cz+portalReach, sp); rz++ {
 			sx, sz := n.portalPick(rx, rz)
-			if abs32(sx-cx) <= portalReach && abs32(sz-cz) <= portalReach {
+			if mathx.Abs(sx-cx) <= portalReach && mathx.Abs(sz-cz) <= portalReach {
 				f(sx, sz)
 			}
 		}
@@ -95,7 +97,7 @@ func (n *Nether) NearestRuinedPortal(x, z, maxRegions int32) (px, py, pz int32, 
 	}
 	var cands []cand
 	sp := int32(structure.NetherPortalSpacing)
-	rx0, rz0 := floorDiv(x>>4, sp), floorDiv(z>>4, sp)
+	rx0, rz0 := mathx.FloorDiv(x>>4, sp), mathx.FloorDiv(z>>4, sp)
 	for rx := rx0 - maxRegions; rx <= rx0+maxRegions; rx++ {
 		for rz := rz0 - maxRegions; rz <= rz0+maxRegions; rz++ {
 			cx, cz := n.portalPick(rx, rz)

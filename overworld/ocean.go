@@ -4,6 +4,8 @@ import (
 	"encoding/json"
 	"strings"
 
+	"github.com/helix-bedrock/worldgen/internal/mathx"
+
 	"github.com/helix-bedrock/worldgen/biome"
 	"github.com/helix-bedrock/worldgen/rand"
 )
@@ -67,9 +69,9 @@ func (f *partiallyExposedBlobFeature) place(w *featureWorld, x, y, z int32, r *r
 	for depth := int32(0); depth <= 3*rad; depth++ {
 		mx := min(depth, rad)
 		for dx := -mx; dx <= mx; dx++ {
-			my := min(depth-iabs(dx), rad)
+			my := min(depth-mathx.Abs(dx), rad)
 			for dy := -my; dy <= my; dy++ {
-				dz := depth - iabs(dx) - iabs(dy)
+				dz := depth - mathx.Abs(dx) - mathx.Abs(dy)
 				if dz > rad {
 					continue
 				}
@@ -145,11 +147,4 @@ func (f *seaAnemoneFeature) place(w *featureWorld, x, y, z int32, r *rand.MT) (b
 		w.set(x, y, z, f.coral.fans[fan][r.IntN(2)])
 	}
 	return blockPos{x, y, z}, true
-}
-
-func iabs(v int32) int32 {
-	if v < 0 {
-		return -v
-	}
-	return v
 }

@@ -1,7 +1,9 @@
 package nether
 
 import (
+	"github.com/helix-bedrock/worldgen/internal/mathx"
 	"github.com/helix-bedrock/worldgen/rand"
+	"github.com/helix-bedrock/worldgen/structure"
 )
 
 // Nether fortresses, written from BDS 1.26.52: the placement shared with
@@ -85,18 +87,10 @@ func orientedBox(x, y, z, ox, oy, w, h, d, o int32) box {
 	return box{x + ox, y0, z, x + ox + w - 1, y1, z + d - 1}
 }
 
-// floorDiv is the grid region of a chunk coordinate.
-func floorDiv(v, n int32) int32 {
-	if v < 0 {
-		v -= n - 1
-	}
-	return v / n
-}
-
 // complexStart is the candidate chunk of grid region (rx, rz) and the
 // random it was drawn from, which the start goes on with.
 func (n *Nether) complexStart(rx, rz int32, r *rand.MT) (int32, int32) {
-	r.Seed(uint32(-1724254968*rx-245998635*rz) + uint32(n.seed) + complexSalt)
+	r.Seed(structure.RegionSeed(n.seed, complexSalt, rx, rz))
 	cx := complexSpacing*rx + r.IntN(complexRange)
 	cz := complexSpacing*rz + r.IntN(complexRange)
 	return cx, cz
@@ -119,7 +113,7 @@ func (n *Nether) complexBiomesOK(cx, cz int32, ok func(b uint32) bool) bool {
 // leaves r where the start goes on. A fortress may stand in every Nether
 // biome; a third of the grid's starts are fortresses, the rest bastions.
 func (n *Nether) fortressChunk(cx, cz int32, r *rand.MT) bool {
-	sx, sz := n.complexStart(floorDiv(cx, complexSpacing), floorDiv(cz, complexSpacing), r)
+	sx, sz := n.complexStart(mathx.FloorDiv(cx, complexSpacing), mathx.FloorDiv(cz, complexSpacing), r)
 	if sx != cx || sz != cz {
 		return false
 	}
@@ -300,7 +294,7 @@ func (l *nbLayout) create(k uint8, r *rand.MT, x, y, z, o, depth int32) *nbPiece
 // next picks and adds the piece at (x, y, z) heading o, from the castle
 // list or the bridge list.
 func (l *nbLayout) next(r *rand.MT, x, y, z, o, depth int32, castle bool) {
-	if abs32(x-l.start.x0) > 112 || abs32(z-l.start.z0) > 112 {
+	if mathx.Abs(x-l.start.x0) > 112 || mathx.Abs(z-l.start.z0) > 112 {
 		if p := l.filler(r, x, y, z, o, depth); p != nil {
 			l.add(p)
 		}
@@ -426,13 +420,13 @@ func (l *nbLayout) children(p *nbPiece, r *rand.MT) {
 // searching the 30-chunk grid ring by ring up to maxRings out. It returns
 // the start piece's middle, at its height.
 func (n *Nether) NearestFortress(x, z, maxRings int32) (fx, fy, fz int32, found bool) {
-	rx0, rz0 := floorDiv(x>>4, complexSpacing), floorDiv(z>>4, complexSpacing)
+	rx0, rz0 := mathx.FloorDiv(x>>4, complexSpacing), mathx.FloorDiv(z>>4, complexSpacing)
 	best, foundRing := int64(-1), int32(-1)
 	var r rand.MT
 	for ring := int32(0); ring <= maxRings; ring++ {
 		for rx := rx0 - ring; rx <= rx0+ring; rx++ {
 			for rz := rz0 - ring; rz <= rz0+ring; rz++ {
-				if abs32(rx-rx0) != ring && abs32(rz-rz0) != ring {
+				if mathx.Abs(rx-rx0) != ring && mathx.Abs(rz-rz0) != ring {
 					continue
 				}
 				cx, cz := n.complexStart(rx, rz, &r)

@@ -3,6 +3,8 @@ package overworld
 import (
 	"math"
 
+	"github.com/helix-bedrock/worldgen/internal/mathx"
+
 	"github.com/helix-bedrock/worldgen/rand"
 )
 
@@ -241,7 +243,7 @@ func (f *clusterFeature) place(w *featureWorld, x, y, z int32, r *rand.MT) (bloc
 	}
 	for dx := -xr; dx <= xr; dx++ {
 		for dz := -zr; dz <= zr; dz++ {
-			k := min(xr-abs32i(dx), zr-abs32i(dz))
+			k := min(xr-mathx.Abs(dx), zr-mathx.Abs(dz))
 			v := float32(float64(float32(k)) / 3.0)
 			// The column chance rises from 0.1 at the edge to 1 three
 			// blocks in.
@@ -271,7 +273,7 @@ func (f *clusterFeature) place(w *featureWorld, x, y, z int32, r *rand.MT) (bloc
 							maxH = min(height, ceil-floor)
 						}
 						half := float32(maxH) * 0.5
-						stal = heightAt(abs32i(dz)+abs32i(dx), maxH, float32(float32((0-half)*(float32(abs32i(dz)+abs32i(dx))*0.125))+half))
+						stal = heightAt(mathx.Abs(dz)+mathx.Abs(dx), maxH, float32(float32((0-half)*(float32(mathx.Abs(dz)+mathx.Abs(dx))*0.125))+half))
 					}
 				}
 			}
@@ -286,8 +288,8 @@ func (f *clusterFeature) place(w *featureWorld, x, y, z int32, r *rand.MT) (bloc
 					adjust = false
 					if r.Float() <= density {
 						half := float32(height) * 0.5
-						t := float32(abs32i(dx)+abs32i(dz)) * 0.125
-						stag = heightAt(abs32i(dx)+abs32i(dz), height, float32(float32((0-half)*t)+half))
+						t := float32(mathx.Abs(dx)+mathx.Abs(dz)) * 0.125
+						stag = heightAt(mathx.Abs(dx)+mathx.Abs(dz), height, float32(float32((0-half)*t)+half))
 					}
 				}
 			}

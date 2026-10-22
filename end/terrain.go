@@ -2,6 +2,8 @@ package end
 
 import (
 	"math"
+
+	"github.com/helix-bedrock/worldgen/internal/mathx"
 )
 
 // The terrain is the old 3D-noise generator: a selector noise blends two
@@ -16,12 +18,46 @@ const (
 	selectorY  = 4.277575
 	limitXZ    = 1368.824
 	limitY     = 684.412
+	// limitScale brings the limit noises down to density units (1/512).
+	limitScale = 0.001953125
+	// densityOffset is added to every corner before the island height.
+	densityOffset = -8
+
+	// cellXZ and cellY are the blocks between grid corners.
+	cellXZ = 8
+	cellY  = 4
+
+	// slideBottom and slideTop bound the grid heights left unslid.
+	slideBottom = 8
+	slideTop    = 15
+)
+
+// The islands (sub_5196720): the main island is a cone around the origin;
+// outer islands stand on chunks more than 64 chunks out where the island
+// noise is below outerIslandNoise.
+const (
+	islandMax        = 80
+	islandMin        = -100
+	islandPeak       = 100
+	mainIslandSlope  = -8
+	outerIslandReach = 12
+	// outerIslandChunks2 is 64 chunks, squared.
+	outerIslandChunks2 = 64 * 64
+	outerIslandNoise   = -0.9
+	// An outer island's slope is (sizeMulX*|x| + sizeMulZ*|z|) % sizeRange
+	// + sizeMin, with x and z its chunk.
+	sizeMulX  = 3439
+	sizeMulZ  = 147
+	sizeRange = 13
+	sizeMin   = 9
 )
 
 // slide is the factor and offset BDS applies to a corner at each grid
 // height, as stored in the binary: the bottom eight corners slide toward
 // -30, the top eighteen toward -3000.
-var slide = func() (s [gridY][2]float32) {
+var slide = slideTable()
+
+func slideTable() (s [gridY][2]float32) {
 	f := math.Float32frombits
 	for j := range s {
 		s[j] = [2]float32{1, 0}
@@ -40,10 +76,10 @@ var slide = func() (s [gridY][2]float32) {
 		s[j] = [2]float32{f(b[0]), f(b[1])}
 	}
 	return s
-}()
+}
 
 // sliding reports whether grid height j is slid.
-func sliding(j int) bool { return j < 8 || j >= 15 }
+func sliding(j int) bool { return j < slideBottom || j >= slideTop }
 
 // islandHeight is the height the islands add at grid column (gx, gz) of
 // chunk (cx, cz), in grid cells of 8 blocks: the main island, a cone around
@@ -52,21 +88,21 @@ func sliding(j int) bool { return j < 8 || j >= 15 }
 // island noise is below -0.9.
 func (e *End) islandHeight(cx, cz, gx, gz int32) float32 {
 	x, z := float32(gx+2*cx), float32(gz+2*cz)
-	h := clampIsland(float32(sqrt32(float32(x*x)+float32(z*z))*-8) + 100)
-	for dx := int32(-12); dx <= 12; dx++ {
+	h := clampIsland(float32(mathx.Sqrt32(float32(x*x)+float32(z*z))*mainIslandSlope) + islandPeak)
+	for dx := int32(-outerIslandReach); dx <= outerIslandReach; dx++ {
 		ix := cx + dx
 		ddx := float32(gx - 2*dx)
-		for dz := int32(-12); dz <= 12; dz++ {
+		for dz := int32(-outerIslandReach); dz <= outerIslandReach; dz++ {
 			iz := cz + dz
-			if int64(ix)*int64(ix)+int64(iz)*int64(iz) <= 4096 {
+			if int64(ix)*int64(ix)+int64(iz)*int64(iz) <= outerIslandChunks2 {
 				continue
 			}
-			if e.island.Sample2(float32(ix), float32(iz)) >= -0.9 {
+			if e.island.Sample2(float32(ix), float32(iz)) >= outerIslandNoise {
 				continue
 			}
-			size := float32(int32((uint32(3439*abs32(ix))+uint32(147*abs32(iz)))%13 + 9))
+			size := float32(int32((uint32(sizeMulX*mathx.Abs(ix))+uint32(sizeMulZ*mathx.Abs(iz)))%sizeRange + sizeMin))
 			ddz := float32(gz - 2*dz)
-			h = max(clampIsland(100-float32(sqrt32(float32(ddz*ddz)+float32(ddx*ddx))*size)), h)
+			h = max(clampIsland(islandPeak-float32(mathx.Sqrt32(float32(ddz*ddz)+float32(ddx*ddx))*size)), h)
 		}
 	}
 	return h
@@ -77,19 +113,10 @@ func (e *End) islandHeight(cx, cz, gx, gz int32) float32 {
 func (e *End) ChunkIslandHeight(cx, cz int32) float32 { return e.islandHeight(cx, cz, 1, 1) }
 
 func clampIsland(v float32) float32 {
-	if v > 80 {
-		return 80
+	if v > islandMax {
+		return islandMax
 	}
-	return max(v, -100)
-}
-
-func sqrt32(v float32) float32 { return float32(math.Sqrt(float64(v))) }
-
-func abs32(v int32) int32 {
-	if v < 0 {
-		return -v
-	}
-	return v
+	return max(v, islandMin)
 }
 
 // terrain fills c with end stone where the density is positive. Every
@@ -108,7 +135,7 @@ func (e *End) terrain(cx, cz int32, c *Chunk) {
 			base := int(gx*gridXZ+gz) * gridY
 			for j := range gridY {
 				i := base + j
-				l, u := float32(lo[i]*0.001953125), float32(hi[i]*0.001953125)
+				l, u := float32(lo[i]*limitScale), float32(hi[i]*limitScale)
 				t := (sel[i]/10 + 1) * 0.5
 				v := l
 				if t >= 0 {
@@ -118,7 +145,7 @@ func (e *End) terrain(cx, cz int32, c *Chunk) {
 						v = u
 					}
 				}
-				v = float32(v+-8) + h
+				v = float32(v+densityOffset) + h
 				if sliding(j) {
 					v = float32(v*slide[j][0]) + slide[j][1]
 				}
@@ -126,29 +153,39 @@ func (e *End) terrain(cx, cz int32, c *Chunk) {
 			}
 		}
 	}
-	at := func(gx, gz, j int) float32 { return d[(gx*gridXZ+gz)*gridY+j] }
+	e.fill(&d, c)
+}
+
+// corner is the density at grid corner (gx, j, gz).
+func corner(d *[gridXZ * gridY * gridXZ]float32, gx, gz, j int) float32 {
+	return d[(gx*gridXZ+gz)*gridY+j]
+}
+
+// fill lerps the grid densities d across each cell and sets end stone
+// where the result is positive.
+func (e *End) fill(d *[gridXZ * gridY * gridXZ]float32, c *Chunk) {
 	for gx := range gridXZ - 1 {
 		for gz := range gridXZ - 1 {
 			for j := range gridY - 1 {
-				c00, c01 := at(gx, gz, j), at(gx, gz+1, j)
-				c10, c11 := at(gx+1, gz, j), at(gx+1, gz+1, j)
-				u00, u01 := at(gx, gz, j+1), at(gx, gz+1, j+1)
-				u10, u11 := at(gx+1, gz, j+1), at(gx+1, gz+1, j+1)
+				c00, c01 := corner(d, gx, gz, j), corner(d, gx, gz+1, j)
+				c10, c11 := corner(d, gx+1, gz, j), corner(d, gx+1, gz+1, j)
+				u00, u01 := corner(d, gx, gz, j+1), corner(d, gx, gz+1, j+1)
+				u10, u11 := corner(d, gx+1, gz, j+1), corner(d, gx+1, gz+1, j+1)
 				dz0, dz1 := c01-c00, c11-c10
 				uz0, uz1 := u01-u00, u11-u10
-				for zi := range 8 {
-					tz := float32(zi) * 0.125
+				for zi := range cellXZ {
+					tz := float32(zi) / cellXZ
 					a := float32(dz0*tz) + c00
 					b := float32(float32(dz1*tz)+c10) - a
 					au := float32(uz0*tz) + u00
 					bu := float32(float32(tz*uz1)+u10) - au
-					for xi := range 8 {
-						tx := float32(xi) * 0.125
+					for xi := range cellXZ {
+						tx := float32(xi) / cellXZ
 						lo := float32(b*tx) + a
 						dy := float32(float32(tx*bu)+au) - lo
-						for yi, f := range [4]float32{0, 0.25, 0.5, 0.75} {
-							if float32(dy*f)+lo > 0 {
-								c.set(gx*8+xi, j*4+yi, gz*8+zi, e.ids.endStone)
+						for yi := range cellY {
+							if float32(dy*(float32(yi)/cellY))+lo > 0 {
+								c.set(gx*cellXZ+xi, j*cellY+yi, gz*cellXZ+zi, e.ids.endStone)
 							}
 						}
 					}

@@ -1,6 +1,7 @@
 package overworld
 
 import (
+	"github.com/helix-bedrock/worldgen/internal/mathx"
 	"github.com/helix-bedrock/worldgen/rand"
 	"github.com/helix-bedrock/worldgen/structure"
 )
@@ -68,7 +69,7 @@ func (o *Overworld) isMineshaftChunk(r *rand.MT, cx, cz int32) bool {
 	r.Uint32()
 	f := r.Float()
 	n := r.IntN(80)
-	return f < 0.004 && n < max(abs32i(cx), abs32i(cz))
+	return f < 0.004 && n < max(mathx.Abs(cx), mathx.Abs(cz))
 }
 
 // mineshaftAt assembles the mineshaft starting in chunk (cx, cz), if any.
@@ -335,7 +336,7 @@ func (o *Overworld) msPiece(ms *mineshaft, r *rand.MT, x, y, z, dir, depth int32
 		return nil
 	}
 	start := ms.pieces[0].bb
-	if abs32i(x-start.X0) > 80 || abs32i(z-start.Z0) > 80 {
+	if mathx.Abs(x-start.X0) > 80 || mathx.Abs(z-start.Z0) > 80 {
 		return nil
 	}
 	var p *msPiece
@@ -986,7 +987,7 @@ func (o *Overworld) NearestMineshaft(x, z, maxChunks int32) (Mineshaft, bool) {
 	for ring := int32(0); ring <= maxChunks; ring++ {
 		for cx := cx0 - ring; cx <= cx0+ring; cx++ {
 			for cz := cz0 - ring; cz <= cz0+ring; cz++ {
-				if max(abs32i(cx-cx0), abs32i(cz-cz0)) != ring || !o.isMineshaftChunk(&r, cx, cz) {
+				if max(mathx.Abs(cx-cx0), mathx.Abs(cz-cz0)) != ring || !o.isMineshaftChunk(&r, cx, cz) {
 					continue
 				}
 				dx, dz := int64(cx*16+8-x), int64(cz*16+8-z)

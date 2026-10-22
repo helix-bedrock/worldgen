@@ -1,6 +1,7 @@
 package overworld
 
 import (
+	"github.com/helix-bedrock/worldgen/internal/mathx"
 	"github.com/helix-bedrock/worldgen/rand"
 )
 
@@ -140,10 +141,10 @@ func (t *treeFeature) poplarCanopy(w *featureWorld, x, y, z int32, r *rand.MT) b
 	// long, turned to their direction.
 	for dx := -R; dx <= R; dx++ {
 		for dz := -R; dz <= R; dz++ {
-			if !(dx == 0 && R-absI(dz) >= 4) && !(dz == 0 && R-absI(dx) >= 4) {
+			if !(dx == 0 && R-mathx.Abs(dz) >= 4) && !(dz == 0 && R-mathx.Abs(dx) >= 4) {
 				continue
 			}
-			if absI(dx)+absI(dz) > R+poplarSkew(dx, dz, flip, false)-2 {
+			if mathx.Abs(dx)+mathx.Abs(dz) > R+poplarSkew(dx, dz, flip, false)-2 {
 				continue
 			}
 			axis := "z"
@@ -191,14 +192,14 @@ func (t *treeFeature) poplarLayer(w *featureWorld, x, y, z int32, r *rand.MT, h,
 	top := yo == h-1 || yo == h-2
 	for dx := -rad; dx <= rad; dx++ {
 		for dz := -rad; dz <= rad; dz++ {
-			if top && (absI(dz) == rad || absI(dx) == rad) {
+			if top && (mathx.Abs(dz) == rad || mathx.Abs(dx) == rad) {
 				continue
 			}
 			lim := rad + poplarSkew(dx, dz, flip, top) - 1
 			if t.holeChance < r.Float() {
 				lim++
 			}
-			if absI(dx)+absI(dz) > lim {
+			if mathx.Abs(dx)+mathx.Abs(dz) > lim {
 				continue
 			}
 			bx, ly, bz := x+dx, y+yo, z+dz

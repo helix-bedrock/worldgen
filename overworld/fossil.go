@@ -3,6 +3,8 @@ package overworld
 import (
 	"encoding/json"
 
+	"github.com/helix-bedrock/worldgen/internal/mathx"
+
 	"github.com/helix-bedrock/worldgen/biome"
 	"github.com/helix-bedrock/worldgen/rand"
 	"github.com/helix-bedrock/worldgen/structure"
@@ -287,7 +289,7 @@ func (o *Overworld) ruleChunks(ruleID string, x, z, maxChunks int32, f func(x, z
 	for ring := int32(0); ring <= maxChunks; ring++ {
 		for cx := cx0 - ring; cx <= cx0+ring; cx++ {
 			for cz := cz0 - ring; cz <= cz0+ring; cz++ {
-				if max(abs32i(cx-cx0), abs32i(cz-cz0)) != ring {
+				if max(mathx.Abs(cx-cx0), mathx.Abs(cz-cz0)) != ring {
 					continue
 				}
 				r.Seed(ruleSeed(populationSeed(o.seed, cx, cz), rule.hash))

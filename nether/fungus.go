@@ -3,6 +3,8 @@ package nether
 import (
 	"fmt"
 
+	"github.com/helix-bedrock/worldgen/internal/mathx"
+
 	"github.com/helix-bedrock/worldgen/rand"
 )
 
@@ -115,13 +117,6 @@ func (n *Nether) loadFungi() error {
 	return nil
 }
 
-func abs32(v int32) int32 {
-	if v < 0 {
-		return -v
-	}
-	return v
-}
-
 func (n *Nether) isLava(b uint32) bool { return b == n.ids.lava || b == n.ids.flowingLava }
 
 // growsFungus reports whether a huge fungus may stand on b.
@@ -173,7 +168,7 @@ func (n *Nether) hugeFungus(r *region, x, y, z int32, mt *rand.MT, k *fungusKind
 	}
 	for dx := -t; dx <= t; dx++ {
 		for dz := -t; dz <= t; dz++ {
-			corner := thick && abs32(dx) == t && abs32(dz) == t
+			corner := thick && mathx.Abs(dx) == t && mathx.Abs(dz) == t
 			for i := range height {
 				px, py, pz := x+dx, y+i, z+dz
 				b := r.at(px, py, pz)
@@ -205,7 +200,7 @@ func (n *Nether) hugeFungus(r *region, x, y, z int32, mt *rand.MT, k *fungusKind
 				if f.solid[b] || !f.replaceable[b] {
 					continue
 				}
-				edgeX, edgeZ, top := abs32(dx) == R, abs32(dz) == R, yy == height
+				edgeX, edgeZ, top := mathx.Abs(dx) == R, mathx.Abs(dz) == R, yy == height
 				if lower {
 					if !edgeX && !edgeZ && !top {
 						continue

@@ -4,6 +4,8 @@ import (
 	"encoding/json"
 	"fmt"
 
+	"github.com/helix-bedrock/worldgen/internal/mathx"
+
 	"github.com/helix-bedrock/worldgen/biome"
 	"github.com/helix-bedrock/worldgen/rand"
 )
@@ -215,7 +217,7 @@ func (t *treeFeature) mangroveRootWalk(w *featureWorld, pos blockPos, d [2]int32
 	}
 	below := blockPos{pos[0], pos[1] - 1, pos[2]}
 	side := blockPos{pos[0] + d[0], pos[1], pos[2] + d[1]}
-	dist := absI(origin[0]-pos[0]) + absI(origin[1]-pos[1]) + absI(origin[2]-pos[2])
+	dist := mathx.Abs(origin[0]-pos[0]) + mathx.Abs(origin[1]-pos[1]) + mathx.Abs(origin[2]-pos[2])
 	var cands []blockPos
 	if m.rootWidth-3 >= dist || m.rootWidth < dist {
 		c := below

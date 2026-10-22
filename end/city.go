@@ -4,6 +4,8 @@ import (
 	"cmp"
 	"slices"
 
+	"github.com/helix-bedrock/worldgen/structure"
+
 	"github.com/helix-bedrock/worldgen/rand"
 )
 
@@ -24,7 +26,7 @@ const (
 
 // cityRandom is city region (rx, rz)'s placement random.
 func (e *End) cityRandom(rx, rz int32) *rand.MT {
-	return rand.NewMT(uint32(e.seed) + citySalt - 245998635*uint32(rz) - 1724254968*uint32(rx))
+	return rand.NewMT(structure.RegionSeed(e.seed, citySalt, rx, rz))
 }
 
 // cityPick is the chunk city region (rx, rz) picks.
@@ -66,7 +68,7 @@ func (e *End) cityHeight(cx, cz int32, rot int) int32 {
 // its turn and height: the chunk is its region's pick, more than 64
 // chunks from the origin, on ground at least 60 high.
 func (e *End) isCityChunk(cx, cz int32) (rot int, y int32, ok bool) {
-	px, pz := e.cityPick(cityRegion(cx), cityRegion(cz))
+	px, pz := e.cityPick(structure.Region(cx, citySpacing), structure.Region(cz, citySpacing))
 	if px != cx || pz != cz || int64(cx)*int64(cx)+int64(cz)*int64(cz) <= 4096 {
 		return 0, 0, false
 	}
@@ -80,20 +82,16 @@ func (e *End) isCityChunk(cx, cz int32) (rot int, y int32, ok bool) {
 // middle of its start chunk at the start's height. It is safe for
 // concurrent use.
 func (e *End) NearestCity(x, z, maxRegions int32) (cx, cy, cz int32, found bool) {
-	type cand struct {
-		cx, cz int32
-		d      int64
-	}
-	var cands []cand
-	rx0, rz0 := cityRegion(x>>4), cityRegion(z>>4)
+	var cands []cityCandidate
+	rx0, rz0 := structure.Region(x>>4, citySpacing), structure.Region(z>>4, citySpacing)
 	for rx := rx0 - maxRegions; rx <= rx0+maxRegions; rx++ {
 		for rz := rz0 - maxRegions; rz <= rz0+maxRegions; rz++ {
 			px, pz := e.cityPick(rx, rz)
 			dx, dz := int64(px*16+8-x), int64(pz*16+8-z)
-			cands = append(cands, cand{px, pz, dx*dx + dz*dz})
+			cands = append(cands, cityCandidate{px, pz, dx*dx + dz*dz})
 		}
 	}
-	slices.SortFunc(cands, func(a, b cand) int { return cmp.Compare(a.d, b.d) })
+	slices.SortFunc(cands, func(a, b cityCandidate) int { return cmp.Compare(a.d, b.d) })
 	for _, c := range cands {
 		if _, y, ok := e.isCityChunk(c.cx, c.cz); ok {
 			return c.cx*16 + 8, y, c.cz*16 + 8, true
@@ -102,11 +100,9 @@ func (e *End) NearestCity(x, z, maxRegions int32) (cx, cy, cz int32, found bool)
 	return 0, 0, 0, false
 }
 
-// cityRegion is the city region of chunk coordinate c: c / 20 rounded
-// down, as BDS computes it.
-func cityRegion(c int32) int32 {
-	if c < 0 {
-		c -= citySpacing - 1
-	}
-	return c / citySpacing
+// cityCandidate is a region's picked chunk and its squared distance from
+// where NearestCity searches.
+type cityCandidate struct {
+	cx, cz int32
+	d      int64
 }

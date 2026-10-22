@@ -202,16 +202,12 @@ func (r *Registry) Default(name string) (uint32, bool) {
 // written as little-endian NBT {name, states} with the state keys sorted.
 func Hash(s State) uint32 {
 	var b []byte
-	str := func(v string) {
-		b = binary.LittleEndian.AppendUint16(b, uint16(len(v)))
-		b = append(b, v...)
-	}
 	b = append(b, tagCompound, 0, 0)
 	b = append(b, tagString)
-	str("name")
-	str(s.Name)
+	b = appendString(b, "name")
+	b = appendString(b, s.Name)
 	b = append(b, tagCompound)
-	str("states")
+	b = appendString(b, "states")
 	keys := make([]string, 0, len(s.Props))
 	for k := range s.Props {
 		keys = append(keys, k)
@@ -221,15 +217,15 @@ func Hash(s State) uint32 {
 		switch v := s.Props[k].(type) {
 		case string:
 			b = append(b, tagString)
-			str(k)
-			str(v)
+			b = appendString(b, k)
+			b = appendString(b, v)
 		case uint8:
 			b = append(b, tagByte)
-			str(k)
+			b = appendString(b, k)
 			b = append(b, v)
 		case int32:
 			b = append(b, tagInt)
-			str(k)
+			b = appendString(b, k)
 			b = binary.LittleEndian.AppendUint32(b, uint32(v))
 		}
 	}
@@ -237,6 +233,38 @@ func Hash(s State) uint32 {
 	h := fnv.New32a()
 	_, _ = h.Write(b)
 	return h.Sum32()
+}
+
+// appendString appends v as an NBT string: a little-endian length, then
+// the bytes.
+func appendString(b []byte, v string) []byte {
+	b = binary.LittleEndian.AppendUint16(b, uint16(len(v)))
+	return append(b, v...)
+}
+
+// Want is a block state a generator needs: the block's name, the
+// properties set over its default state (nil for the default), and where
+// its index goes.
+type Want struct {
+	Dst   *uint32
+	Name  string
+	Props map[string]any
+}
+
+// Resolve looks up every wanted state and stores its index. It fails on
+// the first one the registry does not have.
+func (r *Registry) Resolve(wants ...Want) error {
+	for _, w := range wants {
+		id, ok := r.Lookup(w.Name, w.Props)
+		if !ok && len(w.Props) > 0 {
+			return fmt.Errorf("worldgen: block %s %v missing from the block list", w.Name, w.Props)
+		}
+		if !ok {
+			return fmt.Errorf("worldgen: block %s missing from the block list", w.Name)
+		}
+		*w.Dst = id
+	}
+	return nil
 }
 
 // Lookup returns the state of name with props applied over its default

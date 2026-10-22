@@ -1,6 +1,7 @@
 package overworld
 
 import (
+	"github.com/helix-bedrock/worldgen/internal/mathx"
 	"github.com/helix-bedrock/worldgen/rand"
 	"github.com/helix-bedrock/worldgen/structure"
 )
@@ -221,7 +222,7 @@ func (o *Overworld) NearestAncientCity(x, z, maxRings int32) (AncientCity, bool)
 	for ring := int32(0); ring <= maxRings; ring++ {
 		for rx := rx0 - ring; rx <= rx0+ring; rx++ {
 			for rz := rz0 - ring; rz <= rz0+ring; rz++ {
-				if max(abs32i(rx-rx0), abs32i(rz-rz0)) != ring {
+				if max(mathx.Abs(rx-rx0), mathx.Abs(rz-rz0)) != ring {
 					continue
 				}
 				cx, cz := o.cityPick(rx, rz, &r)

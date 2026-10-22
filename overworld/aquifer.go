@@ -1,6 +1,7 @@
 package overworld
 
 import (
+	"github.com/helix-bedrock/worldgen/internal/mathx"
 	"github.com/helix-bedrock/worldgen/noise"
 	"github.com/helix-bedrock/worldgen/rand"
 )
@@ -116,8 +117,8 @@ func (a *aquifer) group(cx, cy, cz int32) *aquiferGroup {
 	return g
 }
 
-// The cell y range blocks above y -55 sample: floorDiv(y+1, 12) - 1 to
-// floorDiv(y+1, 12) + 1.
+// The cell y range blocks above y -55 sample: mathx.FloorDiv(y+1, 12) - 1 to
+// mathx.FloorDiv(y+1, 12) + 1.
 const (
 	aquiferMinCellY = -6
 	aquiferCellsY   = (MaxY+12)/12 + 1 - aquiferMinCellY
@@ -127,14 +128,6 @@ const (
 func newAquifer(o *Overworld, chunkX, chunkZ int32) *aquifer {
 	return &aquifer{o: o, gridX: chunkX - 1, gridZ: chunkZ - 1,
 		cells: map[[3]int32]*aquiferCenter{}, prelim: map[[2]int32]int32{}}
-}
-
-func floorDiv(a, b int32) int32 {
-	q := a / b
-	if (a%b != 0) && ((a < 0) != (b < 0)) {
-		q--
-	}
-	return q
 }
 
 // prelimAt is the preliminary surface level of quarter column (qx, qz).
@@ -227,15 +220,15 @@ func (a *aquifer) computeFluid(x, y, z int32) (int32, bool) {
 	if partial*1.2+-0.8 > flood {
 		return noFluidLevel, false
 	}
-	gy := floorDiv(y, 40)
-	s := (o.aquiferNoise.spread.Sample(float32(floorDiv(x, 16)), float32(gy)/1.4, float32(floorDiv(z, 16))) * 10) / 3
+	gy := mathx.FloorDiv(y, 40)
+	s := (o.aquiferNoise.spread.Sample(float32(mathx.FloorDiv(x, 16)), float32(gy)/1.4, float32(mathx.FloorDiv(z, 16))) * 10) / 3
 	fl := int32(s)
 	if float32(fl) > s {
 		fl--
 	}
 	raw := 3*fl + 40*gy + 20
 	level := min(raw, minSurface)
-	lava := raw <= -10 && abs32(o.aquiferNoise.lava.Sample(float32(floorDiv(x, 64)), float32(gy), float32(floorDiv(z, 64)))) > 0.3
+	lava := raw <= -10 && mathx.AbsFloat(o.aquiferNoise.lava.Sample(float32(mathx.FloorDiv(x, 64)), float32(gy), float32(mathx.FloorDiv(z, 64)))) > 0.3
 	return level, lava
 }
 
@@ -251,7 +244,7 @@ func pressureTerm(y, levelA, levelB int32, lavaA, lavaB bool) (float32, bool) {
 		diff = -diff
 	}
 	mid := (float32(y) + 0.5) - float32(levelA+levelB)*0.5
-	q := float32(diff)*0.5 - abs32(mid)
+	q := float32(diff)*0.5 - mathx.AbsFloat(mid)
 	var r float32
 	if mid <= 0 {
 		div := float32(10)
@@ -266,7 +259,7 @@ func pressureTerm(y, levelA, levelB int32, lavaA, lavaB bool) (float32, bool) {
 		}
 		r = (q + 0) / div
 	}
-	return r, abs32(r) <= 2
+	return r, mathx.AbsFloat(r) <= 2
 }
 
 // sample computes the aquifer at block (x, y, z): fluid level, lava flag and
@@ -276,7 +269,7 @@ func (a *aquifer) sample(x, y, z int32) {
 		a.level, a.isLava, a.density = -54, true, 0
 		return
 	}
-	cx, cy, cz := floorDiv(x-5, 16), floorDiv(y+1, 12), floorDiv(z-5, 16)
+	cx, cy, cz := mathx.FloorDiv(x-5, 16), mathx.FloorDiv(y+1, 12), mathx.FloorDiv(z-5, 16)
 	g := a.group(cx, cy, cz)
 	if g != nil && g.uniform {
 		a.level, a.isLava, a.density = g.level, g.lava, 0
