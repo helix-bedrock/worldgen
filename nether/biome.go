@@ -92,22 +92,7 @@ func newBiomeSource(seed int64, biomeIDs map[string]uint32) (*biomeSource, error
 		if err != nil {
 			return err
 		}
-		var f struct {
-			Biome struct {
-				Components struct {
-					Tags struct {
-						Tags []string `json:"tags"`
-					} `json:"minecraft:tags"`
-					Rules *struct {
-						Temp   float32 `json:"target_temperature"`
-						Humid  float32 `json:"target_humidity"`
-						Alt    float32 `json:"target_altitude"`
-						Weird  float32 `json:"target_weirdness"`
-						Weight float32 `json:"weight"`
-					} `json:"minecraft:multinoise_generation_rules"`
-				} `json:"components"`
-			} `json:"minecraft:biome"`
-		}
+		var f biomeFile
 		if err := json.Unmarshal(raw, &f); err != nil {
 			return fmt.Errorf("nether: read %s: %w", p, err)
 		}
@@ -156,21 +141,51 @@ func (s *biomeSource) pick(qx, qz int32) uint32 {
 // fill writes the biome of every column of chunk (chunkX, chunkZ), index
 // z<<4 | x: Java's old Voronoi zoom, in float, over the quarter grid.
 func (s *biomeSource) fill(chunkX, chunkZ int32, out *[256]uint16) {
-	cache := map[[2]int32]uint32{}
-	at := func(qx, qz int32) uint32 {
-		k := [2]int32{qx, qz}
-		if b, ok := cache[k]; ok {
-			return b
-		}
-		b := s.pick(qx, qz)
-		cache[k] = b
-		return b
-	}
+	c := quarterCache{s: s, picked: map[[2]int32]uint32{}}
 	for z := range int32(16) {
 		for x := range int32(16) {
-			out[z<<4|x] = uint16(s.zoom(chunkX*16+x, chunkZ*16+z, at))
+			out[z<<4|x] = uint16(s.zoom(chunkX*16+x, chunkZ*16+z, c.pick))
 		}
 	}
+}
+
+// quarterCache remembers the biomes picked on the quarter grid while one
+// chunk is filled.
+type quarterCache struct {
+	s      *biomeSource
+	picked map[[2]int32]uint32
+}
+
+// pick is biomeSource.pick, asked at most once per quarter position.
+func (c *quarterCache) pick(qx, qz int32) uint32 {
+	k := [2]int32{qx, qz}
+	if b, ok := c.picked[k]; ok {
+		return b
+	}
+	b := c.s.pick(qx, qz)
+	c.picked[k] = b
+	return b
+}
+
+// biomeFile is the part of a vanilla biome file the Nether reads.
+type biomeFile struct {
+	Biome struct {
+		Components struct {
+			Tags struct {
+				Tags []string `json:"tags"`
+			} `json:"minecraft:tags"`
+			Rules *multinoiseRules `json:"minecraft:multinoise_generation_rules"`
+		} `json:"components"`
+	} `json:"minecraft:biome"`
+}
+
+// multinoiseRules is a biome's minecraft:multinoise_generation_rules.
+type multinoiseRules struct {
+	Temp   float32 `json:"target_temperature"`
+	Humid  float32 `json:"target_humidity"`
+	Alt    float32 `json:"target_altitude"`
+	Weird  float32 `json:"target_weirdness"`
+	Weight float32 `json:"weight"`
 }
 
 // column is the biome of block column (x, z), as fill gives it.

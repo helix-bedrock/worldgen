@@ -1,6 +1,18 @@
 package nether
 
-import "github.com/helix-bedrock/worldgen/rand"
+import (
+	"github.com/helix-bedrock/worldgen/cube"
+	"github.com/helix-bedrock/worldgen/rand"
+)
+
+const (
+	// wartTries is how many spots a weeping vine cluster tries for its wart.
+	wartTries = 200
+	// weepingVineTries is how many columns a weeping vine cluster tries.
+	weepingVineTries = 100
+	// twistingVineTries is how many columns a twisting vine cluster tries.
+	twistingVineTries = 100
+)
 
 // weepingVinesCluster is BDS's WeepingVinesClusterFeature (sub_4DE7B20):
 // nether wart under netherrack or wart, 200 tries to grow the wart along
@@ -8,13 +20,11 @@ import "github.com/helix-bedrock/worldgen/rand"
 // hang vines from netherrack or wart.
 func (n *Nether) weepingVinesCluster(r *region, x, y, z int32, mt *rand.MT) {
 	f := &n.fungi
-	nr := n.ids.netherrack
-	ceiling := func(b uint32) bool { return b == nr || b == f.netherWart }
-	if r.at(x, y, z) != n.ids.air || !ceiling(r.at(x, y+1, z)) {
+	if r.at(x, y, z) != n.ids.air || !n.vineCeiling(r.at(x, y+1, z)) {
 		return
 	}
 	r.set(x, y, z, f.netherWart)
-	for range 200 {
+	for range wartTries {
 		px := x + mt.IntN(12) - 6
 		py := y + mt.IntN(7) - 5
 		pz := z + mt.IntN(12) - 6
@@ -22,8 +32,8 @@ func (n *Nether) weepingVinesCluster(r *region, x, y, z int32, mt *rand.MT) {
 			continue
 		}
 		count := 0
-		for _, d := range [6][3]int32{{0, -1, 0}, {0, 1, 0}, {0, 0, -1}, {0, 0, 1}, {-1, 0, 0}, {1, 0, 0}} {
-			if ceiling(r.at(px+d[0], py+d[1], pz+d[2])) {
+		for _, face := range cube.Faces() {
+			if dx, dy, dz := face.Step(); n.vineCeiling(r.at(px+dx, py+dy, pz+dz)) {
 				count++
 			}
 		}
@@ -31,16 +41,20 @@ func (n *Nether) weepingVinesCluster(r *region, x, y, z int32, mt *rand.MT) {
 			r.set(px, py, pz, f.netherWart)
 		}
 	}
-	for range 100 {
+	for range weepingVineTries {
 		px := x - 8 + mt.IntN(16)
 		py := y - 8 + mt.IntN(9)
 		pz := z - 8 + mt.IntN(16)
-		if r.at(px, py, pz) != n.ids.air || !ceiling(r.at(px, py+1, pz)) {
+		if r.at(px, py, pz) != n.ids.air || !n.vineCeiling(r.at(px, py+1, pz)) {
 			continue
 		}
 		n.weepingColumn(r, px, py, pz, vineLength(mt), 17, 25, mt)
 	}
 }
+
+// vineCeiling reports whether b holds up weeping vines: netherrack or
+// nether wart.
+func (n *Nether) vineCeiling(b uint32) bool { return b == n.ids.netherrack || b == n.fungi.netherWart }
 
 // vineLength draws a vine cluster's column length: one to seven, now and
 // then doubled, a fifth of the time just one.
@@ -60,7 +74,7 @@ func vineLength(mt *rand.MT) int32 {
 // from netherrack, warped nylium or warped wart.
 func (n *Nether) twistingVinesCluster(r *region, x, y, z int32, mt *rand.MT) {
 	f := &n.fungi
-	for range 100 {
+	for range twistingVineTries {
 		// Each horizontal offset is the difference of two raw draws mod 10,
 		// shifted by -5 (x first, then z), then y.
 		dx := int32(mt.Uint32()%10) - int32(mt.Uint32()%10)

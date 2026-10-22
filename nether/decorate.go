@@ -150,20 +150,24 @@ type decoIDs struct {
 	goldOre, quartzOre, magma, gravel, ancientDebris                  uint32
 }
 
+// blockTarget is a block name and the field its default state is loaded
+// into.
+type blockTarget struct {
+	dst  *uint32
+	name string
+}
+
 func (n *Nether) loadDecoIDs() error {
-	for _, b := range []struct {
-		dst  *uint32
-		name string
-	}{
-		{&n.deco.fire, "minecraft:fire"},
-		{&n.deco.soulFire, "minecraft:soul_fire"},
+	for _, b := range []blockTarget{
+		{&n.deco.fire, blockFire},
+		{&n.deco.soulFire, blockSoulFire},
 		{&n.deco.soulSoil, "minecraft:soul_soil"},
-		{&n.deco.soulSand, "minecraft:soul_sand"},
+		{&n.deco.soulSand, blockSoulSand},
 		{&n.deco.glowstone, "minecraft:glowstone"},
-		{&n.deco.basalt, "minecraft:basalt"},
+		{&n.deco.basalt, blockBasalt},
 		{&n.deco.blackstone, "minecraft:blackstone"},
-		{&n.deco.brownMushroom, "minecraft:brown_mushroom"},
-		{&n.deco.redMushroom, "minecraft:red_mushroom"},
+		{&n.deco.brownMushroom, blockBrownMushroom},
+		{&n.deco.redMushroom, blockRedMushroom},
 		{&n.deco.goldOre, "minecraft:nether_gold_ore"},
 		{&n.deco.quartzOre, "minecraft:quartz_ore"},
 		{&n.deco.magma, "minecraft:magma"},
@@ -178,7 +182,7 @@ func (n *Nether) loadDecoIDs() error {
 	}
 	n.basaltStates = make([]bool, n.reg.Len())
 	for i := range n.basaltStates {
-		if s, ok := n.reg.State(uint32(i)); ok && s.Name == "minecraft:basalt" {
+		if s, ok := n.reg.State(uint32(i)); ok && s.Name == blockBasalt {
 			n.basaltStates[i] = true
 		}
 	}
@@ -196,70 +200,80 @@ func populationSeed(levelSeed int64, chunkX, chunkZ int32) uint32 {
 	return (b*uint32(chunkZ) + a*uint32(chunkX)) ^ s
 }
 
+// decoDraw draws feature positions in an origin chunk.
+type decoDraw struct {
+	mt     *rand.MT
+	bx, bz int32
+}
+
+// pos draws a position x, y, z: x and z in the chunk plus off, y from yn
+// values plus y0.
+func (d *decoDraw) pos(off, yn, y0 int32) (int32, int32, int32) {
+	x := d.bx + off + d.mt.IntN(16)
+	y := d.mt.IntN(yn) + y0
+	z := d.bz + off + d.mt.IntN(16)
+	return x, y, z
+}
+
+// decoOre places times ore veins of count at positions drawn by d, each
+// turning the replace blocks into place.
+func (n *Nether) decoOre(r *region, d *decoDraw, count int32, place uint32, replace []uint32, times int, yn, y0 int32) {
+	for range times {
+		x, y, z := d.pos(0, yn, y0)
+		feature.OreVein(count, x, y, z, d.mt, func(bx, by, bz int32) {
+			cur := r.at(bx, by, bz)
+			if cur == place {
+				return
+			}
+			for _, m := range replace {
+				if cur == m {
+					r.set(bx, by, bz, place)
+					return
+				}
+			}
+		})
+	}
+}
+
 // decorate runs origin (ox, oz)'s features on r, in BDS's order.
 func (n *Nether) decorate(r *region, ox, oz int32) {
 	mt := rand.NewMT(populationSeed(n.seed, ox, oz))
-	bx, bz := ox*16, oz*16
-	// at draws a position x, y, z: x and z in the chunk plus off, y from
-	// yn values plus y0.
-	at := func(off, yn, y0 int32) (int32, int32, int32) {
-		x := bx + off + mt.IntN(16)
-		y := mt.IntN(yn) + y0
-		z := bz + off + mt.IntN(16)
-		return x, y, z
-	}
+	d := decoDraw{mt: mt, bx: ox * 16, bz: oz * 16}
 	for range 8 {
-		x, y, z := at(8, 120, 4)
+		x, y, z := d.pos(8, 120, 4)
 		n.spring(r, x, y, z, false)
 	}
 	for i := mt.IntN(mt.IntN(10)+1) + 1; i > 0; i-- {
-		x, y, z := at(8, 120, 4)
+		x, y, z := d.pos(8, 120, 4)
 		n.firePatch(r, x, y, z, mt)
 	}
 	for i := mt.IntN(mt.IntN(10) + 1); i > 0; i-- {
-		x, y, z := at(8, 120, 4)
+		x, y, z := d.pos(8, 120, 4)
 		n.glowstoneBlob(r, x, y, z, mt)
 	}
 	for range 10 {
-		x, y, z := at(8, 128, 0)
+		x, y, z := d.pos(8, 128, 0)
 		n.glowstoneBlob(r, x, y, z, mt)
 	}
 	for _, b := range [2]uint32{n.deco.brownMushroom, n.deco.redMushroom} {
 		if mt.IntN(1) == 0 {
-			x, y, z := at(8, 128, 0)
+			x, y, z := d.pos(8, 128, 0)
 			n.mushroomPatch(r, x, y, z, b, mt)
 		}
 	}
 	netherrack := []uint32{n.ids.netherrack}
-	ore := func(count int32, place uint32, replace []uint32, times int, yn, y0 int32) {
-		for range times {
-			x, y, z := at(0, yn, y0)
-			feature.OreVein(count, x, y, z, mt, func(bx, by, bz int32) {
-				cur := r.at(bx, by, bz)
-				if cur == place {
-					return
-				}
-				for _, m := range replace {
-					if cur == m {
-						r.set(bx, by, bz, place)
-						return
-					}
-				}
-			})
-		}
-	}
 	// The counts and blocks are VanillaFeatures' registrations
 	// (sub_4E2BB50); BDS gates gold ore, blackstone and ancient debris on
 	// the world's base game version, which every new world passes.
-	ore(10, n.deco.goldOre, netherrack, 10, 108, 10)
-	ore(14, n.deco.quartzOre, netherrack, 16, 108, 10)
+	n.decoOre(r, &d, 10, n.deco.goldOre, netherrack, 10, 108, 10)
+	n.decoOre(r, &d, 14, n.deco.quartzOre, netherrack, 16, 108, 10)
 	for range 16 {
-		x, y, z := at(0, 108, 10)
+		x, y, z := d.pos(0, 108, 10)
 		n.spring(r, x, y, z, true)
 	}
-	ore(28, n.deco.magma, []uint32{n.ids.netherrack, n.deco.blackstone}, 9, 14, 23)
-	ore(33, n.deco.gravel, netherrack, 2, 32, 5)
-	ore(33, n.deco.blackstone, netherrack, 2, 32, 5)
+	n.decoOre(r, &d, 28, n.deco.magma, []uint32{n.ids.netherrack, n.deco.blackstone}, 9, 14, 23)
+	n.decoOre(r, &d, 33, n.deco.gravel, netherrack, 2, 32, 5)
+	n.decoOre(r, &d, 33, n.deco.blackstone, netherrack, 2, 32, 5)
 	// The random starts over for the biomes' feature rules and the
 	// ancient debris.
 	mt.Seed(populationSeed(n.seed, ox, oz))
@@ -269,11 +283,11 @@ func (n *Nether) decorate(r *region, ox, oz int32) {
 	mt.Uint32()
 	n.runRules(r, ox, oz, r.biome, mt)
 	for range 2 {
-		x, y, z := at(0, 16, 8)
+		x, y, z := d.pos(0, 16, 8)
 		n.debris(r, x, y, z, 0, 4, mt)
 	}
 	for range 3 {
-		x, y, z := at(0, 112, 8)
+		x, y, z := d.pos(0, 112, 8)
 		n.debris(r, x, y, z, 0, 3, mt)
 	}
 }
@@ -447,11 +461,26 @@ func (n *Nether) originWrites(ox, oz int32, neighbour func(cx, cz int32) *Chunk)
 // fence on the chunk's side needs more than 2. Cache does the same with the
 // neighbours kept. It is safe to call from many goroutines if neighbour is.
 func (n *Nether) Decorate(chunkX, chunkZ int32, c *Chunk, neighbour func(cx, cz int32) *Chunk) {
-	writes := func(ox, oz int32) *originWrites { return n.originWrites(ox, oz, neighbour) }
-	n.decorateWith(chunkX, chunkZ, c, writes)
-	n.connectFences(c, chunkX, chunkZ, func(cx, cz int32) *Chunk {
-		return n.decorated(cx, cz, neighbour, writes)
-	})
+	w := originSource{n: n, neighbour: neighbour}
+	n.decorateWith(chunkX, chunkZ, c, w.writes)
+	n.connectFences(c, chunkX, chunkZ, w.decorated)
+}
+
+// originSource computes origin writes from a chunk's undecorated
+// neighbours, without a cache.
+type originSource struct {
+	n         *Nether
+	neighbour func(cx, cz int32) *Chunk
+}
+
+// writes is the placements of origin (ox, oz).
+func (w originSource) writes(ox, oz int32) *originWrites {
+	return w.n.originWrites(ox, oz, w.neighbour)
+}
+
+// decorated is the decorated chunk (cx, cz), without its fences joined.
+func (w originSource) decorated(cx, cz int32) *Chunk {
+	return w.n.decorated(cx, cz, w.neighbour, w.writes)
 }
 
 // decorateWith applies the placements of the nine origins around chunk

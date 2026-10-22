@@ -112,26 +112,7 @@ func (n *Nether) loadRules(biomeIDs map[string]uint32) error {
 		if err != nil {
 			return fmt.Errorf("worldgen: read %s: %w", f, err)
 		}
-		var raw struct {
-			Rules struct {
-				Description struct {
-					Identifier    string `json:"identifier"`
-					PlacesFeature string `json:"places_feature"`
-				} `json:"description"`
-				Conditions struct {
-					Pass   string          `json:"placement_pass"`
-					Filter json.RawMessage `json:"minecraft:biome_filter"`
-				} `json:"conditions"`
-				Distribution struct {
-					Iterations json.RawMessage `json:"iterations"`
-					Scatter    json.RawMessage `json:"scatter_chance"`
-					Order      string          `json:"coordinate_eval_order"`
-					X          json.RawMessage `json:"x"`
-					Y          json.RawMessage `json:"y"`
-					Z          json.RawMessage `json:"z"`
-				} `json:"distribution"`
-			} `json:"minecraft:feature_rules"`
-		}
+		var raw featureRuleFile
 		if err := json.Unmarshal(data, &raw); err != nil {
 			return fmt.Errorf("worldgen: decode %s: %w", f, err)
 		}
@@ -151,7 +132,7 @@ func (n *Nether) loadRules(biomeIDs map[string]uint32) error {
 			}
 		}
 		if len(r.Distribution.Scatter) > 0 {
-			var frac struct{ Numerator, Denominator int32 }
+			var frac scatterChance
 			if err := json.Unmarshal(r.Distribution.Scatter, &frac); err != nil || frac.Denominator <= 0 {
 				return fmt.Errorf("worldgen: rule %s: scatter chance %s not supported", rule.id, r.Distribution.Scatter)
 			}
@@ -189,6 +170,31 @@ func (n *Nether) loadRules(biomeIDs map[string]uint32) error {
 	return nil
 }
 
+// featureRuleFile is a minecraft:feature_rules file.
+type featureRuleFile struct {
+	Rules struct {
+		Description struct {
+			Identifier    string `json:"identifier"`
+			PlacesFeature string `json:"places_feature"`
+		} `json:"description"`
+		Conditions struct {
+			Pass   string          `json:"placement_pass"`
+			Filter json.RawMessage `json:"minecraft:biome_filter"`
+		} `json:"conditions"`
+		Distribution struct {
+			Iterations json.RawMessage `json:"iterations"`
+			Scatter    json.RawMessage `json:"scatter_chance"`
+			Order      string          `json:"coordinate_eval_order"`
+			X          json.RawMessage `json:"x"`
+			Y          json.RawMessage `json:"y"`
+			Z          json.RawMessage `json:"z"`
+		} `json:"distribution"`
+	} `json:"minecraft:feature_rules"`
+}
+
+// scatterChance is a rule's scatter_chance fraction.
+type scatterChance struct{ Numerator, Denominator int32 }
+
 // parseRandomIterations reads iterations of the form "Math.Random(lo, hi)",
 // the only Molang the Nether's rules use.
 func parseRandomIterations(raw json.RawMessage) (*[2]float32, error) {
@@ -213,10 +219,7 @@ func parseUniform(raw json.RawMessage) ([2]int32, error) {
 	if json.Unmarshal(raw, &c) == nil {
 		return [2]int32{c, c}, nil
 	}
-	var a struct {
-		Distribution string   `json:"distribution"`
-		Extent       [2]int32 `json:"extent"`
-	}
+	var a triangle
 	if err := json.Unmarshal(raw, &a); err != nil || a.Distribution != "uniform" {
 		return [2]int32{}, fmt.Errorf("axis %s not supported", strings.TrimSpace(string(raw)))
 	}

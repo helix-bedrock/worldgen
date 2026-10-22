@@ -23,36 +23,51 @@ type plantScatter struct {
 	block uint32
 }
 
+// readFeature decodes the vanilla feature file id into v.
+func readFeature(id string, v any) error {
+	name := strings.TrimPrefix(id, "minecraft:")
+	raw, err := worldgen.Data.ReadFile(path.Join("data/vanilla/features", name+".json"))
+	if err != nil {
+		return fmt.Errorf("worldgen: read feature %s: %w", id, err)
+	}
+	if err := json.Unmarshal(raw, v); err != nil {
+		return fmt.Errorf("worldgen: decode feature %s: %w", id, err)
+	}
+	return nil
+}
+
+// triangle is a feature axis with a distribution over an extent.
+type triangle struct {
+	Distribution string   `json:"distribution"`
+	Extent       [2]int32 `json:"extent"`
+}
+
+// scatterFile is a minecraft:scatter_feature file.
+type scatterFile struct {
+	F struct {
+		Iterations int32    `json:"iterations"`
+		Order      string   `json:"coordinate_eval_order"`
+		X          triangle `json:"x"`
+		Y          triangle `json:"y"`
+		Z          triangle `json:"z"`
+		ToFloor    bool     `json:"project_input_to_floor"`
+		Places     string   `json:"places_feature"`
+	} `json:"minecraft:scatter_feature"`
+}
+
+// singleBlockFile is a minecraft:single_block_feature file.
+type singleBlockFile struct {
+	F struct {
+		Places     biome.Block `json:"places_block"`
+		MayReplace []string    `json:"may_replace"`
+	} `json:"minecraft:single_block_feature"`
+}
+
 // loadPlantScatter reads a scatter feature and the single block feature it
 // places from the vanilla data.
 func (n *Nether) loadPlantScatter(id string) (*plantScatter, error) {
-	read := func(id string, v any) error {
-		name := strings.TrimPrefix(id, "minecraft:")
-		raw, err := worldgen.Data.ReadFile(path.Join("data/vanilla/features", name+".json"))
-		if err != nil {
-			return fmt.Errorf("worldgen: read feature %s: %w", id, err)
-		}
-		if err := json.Unmarshal(raw, v); err != nil {
-			return fmt.Errorf("worldgen: decode feature %s: %w", id, err)
-		}
-		return nil
-	}
-	type triangle struct {
-		Distribution string   `json:"distribution"`
-		Extent       [2]int32 `json:"extent"`
-	}
-	var sc struct {
-		F struct {
-			Iterations int32    `json:"iterations"`
-			Order      string   `json:"coordinate_eval_order"`
-			X          triangle `json:"x"`
-			Y          triangle `json:"y"`
-			Z          triangle `json:"z"`
-			ToFloor    bool     `json:"project_input_to_floor"`
-			Places     string   `json:"places_feature"`
-		} `json:"minecraft:scatter_feature"`
-	}
-	if err := read(id, &sc); err != nil {
+	var sc scatterFile
+	if err := readFeature(id, &sc); err != nil {
 		return nil, err
 	}
 	f := sc.F
@@ -67,16 +82,11 @@ func (n *Nether) loadPlantScatter(id string) (*plantScatter, error) {
 		}
 		p.axes[i] = a.Extent
 	}
-	var sb struct {
-		F struct {
-			Places     biome.Block `json:"places_block"`
-			MayReplace []string    `json:"may_replace"`
-		} `json:"minecraft:single_block_feature"`
-	}
-	if err := read(f.Places, &sb); err != nil {
+	var sb singleBlockFile
+	if err := readFeature(f.Places, &sb); err != nil {
 		return nil, err
 	}
-	if len(sb.F.MayReplace) != 1 || sb.F.MayReplace[0] != "minecraft:air" {
+	if len(sb.F.MayReplace) != 1 || sb.F.MayReplace[0] != blockAir {
 		return nil, fmt.Errorf("worldgen: feature %s: may_replace %v not supported", f.Places, sb.F.MayReplace)
 	}
 	if p.block, ok = n.reg.Lookup(sb.F.Places.Name, sb.F.Places.States); !ok {
