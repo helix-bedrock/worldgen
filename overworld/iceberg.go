@@ -202,15 +202,8 @@ func (f *icebergFeature) place(w *featureWorld, x, _, z int32, r *rand.MT) (bloc
 		return blockPos{x, SeaLevel, z}, true
 	}
 	n := max(half, 3) - 2
-	offset := func() int32 {
-		v := r.IntN(n)
-		if r.Uint32()>>27&1 != 0 {
-			v = half - r.IntN(max(width-half-1, 1)) + 1
-		}
-		return v
-	}
-	ox := offset()
-	oz := offset()
+	ox := icebergChannelOffset(r, n, half, width)
+	oz := icebergChannelOffset(r, n, half, width)
 	if !round {
 		ox = r.IntN(max(6-v6, 1))
 		oz = ox
@@ -409,4 +402,14 @@ func (f *blueIceFeature) place(w *featureWorld, x, y, z int32, r *rand.MT) (bloc
 		}
 	}
 	return blockPos{x, y, z}, true
+}
+
+// icebergChannelOffset is the offset of the channel cut through an
+// iceberg on one axis: nextInt(n), or on a coin flip a draw near the edge.
+func icebergChannelOffset(r *rand.MT, n, half, width int32) int32 {
+	v := r.IntN(n)
+	if r.Uint32()>>27&1 != 0 {
+		v = half - r.IntN(max(width-half-1, 1)) + 1
+	}
+	return v
 }

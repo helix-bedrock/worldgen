@@ -226,7 +226,7 @@ func (o *Overworld) villageAt(cx, cz int32) *village {
 		var r rand.MT
 		// The start is built with the region's random after the spread
 		// draws (VERIFY: sub_4FBBAD0's caller).
-		rx, rz := floorDivRegion(cx, villageSpacing), floorDivRegion(cz, villageSpacing)
+		rx, rz := structure.Region(cx, villageSpacing), structure.Region(cz, villageSpacing)
 		structureSeed(&r, o.seed, rx, rz, villageSalt)
 		for range 4 {
 			r.IntN(villageSpacing - villageSeparation)
@@ -261,8 +261,8 @@ func (o *Overworld) placeVillages(cx, cz int32, c *Chunk, height func(x, z int32
 		return
 	}
 	// Villages reach up to 80 blocks from their start chunk.
-	r0x, r1x := floorDivRegion(cx-6, villageSpacing), floorDivRegion(cx+6, villageSpacing)
-	r0z, r1z := floorDivRegion(cz-6, villageSpacing), floorDivRegion(cz+6, villageSpacing)
+	r0x, r1x := structure.Region(cx-6, villageSpacing), structure.Region(cx+6, villageSpacing)
+	r0z, r1z := structure.Region(cz-6, villageSpacing), structure.Region(cz+6, villageSpacing)
 	chunkBox := structure.NewBox(cx*16, MinY, cz*16, cx*16+15, MaxY-1, cz*16+15)
 	for rx := r0x; rx <= r1x; rx++ {
 		for rz := r0z; rz <= r1z; rz++ {
@@ -365,7 +365,7 @@ func (o *Overworld) placeHouseChest(p *structure.Piece, c *Chunk, chunkBox struc
 	if !chunkBox.Contains([3]int32{x, y, z}) {
 		return
 	}
-	cs, _, ok := o.st.ConvertJavaState(structure.TemplateState{Name: "minecraft:chest", Props: map[string]string{"facing": structure.RotateFacing(spot.Facing, p.Rotation)}})
+	cs, _, ok := o.st.ConvertJavaState(structure.TemplateState{Name: blockChest, Props: map[string]string{"facing": structure.RotateFacing(spot.Facing, p.Rotation)}})
 	if !ok {
 		return
 	}
@@ -375,7 +375,7 @@ func (o *Overworld) placeHouseChest(p *structure.Piece, c *Chunk, chunkBox struc
 	}
 	c.Blocks[idx] = uint16(cs)
 	kind := strings.TrimPrefix(p.Element.Template[:i], "village/")
-	d := o.st.BlockEntityFor(cs, "minecraft:chest", x, y, z)
+	d := o.st.BlockEntityFor(cs, blockChest, x, y, z)
 	be := structure.BlockEntity{X: x, Y: y, Z: z, Data: d, LootTable: "loot_tables/chests/village/village_" + kind + "_house.json"}
 	d["LootTable"] = be.LootTable
 	d["LootTableSeed"] = int32(structure.PositionSeed(o.seed, x, y, z))
@@ -440,8 +440,8 @@ func (o *Overworld) villagesReach(cx, cz int32) bool {
 		return false
 	}
 	chunkBox := structure.NewBox(cx*16, MinY, cz*16, cx*16+15, MaxY-1, cz*16+15)
-	r0x, r1x := floorDivRegion(cx-6, villageSpacing), floorDivRegion(cx+6, villageSpacing)
-	r0z, r1z := floorDivRegion(cz-6, villageSpacing), floorDivRegion(cz+6, villageSpacing)
+	r0x, r1x := structure.Region(cx-6, villageSpacing), structure.Region(cx+6, villageSpacing)
+	r0z, r1z := structure.Region(cz-6, villageSpacing), structure.Region(cz+6, villageSpacing)
 	for rx := r0x; rx <= r1x; rx++ {
 		for rz := r0z; rz <= r1z; rz++ {
 			sx, sz, _ := o.villagePick(rx, rz)
@@ -462,7 +462,7 @@ func (o *Overworld) villagesReach(cx, cz int32) bool {
 // lifetime and is not safe for concurrent use.
 func (o *Overworld) structuredView(raw func(cx, cz int32) *PackedChunk) func(cx, cz int32) *PackedChunk {
 	done := map[[2]int32]*PackedChunk{}
-	height := func(x, z int32) int32 { return o.surfaceHeight(raw, x, z) }
+	height := surfaceHeights{o, raw}.at
 	return func(cx, cz int32) *PackedChunk {
 		k := [2]int32{cx, cz}
 		if p, ok := done[k]; ok {
@@ -505,7 +505,7 @@ func (o *Overworld) villageKind(cx, cz int32) string {
 // takes any. It returns the centre of the start chunk and its preliminary
 // surface height.
 func (o *Overworld) NearestVillage(x, z int32, kind string, maxRings int32) (vx, vy, vz int32, ok bool) {
-	rx0, rz0 := floorDivRegion(x>>4, villageSpacing), floorDivRegion(z>>4, villageSpacing)
+	rx0, rz0 := structure.Region(x>>4, villageSpacing), structure.Region(z>>4, villageSpacing)
 	best := int64(-1)
 	for ring := int32(0); ring <= maxRings; ring++ {
 		for rx := rx0 - ring; rx <= rx0+ring; rx++ {
@@ -546,8 +546,8 @@ func (o *Overworld) villageFeatures(w *featureWorld, ox, oz int32, pop uint32) {
 	}
 	chunkBox := structure.NewBox(ox*16, MinY, oz*16, ox*16+15, MaxY-1, oz*16+15)
 	var r *rand.MT
-	r0x, r1x := floorDivRegion(ox-6, villageSpacing), floorDivRegion(ox+6, villageSpacing)
-	r0z, r1z := floorDivRegion(oz-6, villageSpacing), floorDivRegion(oz+6, villageSpacing)
+	r0x, r1x := structure.Region(ox-6, villageSpacing), structure.Region(ox+6, villageSpacing)
+	r0z, r1z := structure.Region(oz-6, villageSpacing), structure.Region(oz+6, villageSpacing)
 	for rx := r0x; rx <= r1x; rx++ {
 		for rz := r0z; rz <= r1z; rz++ {
 			sx, sz, _ := o.villagePick(rx, rz)
@@ -599,7 +599,7 @@ func (o *Overworld) VillagePieces(cx, cz int32) []PieceInfo {
 	if o.jigsaw == nil {
 		return nil
 	}
-	sx, sz, _ := o.villagePick(floorDivRegion(cx, villageSpacing), floorDivRegion(cz, villageSpacing))
+	sx, sz, _ := o.villagePick(structure.Region(cx, villageSpacing), structure.Region(cz, villageSpacing))
 	v := o.villageAt(sx, sz)
 	if v == nil {
 		return nil

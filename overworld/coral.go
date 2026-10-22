@@ -359,6 +359,18 @@ func (b *coralBuild) arm(p blockPos, dir uint8, last bool) {
 	}
 }
 
+// coralArm is one side block around a spire's stem: placed unless a draw
+// of nextInt(n) is 0, at horizontal offset d.
+type coralArm struct {
+	n int32
+	d [2]int32
+}
+
+// coralClawArms are the spire's side blocks in draw order.
+func coralClawArms() [4]coralArm {
+	return [4]coralArm{{2, [2]int32{1, 0}}, {3, [2]int32{-1, 0}}, {4, [2]int32{0, 1}}, {3, [2]int32{0, -1}}}
+}
+
 func (b *coralBuild) spire(o blockPos) {
 	s := 2*b.r.IntN(2) + 3
 	corner := blockPos{o[0] - s/2, o[1], o[2] - s/2}
@@ -386,11 +398,7 @@ func (b *coralBuild) spire(o blockPos) {
 		return
 	}
 	b.put(c)
-	for _, s := range []struct {
-		n    int32
-		d    [2]int32
-		last bool
-	}{{2, [2]int32{1, 0}, false}, {3, [2]int32{-1, 0}, false}, {4, [2]int32{0, 1}, false}, {3, [2]int32{0, -1}, true}} {
+	for _, s := range coralClawArms() {
 		if b.r.IntN(s.n) == 0 {
 			continue
 		}

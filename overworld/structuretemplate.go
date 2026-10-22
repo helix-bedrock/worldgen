@@ -38,21 +38,24 @@ type structureTemplateFeature struct {
 	level, open, solidCells, otherCells [][3]int32
 }
 
+// rawStructureTemplate is the JSON of a minecraft:structure_template_feature.
+type rawStructureTemplate struct {
+	Name        string `json:"structure_name"`
+	Radius      int32  `json:"adjustment_radius"`
+	Ground      int32  `json:"ground_level"`
+	Center      bool   `json:"rotate_around_center"`
+	Constraints struct {
+		Leveled   *struct{} `json:"leveled"`
+		Unburied  *struct{} `json:"unburied"`
+		Intersect *struct {
+			MotionOnly bool              `json:"only_check_intersection_for_motion_blocking_blocks"`
+			Allow      []json.RawMessage `json:"block_allowlist"`
+		} `json:"block_intersection"`
+	} `json:"constraints"`
+}
+
 func (o *Overworld) parseStructureTemplate(raw json.RawMessage) (placer, error) {
-	var r struct {
-		Name        string `json:"structure_name"`
-		Radius      int32  `json:"adjustment_radius"`
-		Ground      int32  `json:"ground_level"`
-		Center      bool   `json:"rotate_around_center"`
-		Constraints struct {
-			Leveled   *struct{} `json:"leveled"`
-			Unburied  *struct{} `json:"unburied"`
-			Intersect *struct {
-				MotionOnly bool              `json:"only_check_intersection_for_motion_blocking_blocks"`
-				Allow      []json.RawMessage `json:"block_allowlist"`
-			} `json:"block_intersection"`
-		} `json:"constraints"`
-	}
+	var r rawStructureTemplate
 	if err := json.Unmarshal(raw, &r); err != nil {
 		return nil, err
 	}
@@ -78,15 +81,14 @@ func (f *structureTemplateFeature) load() {
 	f.t = t
 	o := f.o
 	g := f.groundLayer()
-	air := func(b uint32) bool { return b == structure.VoidCell || b == o.ids.air }
 	for x := int32(0); x < t.Size[0]; x++ {
 		for z := int32(0); z < t.Size[2]; z++ {
 			// Leveled: the ground under every filled cell of the ground
 			// layer. Unburied: open air over every filled top cell.
-			if !air(t.Cell(x, g, z)) {
+			if !o.voidOrAir(t.Cell(x, g, z)) {
 				f.level = append(f.level, [3]int32{x, -1, z})
 			}
-			if !air(t.Cell(x, t.Size[1]-1, z)) {
+			if !o.voidOrAir(t.Cell(x, t.Size[1]-1, z)) {
 				f.open = append(f.open, [3]int32{x, t.Size[1], z})
 			}
 		}
@@ -184,16 +186,7 @@ func (f *structureTemplateFeature) fits(w *featureWorld, x, y, z int32, rot int,
 		}
 	}
 	if f.intersect {
-		test := func(cells [][3]int32) bool {
-			for _, c := range cells {
-				wx, wy, wz := at(c, x, y, z, rot, px, pz)
-				if b, _ := w.block(wx, wy, wz); !f.allow.match(o, b) {
-					return false
-				}
-			}
-			return true
-		}
-		if !test(f.solidCells) || !f.motionOnly && !test(f.otherCells) {
+		if !f.cellsAllowed(w, f.solidCells, x, y, z, rot, px, pz) || !f.motionOnly && !f.cellsAllowed(w, f.otherCells, x, y, z, rot, px, pz) {
 			return false
 		}
 	}
@@ -207,22 +200,17 @@ func (f *structureTemplateFeature) fits(w *featureWorld, x, y, z int32, rot int,
 // 0x40000; solidMaterial stands in for it.
 func (f *structureTemplateFeature) isLeveled(w *featureWorld, x, y, z int32, rot int, px, pz int32) bool {
 	const tolerance = 2
-	o := w.o
-	solid := func(wx, wy, wz int32) bool {
-		b, _ := w.block(wx, wy, wz)
-		return o.solidMaterial(b)
-	}
 	for _, c := range f.level {
 		wx, wy, wz := at(c, x, y, z, rot, px, pz)
 		wy -= tolerance
-		cur := solid(wx, wy, wz)
+		cur := w.solidMaterialAt(wx, wy, wz)
 		for k := -tolerance; ; k++ {
 			prev := cur
 			if k > tolerance {
 				return false
 			}
 			wy++
-			cur = solid(wx, wy, wz)
+			cur = w.solidMaterialAt(wx, wy, wz)
 			if !cur && prev {
 				break
 			}
@@ -248,4 +236,19 @@ func (f *structureTemplateFeature) build(w *featureWorld, x, y, z int32, rot int
 			}
 		}
 	}
+}
+
+// voidOrAir reports whether a template cell is void or air.
+func (o *Overworld) voidOrAir(b uint32) bool { return b == structure.VoidCell || b == o.ids.air }
+
+// cellsAllowed reports whether every world block under template cells is
+// one the template may intersect.
+func (f *structureTemplateFeature) cellsAllowed(w *featureWorld, cells [][3]int32, x, y, z int32, rot int, px, pz int32) bool {
+	for _, c := range cells {
+		wx, wy, wz := at(c, x, y, z, rot, px, pz)
+		if b, _ := w.block(wx, wy, wz); !f.allow.match(w.o, b) {
+			return false
+		}
+	}
+	return true
 }

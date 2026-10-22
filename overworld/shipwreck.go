@@ -1,7 +1,6 @@
 package overworld
 
 import (
-	"cmp"
 	"slices"
 	"strings"
 
@@ -93,7 +92,7 @@ func (o *Overworld) shipPick(rx, rz int32) (int32, int32) {
 
 // isShipChunk reports whether a shipwreck starts in chunk (cx, cz).
 func (o *Overworld) isShipChunk(cx, cz int32) bool {
-	x, z := o.shipPick(floorDivRegion(cx, shipSpacing), floorDivRegion(cz, shipSpacing))
+	x, z := o.shipPick(structure.Region(cx, shipSpacing), structure.Region(cz, shipSpacing))
 	if x != cx || z != cz {
 		return false
 	}
@@ -218,8 +217,8 @@ func (o *Overworld) shipY(s *shipwreck, raw func(cx, cz int32) *PackedChunk) int
 // Ships reach at most 2 chunks from their start.
 func (o *Overworld) shipsReach(cx, cz int32, f func(s *shipwreck)) {
 	chunk := structure.NewBox(cx*16, MinY, cz*16, cx*16+15, MaxY-1, cz*16+15)
-	for rx := floorDivRegion(cx-2, shipSpacing); rx <= floorDivRegion(cx+2, shipSpacing); rx++ {
-		for rz := floorDivRegion(cz-2, shipSpacing); rz <= floorDivRegion(cz+2, shipSpacing); rz++ {
+	for rx := structure.Region(cx-2, shipSpacing); rx <= structure.Region(cx+2, shipSpacing); rx++ {
+		for rz := structure.Region(cz-2, shipSpacing); rz <= structure.Region(cz+2, shipSpacing); rz++ {
 			sx, sz := o.shipPick(rx, rz)
 			if sx < cx-2 || sx > cx+2 || sz < cz-2 || sz > cz+2 {
 				continue
@@ -248,6 +247,12 @@ func (o *Overworld) placeShips(cx, cz int32, c *Chunk, raw func(cx, cz int32) *P
 	})
 }
 
+// shipMarker is a structure block data marker of a shipwreck template.
+type shipMarker struct {
+	pos  [3]int32
+	name string
+}
+
 // ship places a shipwreck's template (sub_D2B7A10: integrity 1, below sea
 // level air turns to water and liquid holders are waterlogged unless the
 // ship is beached), then its chest markers.
@@ -255,22 +260,18 @@ func (b *scBuild) ship(s *shipwreck, y int32) {
 	o := b.o
 	jt := o.st.Template(s.path)
 	conv := o.st.TemplateStates(jt, s.rot)
-	type marker struct {
-		pos  [3]int32
-		name string
-	}
-	var markers []marker
+	var markers []shipMarker
 	for _, tb := range jt.Template.Blocks {
 		st := jt.Template.Palette[tb.State]
 		rp := structure.RotatePos(tb.Pos, s.rot)
 		pos := [3]int32{s.x + rp[0], y + rp[1], s.z + rp[2]}
 		switch st.Name {
-		case "minecraft:structure_block":
+		case blockStructureBlock:
 			if m, _ := tb.NBT["metadata"].(string); m == "treasureChest" || m == "supplyChest" || m == "mapChest" {
-				markers = append(markers, marker{pos, m})
+				markers = append(markers, shipMarker{pos, m})
 			}
 			continue
-		case "minecraft:jigsaw", "minecraft:structure_void":
+		case blockJigsaw, blockStructureVoid:
 			continue
 		}
 		cs := conv[tb.State]
@@ -281,7 +282,7 @@ func (b *scBuild) ship(s *shipwreck, y int32) {
 		name := o.blockName(id)
 		below := !s.beached && pos[1] < SeaLevel
 		if id == o.ids.air && below {
-			id, name = o.ids.water, "minecraft:water"
+			id, name = o.ids.water, blockWater
 		}
 		if !b.setWorld(pos[0], pos[1], pos[2], id) {
 			continue
@@ -337,7 +338,7 @@ func (b *scBuild) shipChest(pos [3]int32, name string, keep bool, seed int32) {
 		"mapChest": "shipwreck"}[name]
 	for i := range b.c.BlockEntities {
 		be := &b.c.BlockEntities[i]
-		if be.X == cp[0] && be.Y == cp[1] && be.Z == cp[2] && o.blockName(b.c.Block(int(cp[0]&15), int(cp[1]), int(cp[2]&15))) == "minecraft:chest" {
+		if be.X == cp[0] && be.Y == cp[1] && be.Z == cp[2] && o.blockName(b.c.Block(int(cp[0]&15), int(cp[1]), int(cp[2]&15))) == blockChest {
 			be.LootTable = "loot_tables/chests/" + table + ".json"
 			be.Data["LootTable"] = be.LootTable
 			be.Data["LootTableSeed"] = seed
@@ -403,32 +404,17 @@ func (o *Overworld) shipWood(id uint32, woods [2]uint8) uint32 {
 // "shipwreck_beached"; X, Y, Z are the template corner. It is safe for
 // concurrent use.
 func (o *Overworld) NearestShipwreck(x, z int32, maxRegions int32) (Scattered, bool) {
-	type cand struct {
-		cx, cz int32
-		d      int64
-	}
-	var cands []cand
-	rx0, rz0 := floorDivRegion(x>>4, shipSpacing), floorDivRegion(z>>4, shipSpacing)
+	var cands []locateCand
+	rx0, rz0 := structure.Region(x>>4, shipSpacing), structure.Region(z>>4, shipSpacing)
 	for rx := rx0 - maxRegions; rx <= rx0+maxRegions; rx++ {
 		for rz := rz0 - maxRegions; rz <= rz0+maxRegions; rz++ {
 			cx, cz := o.shipPick(rx, rz)
 			dx, dz := int64(cx*16+8-x), int64(cz*16+8-z)
-			cands = append(cands, cand{cx, cz, dx*dx + dz*dz})
+			cands = append(cands, locateCand{cx, cz, dx*dx + dz*dz})
 		}
 	}
-	slices.SortFunc(cands, func(a, b cand) int { return cmp.Compare(a.d, b.d) })
-	raw := map[[2]int32]*PackedChunk{}
-	get := func(cx, cz int32) *PackedChunk {
-		k := [2]int32{cx, cz}
-		if pc, ok := raw[k]; ok {
-			return pc
-		}
-		var ch Chunk
-		o.GenerateChunk(cx, cz, &ch)
-		pc := Pack(&ch)
-		raw[k] = pc
-		return pc
-	}
+	slices.SortFunc(cands, compareLocateCand)
+	raw := newRawChunks(o)
 	for _, c := range cands {
 		s := o.shipAt(c.cx, c.cz)
 		if s == nil {
@@ -438,7 +424,7 @@ func (o *Overworld) NearestShipwreck(x, z int32, maxRegions int32) (Scattered, b
 		if s.beached {
 			kind = "shipwreck_beached"
 		}
-		return Scattered{Kind: kind, X: s.x, Y: o.shipY(s, get), Z: s.z}, true
+		return Scattered{Kind: kind, X: s.x, Y: o.shipY(s, raw.get), Z: s.z}, true
 	}
 	return Scattered{}, false
 }

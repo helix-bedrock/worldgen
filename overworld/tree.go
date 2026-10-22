@@ -19,16 +19,27 @@ import (
 // max.
 type intRange struct{ min, max int32 }
 
+// rawIntRange is the object form of an intRange.
+type rawIntRange struct {
+	Min int32 `json:"range_min"`
+	Max int32 `json:"range_max"`
+}
+
+// rawFraction is the fraction form of a chance.
+type rawFraction struct{ Numerator, Denominator uint32 }
+
+// rawSubmerge is a trunk's can_be_submerged object.
+type rawSubmerge struct {
+	MaxDepth int32 `json:"max_depth"`
+}
+
 func (r *intRange) UnmarshalJSON(b []byte) error {
 	var n int32
 	if json.Unmarshal(b, &n) == nil {
 		r.min, r.max = n, n
 		return nil
 	}
-	var v struct {
-		Min int32 `json:"range_min"`
-		Max int32 `json:"range_max"`
-	}
+	var v rawIntRange
 	if err := json.Unmarshal(b, &v); err != nil {
 		return err
 	}
@@ -58,7 +69,7 @@ func (c *chance) UnmarshalJSON(b []byte) error {
 		c.percent = f
 		return nil
 	}
-	var v struct{ Numerator, Denominator uint32 }
+	var v rawFraction
 	if err := json.Unmarshal(b, &v); err != nil {
 		return err
 	}
@@ -112,7 +123,7 @@ func (o *Overworld) parseDecoration(raw *rawDecoration) (decoration, error) {
 	if !ok {
 		return decoration{}, fmt.Errorf("decoration block %s missing", b.Name)
 	}
-	d := decoration{set: true, c: raw.Chance, block: id, vine: b.Name == "minecraft:vine", steps: intRange{1, 1}}
+	d := decoration{set: true, c: raw.Chance, block: id, vine: b.Name == blockVine, steps: intRange{1, 1}}
 	if raw.Steps != nil {
 		d.steps = *raw.Steps
 	}
@@ -157,7 +168,7 @@ func (d *decoration) applyMask(w *featureWorld, x, y, z int32, r *rand.MT, m sid
 		}
 		block := d.block
 		if d.vine {
-			if id, ok := w.o.reg.Lookup("minecraft:vine", map[string]any{"vine_direction_bits": float64(s.bits)}); ok {
+			if id, ok := w.o.reg.Lookup(blockVine, map[string]any{"vine_direction_bits": float64(s.bits)}); ok {
 				block = id
 			}
 		}
@@ -273,160 +284,163 @@ type treeFeature struct {
 	branch       uint32
 }
 
+// rawTree is the JSON of a minecraft:tree_feature.
+type rawTree struct {
+	Trunk *struct {
+		Height   intRange        `json:"trunk_height"`
+		Modifier *intRange       `json:"height_modifier"`
+		Block    biome.Block     `json:"trunk_block"`
+		Deco     *rawDecoration  `json:"trunk_decoration"`
+		Submerge json.RawMessage `json:"can_be_submerged"`
+	} `json:"trunk"`
+	Poplar *struct {
+		Height    *intRange      `json:"trunk_height"`
+		Block     biome.Block    `json:"trunk_block"`
+		Remaining *intRange      `json:"remaining_trunk_height_above_branches"`
+		Branches  *intRange      `json:"amount_of_foliage_support_branches"`
+		Deco      *rawDecoration `json:"trunk_decoration"`
+		LogDeco   string         `json:"log_decoration_feature"`
+	} `json:"poplar_trunk"`
+	Fallen *struct {
+		Length   *intRange      `json:"log_length"`
+		Block    biome.Block    `json:"trunk_block"`
+		Deco     *rawDecoration `json:"trunk_decoration"`
+		LogDeco  string         `json:"log_decoration_feature"`
+		Modifier *intRange      `json:"height_modifier"`
+		Stump    *intRange      `json:"stump_height"`
+	} `json:"fallen_trunk"`
+	Fancy *struct {
+		Height struct {
+			Base     int32   `json:"base"`
+			Variance int32   `json:"variance"`
+			Scale    float32 `json:"scale"`
+		} `json:"trunk_height"`
+		Width    *int32      `json:"trunk_width"`
+		Block    biome.Block `json:"trunk_block"`
+		Branches struct {
+			Slope       float32 `json:"slope"`
+			Density     float32 `json:"density"`
+			MinAltitude float32 `json:"min_altitude_factor"`
+		} `json:"branches"`
+		WidthScale      *float32 `json:"width_scale"`
+		FoliageAltitude *float32 `json:"foliage_altitude_factor"`
+	} `json:"fancy_trunk"`
+	Mega *struct {
+		Width  *int32 `json:"trunk_width"`
+		Height struct {
+			Base      int32   `json:"base"`
+			Intervals []int32 `json:"intervals"`
+		} `json:"trunk_height"`
+		Block    biome.Block    `json:"trunk_block"`
+		Deco     *rawDecoration `json:"trunk_decoration"`
+		Branches *struct {
+			Length   int32     `json:"branch_length"`
+			Slope    *float32  `json:"branch_slope"`
+			Interval *intRange `json:"branch_interval"`
+			Altitude struct {
+				Min float32 `json:"min"`
+				Max float32 `json:"max"`
+			} `json:"branch_altitude_factor"`
+			Canopy struct {
+				Mega *rawMegaCanopy `json:"mega_canopy"`
+			} `json:"branch_canopy"`
+		} `json:"branches"`
+	} `json:"mega_trunk"`
+	Acacia *struct {
+		Width  *int32 `json:"trunk_width"`
+		Height struct {
+			Base      int32   `json:"base"`
+			Intervals []int32 `json:"intervals"`
+			MinCanopy *int32  `json:"min_height_for_canopy"`
+		} `json:"trunk_height"`
+		Block biome.Block    `json:"trunk_block"`
+		Deco  *rawDecoration `json:"trunk_decoration"`
+		Lean  *struct {
+			Diagonal *bool     `json:"allow_diagonal_growth"`
+			Height   *intRange `json:"lean_height"`
+			Steps    *intRange `json:"lean_steps"`
+			Length   *intRange `json:"lean_length"`
+		} `json:"trunk_lean"`
+		Branches *struct {
+			Chance   *chance   `json:"branch_chance"`
+			Length   *intRange `json:"branch_length"`
+			Position *intRange `json:"branch_position"`
+			Canopy   struct {
+				Acacia *rawAcaciaCanopy `json:"acacia_canopy"`
+			} `json:"branch_canopy"`
+		} `json:"branches"`
+	} `json:"acacia_trunk"`
+	AcaciaCanopy *rawAcaciaCanopy `json:"acacia_canopy"`
+	Cherry       *rawCherryTrunk  `json:"cherry_trunk"`
+	CherryCanopy *rawCherryCanopy `json:"cherry_canopy"`
+	RoofedCanopy *struct {
+		Height int32       `json:"canopy_height"`
+		Core   *int32      `json:"core_width"`
+		Outer  int32       `json:"outer_radius"`
+		Inner  int32       `json:"inner_radius"`
+		Leaf   biome.Block `json:"leaf_block"`
+	} `json:"roofed_canopy"`
+	SpreadCanopy *struct {
+		Height   intRange            `json:"canopy_height"`
+		Radius   intRange            `json:"canopy_radius"`
+		Attempts int32               `json:"leaf_placement_attempts"`
+		Leaves   [][]json.RawMessage `json:"leaf_blocks"`
+	} `json:"random_spread_canopy"`
+	MegaCanopy     *rawMegaCanopy `json:"mega_canopy"`
+	MegaPineCanopy *rawMegaCanopy `json:"mega_pine_canopy"`
+	BaseCluster    *struct {
+		MayReplace []json.RawMessage `json:"may_replace"`
+		Clusters   int32             `json:"num_clusters"`
+		Radius     int32             `json:"cluster_radius"`
+	} `json:"base_cluster"`
+	FancyCanopy *struct {
+		Height int32       `json:"height"`
+		Radius int32       `json:"radius"`
+		Leaf   biome.Block `json:"leaf_block"`
+	} `json:"fancy_canopy"`
+	PoplarCanopy *struct {
+		Radius []struct {
+			Value  int32 `json:"value"`
+			Weight int32 `json:"weight"`
+		} `json:"radius"`
+		Height *intRange   `json:"height"`
+		Hole   float32     `json:"side_hole_chance"`
+		Leaf   biome.Block `json:"leaf_block"`
+		Branch biome.Block `json:"branch_block"`
+	} `json:"poplar_canopy"`
+	Canopy *struct {
+		Offset struct {
+			Min int32 `json:"min"`
+			Max int32 `json:"max"`
+		} `json:"canopy_offset"`
+		MinWidth *int32 `json:"min_width"`
+		Slope    *struct {
+			Rise int32 `json:"rise"`
+			Run  int32 `json:"run"`
+		} `json:"canopy_slope"`
+		Variation json.RawMessage `json:"variation_chance"`
+		Leaf      biome.Block     `json:"leaf_block"`
+		Deco      *rawDecoration  `json:"canopy_decoration"`
+	} `json:"canopy"`
+	Spruce *struct {
+		Lower     intRange    `json:"lower_offset"`
+		Upper     intRange    `json:"upper_offset"`
+		MaxRadius intRange    `json:"max_radius"`
+		Leaf      biome.Block `json:"leaf_block"`
+	} `json:"spruce_canopy"`
+	Pine *struct {
+		Height     intRange    `json:"canopy_height"`
+		BaseRadius int32       `json:"base_radius"`
+		Leaf       biome.Block `json:"leaf_block"`
+	} `json:"pine_canopy"`
+	MayGrowOn      []json.RawMessage `json:"may_grow_on"`
+	BaseBlock      []biome.Block     `json:"base_block"`
+	MayGrowThrough []json.RawMessage `json:"may_grow_through"`
+	MayReplace     []json.RawMessage `json:"may_replace"`
+}
+
 func (o *Overworld) parseTree(raw json.RawMessage, set *featureSet) (placer, error) {
-	var r struct {
-		Trunk *struct {
-			Height   intRange        `json:"trunk_height"`
-			Modifier *intRange       `json:"height_modifier"`
-			Block    biome.Block     `json:"trunk_block"`
-			Deco     *rawDecoration  `json:"trunk_decoration"`
-			Submerge json.RawMessage `json:"can_be_submerged"`
-		} `json:"trunk"`
-		Poplar *struct {
-			Height    *intRange      `json:"trunk_height"`
-			Block     biome.Block    `json:"trunk_block"`
-			Remaining *intRange      `json:"remaining_trunk_height_above_branches"`
-			Branches  *intRange      `json:"amount_of_foliage_support_branches"`
-			Deco      *rawDecoration `json:"trunk_decoration"`
-			LogDeco   string         `json:"log_decoration_feature"`
-		} `json:"poplar_trunk"`
-		Fallen *struct {
-			Length   *intRange      `json:"log_length"`
-			Block    biome.Block    `json:"trunk_block"`
-			Deco     *rawDecoration `json:"trunk_decoration"`
-			LogDeco  string         `json:"log_decoration_feature"`
-			Modifier *intRange      `json:"height_modifier"`
-			Stump    *intRange      `json:"stump_height"`
-		} `json:"fallen_trunk"`
-		Fancy *struct {
-			Height struct {
-				Base     int32   `json:"base"`
-				Variance int32   `json:"variance"`
-				Scale    float32 `json:"scale"`
-			} `json:"trunk_height"`
-			Width    *int32      `json:"trunk_width"`
-			Block    biome.Block `json:"trunk_block"`
-			Branches struct {
-				Slope       float32 `json:"slope"`
-				Density     float32 `json:"density"`
-				MinAltitude float32 `json:"min_altitude_factor"`
-			} `json:"branches"`
-			WidthScale      *float32 `json:"width_scale"`
-			FoliageAltitude *float32 `json:"foliage_altitude_factor"`
-		} `json:"fancy_trunk"`
-		Mega *struct {
-			Width  *int32 `json:"trunk_width"`
-			Height struct {
-				Base      int32   `json:"base"`
-				Intervals []int32 `json:"intervals"`
-			} `json:"trunk_height"`
-			Block    biome.Block    `json:"trunk_block"`
-			Deco     *rawDecoration `json:"trunk_decoration"`
-			Branches *struct {
-				Length   int32     `json:"branch_length"`
-				Slope    *float32  `json:"branch_slope"`
-				Interval *intRange `json:"branch_interval"`
-				Altitude struct {
-					Min float32 `json:"min"`
-					Max float32 `json:"max"`
-				} `json:"branch_altitude_factor"`
-				Canopy struct {
-					Mega *rawMegaCanopy `json:"mega_canopy"`
-				} `json:"branch_canopy"`
-			} `json:"branches"`
-		} `json:"mega_trunk"`
-		Acacia *struct {
-			Width  *int32 `json:"trunk_width"`
-			Height struct {
-				Base      int32   `json:"base"`
-				Intervals []int32 `json:"intervals"`
-				MinCanopy *int32  `json:"min_height_for_canopy"`
-			} `json:"trunk_height"`
-			Block biome.Block    `json:"trunk_block"`
-			Deco  *rawDecoration `json:"trunk_decoration"`
-			Lean  *struct {
-				Diagonal *bool     `json:"allow_diagonal_growth"`
-				Height   *intRange `json:"lean_height"`
-				Steps    *intRange `json:"lean_steps"`
-				Length   *intRange `json:"lean_length"`
-			} `json:"trunk_lean"`
-			Branches *struct {
-				Chance   *chance   `json:"branch_chance"`
-				Length   *intRange `json:"branch_length"`
-				Position *intRange `json:"branch_position"`
-				Canopy   struct {
-					Acacia *rawAcaciaCanopy `json:"acacia_canopy"`
-				} `json:"branch_canopy"`
-			} `json:"branches"`
-		} `json:"acacia_trunk"`
-		AcaciaCanopy *rawAcaciaCanopy `json:"acacia_canopy"`
-		Cherry       *rawCherryTrunk  `json:"cherry_trunk"`
-		CherryCanopy *rawCherryCanopy `json:"cherry_canopy"`
-		RoofedCanopy *struct {
-			Height int32       `json:"canopy_height"`
-			Core   *int32      `json:"core_width"`
-			Outer  int32       `json:"outer_radius"`
-			Inner  int32       `json:"inner_radius"`
-			Leaf   biome.Block `json:"leaf_block"`
-		} `json:"roofed_canopy"`
-		SpreadCanopy *struct {
-			Height   intRange            `json:"canopy_height"`
-			Radius   intRange            `json:"canopy_radius"`
-			Attempts int32               `json:"leaf_placement_attempts"`
-			Leaves   [][]json.RawMessage `json:"leaf_blocks"`
-		} `json:"random_spread_canopy"`
-		MegaCanopy     *rawMegaCanopy `json:"mega_canopy"`
-		MegaPineCanopy *rawMegaCanopy `json:"mega_pine_canopy"`
-		BaseCluster    *struct {
-			MayReplace []json.RawMessage `json:"may_replace"`
-			Clusters   int32             `json:"num_clusters"`
-			Radius     int32             `json:"cluster_radius"`
-		} `json:"base_cluster"`
-		FancyCanopy *struct {
-			Height int32       `json:"height"`
-			Radius int32       `json:"radius"`
-			Leaf   biome.Block `json:"leaf_block"`
-		} `json:"fancy_canopy"`
-		PoplarCanopy *struct {
-			Radius []struct {
-				Value  int32 `json:"value"`
-				Weight int32 `json:"weight"`
-			} `json:"radius"`
-			Height *intRange   `json:"height"`
-			Hole   float32     `json:"side_hole_chance"`
-			Leaf   biome.Block `json:"leaf_block"`
-			Branch biome.Block `json:"branch_block"`
-		} `json:"poplar_canopy"`
-		Canopy *struct {
-			Offset struct {
-				Min int32 `json:"min"`
-				Max int32 `json:"max"`
-			} `json:"canopy_offset"`
-			MinWidth *int32 `json:"min_width"`
-			Slope    *struct {
-				Rise int32 `json:"rise"`
-				Run  int32 `json:"run"`
-			} `json:"canopy_slope"`
-			Variation json.RawMessage `json:"variation_chance"`
-			Leaf      biome.Block     `json:"leaf_block"`
-			Deco      *rawDecoration  `json:"canopy_decoration"`
-		} `json:"canopy"`
-		Spruce *struct {
-			Lower     intRange    `json:"lower_offset"`
-			Upper     intRange    `json:"upper_offset"`
-			MaxRadius intRange    `json:"max_radius"`
-			Leaf      biome.Block `json:"leaf_block"`
-		} `json:"spruce_canopy"`
-		Pine *struct {
-			Height     intRange    `json:"canopy_height"`
-			BaseRadius int32       `json:"base_radius"`
-			Leaf       biome.Block `json:"leaf_block"`
-		} `json:"pine_canopy"`
-		MayGrowOn      []json.RawMessage `json:"may_grow_on"`
-		BaseBlock      []biome.Block     `json:"base_block"`
-		MayGrowThrough []json.RawMessage `json:"may_grow_through"`
-		MayReplace     []json.RawMessage `json:"may_replace"`
-	}
+	var r rawTree
 	if err := json.Unmarshal(raw, &r); err != nil {
 		return nil, err
 	}
@@ -458,9 +472,7 @@ func (o *Overworld) parseTree(raw json.RawMessage, set *featureSet) (placer, err
 			t.modifier = *r.Trunk.Modifier
 		}
 		if len(r.Trunk.Submerge) > 0 {
-			var s struct {
-				MaxDepth int32 `json:"max_depth"`
-			}
+			var s rawSubmerge
 			if json.Unmarshal(r.Trunk.Submerge, &s) == nil {
 				t.submerge = s.MaxDepth
 			}
@@ -873,7 +885,7 @@ func (t *treeFeature) leafSpot(w *featureWorld, b uint32) bool {
 		return true
 	}
 	switch w.o.blockName(b) {
-	case "minecraft:snow_layer", "minecraft:short_grass", "minecraft:tall_grass", "minecraft:fern", "minecraft:large_fern", "minecraft:deadbush", "minecraft:vine":
+	case blockSnowLayer, blockShortGrass, blockTallGrass, blockFern, "minecraft:large_fern", blockDeadBush, blockVine:
 		return true
 	}
 	return false
@@ -895,16 +907,19 @@ func (t *treeFeature) leaves(w *featureWorld, x, y, z int32, r *rand.MT) bool {
 	return false
 }
 
+// simpleCanopyRadius is the simple canopy's radius dy blocks above the
+// trunk top.
+func (t *treeFeature) simpleCanopyRadius(dy int32, slope float32) int32 {
+	return t.minWidth + int32(float32(t.offMax)*slope) - int32(float32(dy)*slope)
+}
+
 // simpleCanopy is SimpleTreeCanopy (sub_D2DD1B0).
 func (t *treeFeature) simpleCanopy(w *featureWorld, x, top, z int32, r *rand.MT) bool {
 	slope := float32(t.rise) / float32(t.run)
-	radius := func(dy int32) int32 {
-		return t.minWidth + int32(float32(t.offMax)*slope) - int32(float32(dy)*slope)
-	}
 	placed := false
 	for ly := top + t.offMin; ly <= top+t.offMax; ly++ {
 		dy := ly - top
-		rad := radius(dy)
+		rad := t.simpleCanopyRadius(dy, slope)
 		for bx := x - rad; bx <= x+rad; bx++ {
 			for bz := z - rad; bz <= z+rad; bz++ {
 				if mathx.Abs(bx-x) == rad && mathx.Abs(bz-z) == rad {
@@ -922,7 +937,7 @@ func (t *treeFeature) simpleCanopy(w *featureWorld, x, top, z int32, r *rand.MT)
 	}
 	if t.canopyDeco.set && placed {
 		for ly := top + t.offMin; ly <= top+t.offMax; ly++ {
-			rad := radius(ly - top)
+			rad := t.simpleCanopyRadius(ly-top, slope)
 			for bx := x - rad; bx <= x+rad; bx++ {
 				for bz := z - rad; bz <= z+rad; bz++ {
 					if b, ok := w.block(bx, ly, bz); ok && b == t.leaf {

@@ -31,19 +31,7 @@ func joinKindOf(name string) uint8 {
 // VERIFY: blocks code-built pieces (strongholds, mineshafts) set without a
 // template are joined the same way here; their placement path was not read.
 func (o *Overworld) connectBlocks(c *Chunk, cx, cz int32, near func(cx, cz int32) *PackedChunk) {
-	var others [3][3]*PackedChunk
-	var asked [3][3]bool
-	at := func(x, y, z int32) uint32 {
-		dx, dz := x>>4-cx+1, z>>4-cz+1
-		if !asked[dx][dz] {
-			asked[dx][dz] = true
-			others[dx][dz] = near(x>>4, z>>4)
-		}
-		if p := others[dx][dz]; p != nil {
-			return p.at(int((y-MinY)<<8 | (z&15)<<4 | x&15))
-		}
-		return o.ids.air
-	}
+	n := neighbourChunks{cx: cx, cz: cz, near: near, air: o.ids.air}
 	for i, b := range c.Blocks {
 		if int(b) >= len(o.joinKind) || o.joinKind[b] == 0 {
 			continue
@@ -53,7 +41,7 @@ func (o *Overworld) connectBlocks(c *Chunk, cx, cz int32, near func(cx, cz int32
 		x, y, z := cx*16+int32(i&15), int32(i>>8)+MinY, cz*16+int32(i>>4&15)
 		nid := id
 		for _, side := range joinSides {
-			nb := at(x+side.dx, y, z+side.dz)
+			nb := n.at(x+side.dx, y, z+side.dz)
 			join := o.faceSturdy(nb, side.facing)
 			if kind == joinFence {
 				join = join || o.gateAccepts(nb, side.dx != 0) || (o.isFence(nb) && o.netherFence(nb) == o.netherFence(id))
@@ -66,6 +54,29 @@ func (o *Overworld) connectBlocks(c *Chunk, cx, cz int32, near func(cx, cz int32
 			c.Blocks[i] = uint16(nid)
 		}
 	}
+}
+
+// neighbourChunks reads blocks of chunk (cx, cz) and the eight chunks
+// around it, asking near for each chunk once.
+type neighbourChunks struct {
+	cx, cz int32
+	near   func(cx, cz int32) *PackedChunk
+	air    uint32
+	others [3][3]*PackedChunk
+	asked  [3][3]bool
+}
+
+// at is the block at (x, y, z), air where near has no chunk.
+func (n *neighbourChunks) at(x, y, z int32) uint32 {
+	dx, dz := x>>4-n.cx+1, z>>4-n.cz+1
+	if !n.asked[dx][dz] {
+		n.asked[dx][dz] = true
+		n.others[dx][dz] = n.near(x>>4, z>>4)
+	}
+	if p := n.others[dx][dz]; p != nil {
+		return p.at(int((y-MinY)<<8 | (z&15)<<4 | x&15))
+	}
+	return n.air
 }
 
 // joinSides are the four sides a block joins on, with the face of the
@@ -112,7 +123,7 @@ func (o *Overworld) gateAccepts(gate uint32, eastWest bool) bool {
 	if !ok {
 		return false
 	}
-	d, _ := st.Props["minecraft:cardinal_direction"].(string)
+	d, _ := st.Props[stateCardinalDirection].(string)
 	return eastWest == (d == "north" || d == "south")
 }
 

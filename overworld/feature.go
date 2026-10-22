@@ -186,7 +186,7 @@ func (o *Overworld) loadFeatureRules(fsys fs.FS, dir string, defs map[string]*bi
 			rule.drawOnly = !known
 		}
 		if len(r.Distribution.Scatter) > 0 {
-			var frac struct{ Numerator, Denominator int32 }
+			var frac rawScatterFraction
 			if json.Unmarshal(r.Distribution.Scatter, &frac) == nil && frac.Denominator > 0 {
 				rule.num, rule.den = frac.Numerator, frac.Denominator
 			} else if v, ok := constFloat(r.Distribution.Scatter); ok {
@@ -277,6 +277,12 @@ func constInt(raw json.RawMessage) (int32, bool) {
 	return int32(math.Round(float64(f))), true
 }
 
+// rawAxisDistribution is the object form of a distribution axis.
+type rawAxisDistribution struct {
+	Distribution string            `json:"distribution"`
+	Extent       []json.RawMessage `json:"extent"`
+}
+
 func parseAxis(raw json.RawMessage) (axis, bool) {
 	if v, ok := constInt(raw); ok {
 		return axis{kind: distConstant, min: v, max: v}, true
@@ -290,10 +296,7 @@ func parseAxis(raw json.RawMessage) (axis, bool) {
 			return axis{kind: distAboveTopSolid}, true
 		}
 	}
-	var a struct {
-		Distribution string            `json:"distribution"`
-		Extent       []json.RawMessage `json:"extent"`
-	}
+	var a rawAxisDistribution
 	if json.Unmarshal(raw, &a) != nil || len(a.Extent) != 2 {
 		return axis{}, false
 	}

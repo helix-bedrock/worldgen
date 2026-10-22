@@ -22,18 +22,21 @@ type oreFeature struct {
 	rules   []oreRule
 }
 
+// rawOre is the JSON of a minecraft:ore_feature.
+type rawOre struct {
+	Description struct {
+		Identifier string `json:"identifier"`
+	} `json:"description"`
+	Count   int32   `json:"count"`
+	Discard float32 `json:"discard_chance_on_air_exposure"`
+	Rules   []struct {
+		Places     biome.Block   `json:"places_block"`
+		MayReplace []biome.Block `json:"may_replace"`
+	} `json:"replace_rules"`
+}
+
 func (o *Overworld) parseOre(raw json.RawMessage) (*oreFeature, string, error) {
-	var r struct {
-		Description struct {
-			Identifier string `json:"identifier"`
-		} `json:"description"`
-		Count   int32   `json:"count"`
-		Discard float32 `json:"discard_chance_on_air_exposure"`
-		Rules   []struct {
-			Places     biome.Block   `json:"places_block"`
-			MayReplace []biome.Block `json:"may_replace"`
-		} `json:"replace_rules"`
-	}
+	var r rawOre
 	if err := json.Unmarshal(raw, &r); err != nil {
 		return nil, "", err
 	}
@@ -60,8 +63,8 @@ func (o *Overworld) parseOre(raw json.RawMessage) (*oreFeature, string, error) {
 var upgradedBlocks = map[string]string{
 	"minecraft:stone/granite": "minecraft:granite", "minecraft:stone/diorite": "minecraft:diorite",
 	"minecraft:stone/andesite": "minecraft:andesite", "minecraft:dirt/coarse": "minecraft:coarse_dirt",
-	"minecraft:tallgrass/tall": "minecraft:short_grass", "minecraft:tallgrass/default": "minecraft:short_grass",
-	"minecraft:tallgrass/fern": "minecraft:fern",
+	"minecraft:tallgrass/tall": blockShortGrass, "minecraft:tallgrass/default": blockShortGrass,
+	"minecraft:tallgrass/fern": blockFern,
 }
 
 func upgradedName(b biome.Block) string {
@@ -168,6 +171,6 @@ func upgradedStates(st map[string]any) (map[string]any, bool) {
 		out[k] = v
 	}
 	delete(out, "direction")
-	out["minecraft:cardinal_direction"] = legacyDirections[int(d)]
+	out[stateCardinalDirection] = legacyDirections[int(d)]
 	return out, true
 }

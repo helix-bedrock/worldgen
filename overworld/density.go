@@ -53,20 +53,16 @@ type oreNoises struct {
 }
 
 func newOreNoises(world rand.Positional) oreNoises {
-	n := func(name string, first int) *noise.Normal {
-		r := world.FromHash("minecraft:" + name)
-		return noise.NewNormal(&r, first, []float32{1})
-	}
 	r := world.FromHash("minecraft:ore")
 	return oreNoises{
-		noodle:          n("noodle", -8),
-		noodleThickness: n("noodle_thickness", -8),
-		ridgeA:          n("noodle_ridge_a", -7),
-		ridgeB:          n("noodle_ridge_b", -7),
-		veininess:       n("ore_veininess", -8),
-		veinA:           n("ore_vein_a", -7),
-		veinB:           n("ore_vein_b", -7),
-		gap:             n("ore_gap", -5),
+		noodle:          namedNoise(world, "noodle", -8, 1),
+		noodleThickness: namedNoise(world, "noodle_thickness", -8, 1),
+		ridgeA:          namedNoise(world, "noodle_ridge_a", -7, 1),
+		ridgeB:          namedNoise(world, "noodle_ridge_b", -7, 1),
+		veininess:       namedNoise(world, "ore_veininess", -8, 1),
+		veinA:           namedNoise(world, "ore_vein_a", -7, 1),
+		veinB:           namedNoise(world, "ore_vein_b", -7, 1),
+		gap:             namedNoise(world, "ore_gap", -5, 1),
 		pos:             r.Fork(),
 	}
 }

@@ -1,7 +1,6 @@
 package overworld
 
 import (
-	"cmp"
 	"slices"
 
 	"github.com/helix-bedrock/worldgen/rand"
@@ -142,20 +141,19 @@ func (o *Overworld) layMonument(cx, cz int32) *monument {
 
 	// The room grid: two 5x4 floors and a 3x2 top floor.
 	var rooms [75]*monRoom
-	add := func(i int) { rooms[i] = &monRoom{index: i} }
 	for i := 0; i < 5; i++ {
 		for zz := 0; zz < 4; zz++ {
-			add(i + 5*zz)
+			rooms[i+5*zz] = &monRoom{index: i + 5*zz}
 		}
 	}
 	for i := 0; i < 5; i++ {
 		for zz := 0; zz < 4; zz++ {
-			add(25 + i + 5*zz)
+			rooms[25+i+5*zz] = &monRoom{index: 25 + i + 5*zz}
 		}
 	}
 	for i := 1; i < 4; i++ {
 		for zz := 0; zz < 2; zz++ {
-			add(50 + i + 5*zz)
+			rooms[50+i+5*zz] = &monRoom{index: 50 + i + 5*zz}
 		}
 	}
 	// BDS swaps the direction of a link along z, so north is z+1 in the
@@ -243,10 +241,7 @@ func (o *Overworld) layMonument(cx, cz int32) *monument {
 	// Children, in BDS's order: entry, core, the fitted rooms, then the
 	// wings and the penthouse (added after the rooms are moved).
 	var children []monPiece
-	room := func(kind int, rm *monRoom, sx, sy, sz int32) monPiece {
-		return monPiece{kind: kind, bb: m.roomBox(rm, sx, sy, sz), room: rm}
-	}
-	children = append(children, room(monEntry, source, 1, 1, 1), room(monCore, core, 2, 2, 2))
+	children = append(children, m.roomPiece(monEntry, source, 1, 1, 1), m.roomPiece(monCore, core, 2, 2, 2))
 	for _, rm := range list {
 		if rm.claimed || rm.index > 74 {
 			continue
@@ -259,32 +254,32 @@ func (o *Overworld) layMonument(cx, cz int32) *monument {
 			rm.conn[dEast].claimed = true
 			rm.conn[dUp].claimed = true
 			rm.conn[dEast].conn[dUp].claimed = true
-			p = room(monDoubleXY, rm, 2, 2, 1)
+			p = m.roomPiece(monDoubleXY, rm, 2, 2, 1)
 		case rm.has(dNorth) && !rm.conn[dNorth].claimed && rm.has(dUp) && !rm.conn[dUp].claimed &&
 			rm.conn[dNorth].has(dUp) && !rm.conn[dNorth].conn[dUp].claimed:
 			rm.claimed = true
 			rm.conn[dNorth].claimed = true
 			rm.conn[dUp].claimed = true
 			rm.conn[dNorth].conn[dUp].claimed = true
-			p = room(monDoubleYZ, rm, 1, 2, 2)
+			p = m.roomPiece(monDoubleYZ, rm, 1, 2, 2)
 		case rm.has(dNorth) && !rm.conn[dNorth].claimed:
 			rm.claimed = true
 			rm.conn[dNorth].claimed = true
-			p = room(monDoubleZ, rm, 1, 1, 2)
+			p = m.roomPiece(monDoubleZ, rm, 1, 1, 2)
 		case rm.has(dEast) && !rm.conn[dEast].claimed:
 			rm.claimed = true
 			rm.conn[dEast].claimed = true
-			p = room(monDoubleX, rm, 2, 1, 1)
+			p = m.roomPiece(monDoubleX, rm, 2, 1, 1)
 		case rm.has(dUp) && !rm.conn[dUp].claimed:
 			rm.claimed = true
 			rm.conn[dUp].claimed = true
-			p = room(monDoubleY, rm, 1, 2, 1)
+			p = m.roomPiece(monDoubleY, rm, 1, 2, 1)
 		case rm.open&0x3E == 0:
 			rm.claimed = true
-			p = room(monSimpleTop, rm, 1, 1, 1)
+			p = m.roomPiece(monSimpleTop, rm, 1, 1, 1)
 		default:
 			rm.claimed = true
-			p = room(monSimple, rm, 1, 1, 1)
+			p = m.roomPiece(monSimple, rm, 1, 1, 1)
 			p.design = r.IntN(3)
 		}
 		children = append(children, p)
@@ -297,15 +292,11 @@ func (o *Overworld) layMonument(cx, cz int32) *monument {
 		c.Y0, c.Y1 = c.Y0+building.bb.Y0, c.Y1+building.bb.Y0
 		c.Z0, c.Z1 = c.Z0+dz, c.Z1+dz
 	}
-	corners := func(ax, ay, az, bx, by, bz int32) structure.Box {
-		x0, z0, x1, z1 := b.wx(ax, az), b.wz(ax, az), b.wx(bx, bz), b.wz(bx, bz)
-		return structure.NewBox(min(x0, x1), b.wy(ay), min(z0, z1), max(x0, x1), b.wy(by), max(z0, z1))
-	}
 	design := int32(r.Uint32()>>1) & 1
 	children = append(children,
-		monPiece{kind: monWing, bb: corners(1, 1, 1, 23, 8, 21), design: design},
-		monPiece{kind: monWing, bb: corners(34, 1, 1, 56, 8, 21), design: design ^ 1},
-		monPiece{kind: monPenthouse, bb: corners(22, 13, 22, 35, 17, 35)})
+		monPiece{kind: monWing, bb: b.corners(1, 1, 1, 23, 8, 21), design: design},
+		monPiece{kind: monWing, bb: b.corners(34, 1, 1, 56, 8, 21), design: design ^ 1},
+		monPiece{kind: monPenthouse, bb: b.corners(22, 13, 22, 35, 17, 35)})
 	m.pieces = append([]monPiece{building}, children...)
 	return m
 }
@@ -337,8 +328,8 @@ func (m *monument) roomBox(rm *monRoom, sx, sy, sz int32) structure.Box {
 // (cx, cz). A building spans chunks sx-2..sx+2 of its start.
 func (o *Overworld) monumentsReach(cx, cz int32, f func(m *monument)) {
 	chunk := structure.NewBox(cx*16, MinY, cz*16, cx*16+15, MaxY-1, cz*16+15)
-	for rx := floorDivRegion(cx-2, monumentSpacing); rx <= floorDivRegion(cx+2, monumentSpacing); rx++ {
-		for rz := floorDivRegion(cz-2, monumentSpacing); rz <= floorDivRegion(cz+2, monumentSpacing); rz++ {
+	for rx := structure.Region(cx-2, monumentSpacing); rx <= structure.Region(cx+2, monumentSpacing); rx++ {
+		for rz := structure.Region(cz-2, monumentSpacing); rz <= structure.Region(cz+2, monumentSpacing); rz++ {
 			sx, sz := o.monumentPick(rx, rz)
 			if sx < cx-2 || sx > cx+2 || sz < cz-2 || sz > cz+2 {
 				continue
@@ -1511,20 +1502,16 @@ func (b *monBuild) penthouse() {
 // returns its building's corner at its floor. It is safe for concurrent
 // use.
 func (o *Overworld) NearestMonument(x, z int32, maxRegions int32) (Scattered, bool) {
-	type cand struct {
-		cx, cz int32
-		d      int64
-	}
-	var cands []cand
-	rx0, rz0 := floorDivRegion(x>>4, monumentSpacing), floorDivRegion(z>>4, monumentSpacing)
+	var cands []locateCand
+	rx0, rz0 := structure.Region(x>>4, monumentSpacing), structure.Region(z>>4, monumentSpacing)
 	for rx := rx0 - maxRegions; rx <= rx0+maxRegions; rx++ {
 		for rz := rz0 - maxRegions; rz <= rz0+maxRegions; rz++ {
 			cx, cz := o.monumentPick(rx, rz)
 			dx, dz := int64(cx*16+8-x), int64(cz*16+8-z)
-			cands = append(cands, cand{cx, cz, dx*dx + dz*dz})
+			cands = append(cands, locateCand{cx, cz, dx*dx + dz*dz})
 		}
 	}
-	slices.SortFunc(cands, func(a, b cand) int { return cmp.Compare(a.d, b.d) })
+	slices.SortFunc(cands, compareLocateCand)
 	for _, c := range cands {
 		if m := o.monumentAt(c.cx, c.cz); m != nil {
 			bb := m.pieces[0].bb
@@ -1532,4 +1519,15 @@ func (o *Overworld) NearestMonument(x, z int32, maxRegions int32) (Scattered, bo
 		}
 	}
 	return Scattered{}, false
+}
+
+// roomPiece is a room piece of kind over room rm, sx by sy by sz rooms.
+func (m *monument) roomPiece(kind int, rm *monRoom, sx, sy, sz int32) monPiece {
+	return monPiece{kind: kind, bb: m.roomBox(rm, sx, sy, sz), room: rm}
+}
+
+// corners is the world box between two local corners of the building.
+func (b *monBuild) corners(ax, ay, az, bx, by, bz int32) structure.Box {
+	x0, z0, x1, z1 := b.wx(ax, az), b.wz(ax, az), b.wx(bx, bz), b.wz(bx, bz)
+	return structure.NewBox(min(x0, x1), b.wy(ay), min(z0, z1), max(x0, x1), b.wy(by), max(z0, z1))
 }

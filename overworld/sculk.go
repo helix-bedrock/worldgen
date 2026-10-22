@@ -105,12 +105,8 @@ var sculkReplaceableWorldGen = []string{
 }
 
 func (o *Overworld) newSculkBlocks() *sculkBlocks {
-	id := func(n string) uint32 {
-		b, _ := o.reg.Default("minecraft:" + n)
-		return b
-	}
-	s := &sculkBlocks{sculk: id("sculk"), catalyst: id("sculk_catalyst"), sensor: id("sculk_sensor"),
-		shrieker: id("sculk_shrieker"), movingBlock: id("moving_block"), vein: o.newMultifaceBlock("minecraft:sculk_vein"),
+	s := &sculkBlocks{sculk: o.blockID("minecraft:sculk"), catalyst: o.blockID("minecraft:sculk_catalyst"), sensor: o.blockID("minecraft:sculk_sensor"),
+		shrieker: o.blockID("minecraft:sculk_shrieker"), movingBlock: o.blockID("minecraft:moving_block"), vein: o.newMultifaceBlock("minecraft:sculk_vein"),
 		replace: map[uint32]bool{}}
 	s.shriekerSummon = o.withProp(s.shrieker, "can_summon", true)
 	for _, n := range sculkReplaceableWorldGen {
@@ -514,7 +510,7 @@ func (o *Overworld) sculkUseCharge(w *featureWorld, sb *sculkBlocks, sp *sculkSp
 	r2 := float32(float32(sp.noGrowth) * float32(sp.noGrowth))
 	near := r2 > dist
 	if !near {
-		if above, _ := w.block(c.x, c.y+1, c.z); (above == o.ids.air || o.blockName(above) == "minecraft:water") && o.growthsNear(w, sb, c.x, c.y, c.z) < 3 {
+		if above, _ := w.block(c.x, c.y+1, c.z); (above == o.ids.air || o.blockName(above) == blockWater) && o.growthsNear(w, sb, c.x, c.y, c.z) < 3 {
 			if r.IntN(sp.cost) < charge {
 				g := sb.shriekerSummon
 				if r.IntN(11) != 0 {
@@ -568,14 +564,8 @@ func (o *Overworld) growthsNear(w *featureWorld, sb *sculkBlocks, x, y, z int32)
 // face resting on a replaceable block turns that block to sculk and spreads
 // veins around it.
 func (o *Overworld) veinUseCharge(w *featureWorld, sb *sculkBlocks, sp *sculkSpreader, c *sculkCursor, r *rand.MT, spreadVeins bool) int32 {
-	decay := func() int32 {
-		if r.IntN(sp.decayRate) == 0 {
-			return int32(math.Floor(float64(float32(float32(c.charge) * 0.5))))
-		}
-		return c.charge
-	}
 	if !spreadVeins {
-		return decay()
+		return chargeDecay(r, sp, c)
 	}
 	cur, _ := w.block(c.x, c.y, c.z)
 	for _, d := range shuffledFaces(r) {
@@ -599,7 +589,7 @@ func (o *Overworld) veinUseCharge(w *featureWorld, sb *sculkBlocks, sp *sculkSpr
 		o.spreadAll(w, sb, sb.vein, sb.sculk, nx, ny, nz, false)
 		return c.charge - 1
 	}
-	return decay()
+	return chargeDecay(r, sp, c)
 }
 
 // sculkPatchFeature is SculkPatchFeature (place: sub_D302240).
@@ -614,18 +604,21 @@ type sculkPatchFeature struct {
 	extra                      intRange
 }
 
+// rawSculkPatch is the JSON of a minecraft:sculk_patch_feature.
+type rawSculkPatch struct {
+	On            []json.RawMessage `json:"can_place_sculk_patch_on"`
+	Central       string            `json:"central_block"`
+	CentralChance float32           `json:"central_block_placement_chance"`
+	Cursors       int32             `json:"cursor_count"`
+	Charge        int32             `json:"charge_amount"`
+	Attempts      int32             `json:"spread_attempts"`
+	Growth        int32             `json:"growth_rounds"`
+	Spread        int32             `json:"spread_rounds"`
+	Extra         json.RawMessage   `json:"extra_growth_chance"`
+}
+
 func (o *Overworld) parseSculkPatch(raw json.RawMessage) (placer, error) {
-	var r struct {
-		On            []json.RawMessage `json:"can_place_sculk_patch_on"`
-		Central       string            `json:"central_block"`
-		CentralChance float32           `json:"central_block_placement_chance"`
-		Cursors       int32             `json:"cursor_count"`
-		Charge        int32             `json:"charge_amount"`
-		Attempts      int32             `json:"spread_attempts"`
-		Growth        int32             `json:"growth_rounds"`
-		Spread        int32             `json:"spread_rounds"`
-		Extra         json.RawMessage   `json:"extra_growth_chance"`
-	}
+	var r rawSculkPatch
 	if err := json.Unmarshal(raw, &r); err != nil {
 		return nil, err
 	}
@@ -710,16 +703,19 @@ type multifaceFeature struct {
 	chance float32
 }
 
+// rawMultiface is the JSON of a minecraft:multiface_feature.
+type rawMultiface struct {
+	Search  int32             `json:"search_range"`
+	Block   string            `json:"places_block"`
+	Floor   bool              `json:"can_place_on_floor"`
+	Ceiling bool              `json:"can_place_on_ceiling"`
+	Wall    bool              `json:"can_place_on_wall"`
+	Chance  float32           `json:"chance_of_spreading"`
+	On      []json.RawMessage `json:"can_place_on"`
+}
+
 func (o *Overworld) parseMultiface(raw json.RawMessage) (placer, error) {
-	var r struct {
-		Search  int32             `json:"search_range"`
-		Block   string            `json:"places_block"`
-		Floor   bool              `json:"can_place_on_floor"`
-		Ceiling bool              `json:"can_place_on_ceiling"`
-		Wall    bool              `json:"can_place_on_wall"`
-		Chance  float32           `json:"chance_of_spreading"`
-		On      []json.RawMessage `json:"can_place_on"`
-	}
+	var r rawMultiface
 	if err := json.Unmarshal(raw, &r); err != nil {
 		return nil, err
 	}
@@ -840,4 +836,13 @@ func (f *surfaceThresholdFeature) place(w *featureWorld, x, y, z int32, r *rand.
 		return blockPos{}, false
 	}
 	return p.place(w, x, y, z, r)
+}
+
+// chargeDecay is the cursor's charge after a vein used it: halved, rounded
+// down, one time in decayRate.
+func chargeDecay(r *rand.MT, sp *sculkSpreader, c *sculkCursor) int32 {
+	if r.IntN(sp.decayRate) == 0 {
+		return int32(math.Floor(float64(float32(float32(c.charge) * 0.5))))
+	}
+	return c.charge
 }

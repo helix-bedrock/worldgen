@@ -1,7 +1,6 @@
 package overworld
 
 import (
-	"cmp"
 	"slices"
 	"strings"
 
@@ -81,7 +80,7 @@ func (o *Overworld) scatterKindAt(x, y, z int32) uint8 {
 // chunk (cx, cz), scatterNone if none does.
 func (o *Overworld) scatteredAt(cx, cz int32) uint8 {
 	var r rand.MT
-	rx, rz := floorDivRegion(cx, scatterSpacing), floorDivRegion(cz, scatterSpacing)
+	rx, rz := structure.Region(cx, scatterSpacing), structure.Region(cz, scatterSpacing)
 	structureSeed(&r, o.seed, rx, rz, scatterSalt)
 	n := int32(scatterSpacing - scatterSeparation)
 	if rx*scatterSpacing+r.IntN(n) != cx || rz*scatterSpacing+r.IntN(n) != cz {
@@ -264,14 +263,10 @@ type scBuild struct {
 }
 
 func (b *scBuild) ids() {
-	id := func(name string) uint32 {
-		s, _ := b.o.reg.Default("minecraft:" + name)
-		return s
-	}
 	b.air = b.o.ids.air
-	b.sandstone, b.cut, b.chiseled = id("sandstone"), id("cut_sandstone"), id("chiseled_sandstone")
-	b.orange, b.blue, b.sand = id("orange_terracotta"), id("blue_terracotta"), id("sand")
-	b.cobble, b.mossy, b.redstone = id("cobblestone"), id("mossy_cobblestone"), id("redstone_wire")
+	b.sandstone, b.cut, b.chiseled = b.o.blockID("minecraft:sandstone"), b.o.blockID("minecraft:cut_sandstone"), b.o.blockID("minecraft:chiseled_sandstone")
+	b.orange, b.blue, b.sand = b.o.blockID("minecraft:orange_terracotta"), b.o.blockID("minecraft:blue_terracotta"), b.o.blockID("minecraft:sand")
+	b.cobble, b.mossy, b.redstone = b.o.blockID("minecraft:cobblestone"), b.o.blockID("minecraft:mossy_cobblestone"), b.o.blockID("minecraft:redstone_wire")
 }
 
 // state is a block with properties. A property the block does not have is
@@ -388,9 +383,8 @@ func (b *scBuild) fillDownWorld(s uint32, wx, wy, wz int32) {
 	if !b.cbox.Contains([3]int32{wx, wy, wz}) {
 		return
 	}
-	at := func(y int32) uint32 { return b.c.Block(int(wx&15), int(y), int(wz&15)) }
 	for {
-		cur := at(wy)
+		cur := b.c.Block(int(wx&15), int(wy), int(wz&15))
 		if cur != b.air && !b.o.liquidMaterial(cur) && !soilPlants[b.o.blockName(cur)] {
 			break
 		}
@@ -400,7 +394,7 @@ func (b *scBuild) fillDownWorld(s uint32, wx, wy, wz int32) {
 		b.setWorld(wx, wy, wz, s)
 		wy--
 	}
-	if b.o.blockName(at(wy)) == "minecraft:grass_block" {
+	if b.o.blockName(b.c.Block(int(wx&15), int(wy), int(wz&15))) == "minecraft:grass_block" {
 		dirt, _ := b.o.reg.Default("minecraft:dirt")
 		b.setWorld(wx, wy, wz, dirt)
 	}
@@ -414,10 +408,10 @@ var cardinalOf = map[int32]string{2: "north", 3: "south", 4: "west", 5: "east"}
 // and a seed drawn from the random, unless a chest is already there.
 func (b *scBuild) chest(x, y, z, dir int32, table string) {
 	wx, wy, wz := b.x0+x, b.y0+y, b.z0+z
-	if !b.cbox.Contains([3]int32{wx, wy, wz}) || b.o.blockName(b.get(x, y, z)) == "minecraft:chest" {
+	if !b.cbox.Contains([3]int32{wx, wy, wz}) || b.o.blockName(b.get(x, y, z)) == blockChest {
 		return
 	}
-	b.put(b.o.state("minecraft:chest", map[string]any{"minecraft:cardinal_direction": cardinalOf[dir]}), x, y, z)
+	b.put(b.o.state(blockChest, map[string]any{stateCardinalDirection: cardinalOf[dir]}), x, y, z)
 	if d := b.entity(x, y, z, "loot_tables/chests/"+table+".json"); d != nil {
 		d["LootTableSeed"] = int32(b.r.Uint32() >> 1)
 	}
@@ -584,6 +578,12 @@ func (b *scBuild) desertPyramid() {
 	b.desertCellar()
 }
 
+// layerBlock is the block of one horizontal layer at local height y.
+type layerBlock struct {
+	y int32
+	s uint32
+}
+
 // desertCellar is the archaeology cellar (the second half of sub_4E8B6F0).
 // VERIFY: BDS skips it for worlds of older base game versions (byte_F4A2978
 // and the version test); new worlds get it.
@@ -609,10 +609,7 @@ func (b *scBuild) desertCellar() {
 	b.put(sand, 15, -2, 17)
 	b.put(sandstone, 16, -2, 17)
 	b.put(sand, 16, -3, 17)
-	for _, layer := range []struct {
-		y int32
-		s uint32
-	}{{-3, cut}, {-2, chis}, {-1, cut}} {
+	for _, layer := range [3]layerBlock{{-3, cut}, {-2, chis}, {-1, cut}} {
 		b.fill(13, layer.y, 10, 13, layer.y, 15, layer.s, layer.s, true)
 		b.fill(19, layer.y, 10, 19, layer.y, 15, layer.s, layer.s, true)
 		b.fill(13, layer.y, 10, 19, layer.y, 11, layer.s, layer.s, true)
@@ -643,23 +640,17 @@ func (b *scBuild) desertCellar() {
 	for _, p := range [][2]int32{{17, 14}, {17, 12}, {15, 14}, {15, 12}, {18, 13}, {14, 13}, {16, 15}, {16, 11}, {19, 13}} {
 		b.put(orange, p[0], -4, p[1])
 	}
-	pillar := func(x, z int32) {
-		b.put(sand, x, -3, z)
-		spots = append(spots, [3]int32{x, -3, z})
-		b.put(sand, x, -2, z)
-		spots = append(spots, [3]int32{x, -2, z})
-	}
-	pillar(19, 13)
+	spots = b.cellarPillar(spots, sand, 19, 13)
 	b.put(cut, 20, -3, 13)
 	b.put(chis, 20, -2, 13)
 	b.put(orange, 13, -4, 13)
-	pillar(13, 13)
+	spots = b.cellarPillar(spots, sand, 13, 13)
 	b.put(cut, 12, -3, 13)
 	b.put(chis, 12, -2, 13)
 	b.put(orange, 16, -4, 16)
-	pillar(16, 16)
+	spots = b.cellarPillar(spots, sand, 16, 16)
 	b.put(orange, 16, -4, 10)
-	pillar(16, 10)
+	spots = b.cellarPillar(spots, sand, 16, 10)
 	b.put(cut, 16, -3, 9)
 	b.put(chis, 16, -2, 9)
 	count := min(int(xr.IntN(3))+5, len(spots))
@@ -669,21 +660,12 @@ func (b *scBuild) desertCellar() {
 		}
 	}
 	sus, _ := o.reg.Default("minecraft:suspicious_sand")
-	place := func(p [3]int32) {
-		if !b.put(sus, p[0], p[1], p[2]) {
-			return
-		}
-		// The loot seed is drawn only when the block entity is there.
-		if d := b.entity(p[0], p[1], p[2], "loot_tables/entities/desert_pyramid_brushable_block.json"); d != nil {
-			d["LootTableSeed"] = int32(uint32(xr.Uint64()))
-		}
-	}
 	for i := 0; i < max(count, 1) && i < len(spots); i++ {
-		place(spots[i])
+		b.susSand(&xr, sus, spots[i])
 	}
 	x := xr.IntN(5) + 14
 	z := xr.IntN(5) + 11
-	place([3]int32{x, 0, z})
+	b.susSand(&xr, sus, [3]int32{x, 0, z})
 }
 
 // jungleTemple builds a jungle temple (sub_4E905B0), Java's layout.
@@ -766,18 +748,15 @@ func (b *scBuild) jungleTemple() {
 	b.fillMoss(6, -1, 1, 6, -1, 1)
 	// The tripwire traps. Hooks, levers, pistons and repeaters keep the
 	// direction given (sub_D254F10 leaves them alone).
-	hook := func(dir int32, attached bool) uint32 {
-		return o.state("minecraft:tripwire_hook", map[string]any{"attached_bit": attached, "direction": dir})
-	}
 	// Placed wire joins its neighbours (BDS updates it after placing).
 	wireX := o.state("minecraft:trip_wire", map[string]any{"attached_bit": true,
 		"minecraft:connection_east": true, "minecraft:connection_west": true})
 	wireZ := o.state("minecraft:trip_wire", map[string]any{"attached_bit": true,
 		"minecraft:connection_north": true, "minecraft:connection_south": true})
 	// VineBlock's all-sides constant (dword_F60D6C0).
-	vine := o.state("minecraft:vine", map[string]any{"vine_direction_bits": int32(15)})
-	b.put(hook(3, true), 1, -3, 8)
-	b.put(hook(1, true), 4, -3, 8)
+	vine := o.state(blockVine, map[string]any{"vine_direction_bits": int32(15)})
+	b.put(o.tripwireHook(3, true), 1, -3, 8)
+	b.put(o.tripwireHook(1, true), 4, -3, 8)
 	b.put(wireX, 2, -3, 8)
 	b.put(wireX, 3, -3, 8)
 	for z := int32(7); z >= 1; z-- {
@@ -788,8 +767,8 @@ func (b *scBuild) jungleTemple() {
 	b.dispenser(3, -2, 1, 3, "dispenser_trap")
 	b.put(vine, 3, -2, 2)
 	// This pair is built from the plain hook, not the attached one.
-	b.put(hook(0, false), 7, -3, 1)
-	b.put(hook(2, false), 7, -3, 5)
+	b.put(o.tripwireHook(0, false), 7, -3, 1)
+	b.put(o.tripwireHook(2, false), 7, -3, 5)
 	b.put(wireZ, 7, -3, 2)
 	b.put(wireZ, 7, -3, 3)
 	b.put(wireZ, 7, -3, 4)
@@ -910,14 +889,10 @@ func (b *scBuild) igloo(y int32) {
 	n := b.r.IntN(8) + 4
 	// Each section sits where its connection point meets the top's
 	// (sub_D2B50C0: both points turned, then subtracted).
-	at := func(a, c [3]int32) [3]int32 {
-		ra, rc := structure.RotatePos(a, rot), structure.RotatePos(c, rot)
-		return [3]int32{origin[0] + ra[0] - rc[0], origin[1] + ra[1] - rc[1], origin[2] + ra[2] - rc[2]}
-	}
 	for k := range max(n, 1) {
-		b.template("igloo/igloo_middle", at([3]int32{3, -1 - 3*k, 5}, [3]int32{1, 2, 1}), rot)
+		b.template("igloo/igloo_middle", iglooSection(origin, rot, [3]int32{3, -1 - 3*k, 5}, [3]int32{1, 2, 1}), rot)
 	}
-	bottom := at([3]int32{3, -3*n - 1, 5}, [3]int32{3, 5, 7})
+	bottom := iglooSection(origin, rot, [3]int32{3, -3*n - 1, 5}, [3]int32{3, 5, 7})
 	markers := b.template("igloo/igloo_bottom", bottom, rot)
 	for _, m := range markers {
 		if m.name != "chest" {
@@ -960,9 +935,9 @@ func (b *scBuild) template(path string, origin [3]int32, rot int) []templateMark
 		st := jt.Template.Palette[tb.State]
 		cs := conv[tb.State]
 		switch st.Name {
-		case "minecraft:structure_void", "minecraft:anvil":
+		case blockStructureVoid, "minecraft:anvil":
 			continue
-		case "minecraft:structure_block":
+		case blockStructureBlock:
 			if m, _ := tb.NBT["metadata"].(string); m != "" {
 				markers = append(markers, templateMarker{p, m})
 			}
@@ -1050,12 +1025,8 @@ func (o *Overworld) NearestIglooBasement(x, z int32, maxRegions int32) (Scattere
 // scatterCandidates lists the start chunks of the scattered feature
 // regions within maxRegions of block (x, z), nearest first.
 func (o *Overworld) scatterCandidates(x, z int32, maxRegions int32) [][2]int32 {
-	type cand struct {
-		cx, cz int32
-		d      int64
-	}
-	var cands []cand
-	rx0, rz0 := floorDivRegion(x>>4, scatterSpacing), floorDivRegion(z>>4, scatterSpacing)
+	var cands []locateCand
+	rx0, rz0 := structure.Region(x>>4, scatterSpacing), structure.Region(z>>4, scatterSpacing)
 	for rx := rx0 - maxRegions; rx <= rx0+maxRegions; rx++ {
 		for rz := rz0 - maxRegions; rz <= rz0+maxRegions; rz++ {
 			var r rand.MT
@@ -1064,13 +1035,45 @@ func (o *Overworld) scatterCandidates(x, z int32, maxRegions int32) [][2]int32 {
 			cx := rx*scatterSpacing + r.IntN(n)
 			cz := rz*scatterSpacing + r.IntN(n)
 			dx, dz := int64(cx*16+8-x), int64(cz*16+8-z)
-			cands = append(cands, cand{cx, cz, dx*dx + dz*dz})
+			cands = append(cands, locateCand{cx, cz, dx*dx + dz*dz})
 		}
 	}
-	slices.SortFunc(cands, func(a, b cand) int { return cmp.Compare(a.d, b.d) })
+	slices.SortFunc(cands, compareLocateCand)
 	out := make([][2]int32, len(cands))
 	for i, c := range cands {
 		out[i] = [2]int32{c.cx, c.cz}
 	}
 	return out
+}
+
+// iglooSection is where an igloo section goes so that its connection point
+// c meets point a of the section above, both turned by rot.
+func iglooSection(origin [3]int32, rot int, a, c [3]int32) [3]int32 {
+	ra, rc := structure.RotatePos(a, rot), structure.RotatePos(c, rot)
+	return [3]int32{origin[0] + ra[0] - rc[0], origin[1] + ra[1] - rc[1], origin[2] + ra[2] - rc[2]}
+}
+
+// tripwireHook is a tripwire hook facing dir.
+func (o *Overworld) tripwireHook(dir int32, attached bool) uint32 {
+	return o.state("minecraft:tripwire_hook", map[string]any{"attached_bit": attached, "direction": dir})
+}
+
+// cellarPillar puts the two sand blocks of a cellar pillar at (x, z) and
+// adds them to the suspicious sand spots.
+func (b *scBuild) cellarPillar(spots [][3]int32, sand uint32, x, z int32) [][3]int32 {
+	b.put(sand, x, -3, z)
+	spots = append(spots, [3]int32{x, -3, z})
+	b.put(sand, x, -2, z)
+	return append(spots, [3]int32{x, -2, z})
+}
+
+// susSand places suspicious sand at p with its loot seed drawn from xr.
+func (b *scBuild) susSand(xr *rand.Xoroshiro, sus uint32, p [3]int32) {
+	if !b.put(sus, p[0], p[1], p[2]) {
+		return
+	}
+	// The loot seed is drawn only when the block entity is there.
+	if d := b.entity(p[0], p[1], p[2], "loot_tables/entities/desert_pyramid_brushable_block.json"); d != nil {
+		d["LootTableSeed"] = int32(uint32(xr.Uint64()))
+	}
 }

@@ -146,27 +146,30 @@ func (o *Overworld) loadAbandonedCamps() (*djDef, error) {
 	return d, nil
 }
 
+// rawDJStructure is a minecraft:jigsaw structure file.
+type rawDJStructure struct {
+	J struct {
+		Description struct{ Identifier string }
+		Filters     []struct{ Value string } `json:"biome_filters"`
+		Adapt       string                   `json:"terrain_adaptation"`
+		Start       string                   `json:"start_pool"`
+		Depth       int                      `json:"max_depth"`
+		Dist        struct {
+			Horizontal, Vertical int32
+		} `json:"max_distance_from_center"`
+		Height struct {
+			Value struct {
+				Absolute int32
+			}
+		} `json:"start_height"`
+		Padding    int32  `json:"dimension_padding"`
+		Projection string `json:"heightmap_projection"`
+	} `json:"minecraft:jigsaw"`
+}
+
 // loadDJStructure reads a minecraft:jigsaw structure file.
 func loadDJStructure(file string, pools map[string]*structure.Pool) (*djDef, error) {
-	var st struct {
-		J struct {
-			Description struct{ Identifier string }
-			Filters     []struct{ Value string } `json:"biome_filters"`
-			Adapt       string                   `json:"terrain_adaptation"`
-			Start       string                   `json:"start_pool"`
-			Depth       int                      `json:"max_depth"`
-			Dist        struct {
-				Horizontal, Vertical int32
-			} `json:"max_distance_from_center"`
-			Height struct {
-				Value struct {
-					Absolute int32
-				}
-			} `json:"start_height"`
-			Padding    int32  `json:"dimension_padding"`
-			Projection string `json:"heightmap_projection"`
-		} `json:"minecraft:jigsaw"`
-	}
+	var st rawDJStructure
 	if err := readJSON(file, &st); err != nil {
 		return nil, err
 	}
@@ -182,6 +185,23 @@ func loadDJStructure(file string, pools map[string]*structure.Pool) (*djDef, err
 	return d, nil
 }
 
+// rawTemplatePool is a minecraft:template_pool file.
+type rawTemplatePool struct {
+	P struct {
+		Description struct{ Identifier string }
+		Fallback    string
+		Elements    []struct {
+			Element struct {
+				Type       string `json:"element_type"`
+				Location   string
+				Feature    string
+				Processors string
+			}
+			Weight int32
+		}
+	} `json:"minecraft:template_pool"`
+}
+
 // loadPools reads the template pools of one folder, with the processors
 // they name.
 func (o *Overworld) loadPools(root, dir string) (map[string]*structure.Pool, error) {
@@ -194,21 +214,7 @@ func (o *Overworld) loadPools(root, dir string) (map[string]*structure.Pool, err
 		if err != nil || e.IsDir() || path.Ext(p) != ".json" {
 			return err
 		}
-		var tp struct {
-			P struct {
-				Description struct{ Identifier string }
-				Fallback    string
-				Elements    []struct {
-					Element struct {
-						Type       string `json:"element_type"`
-						Location   string
-						Feature    string
-						Processors string
-					}
-					Weight int32
-				}
-			} `json:"minecraft:template_pool"`
-		}
+		var tp rawTemplatePool
 		if err := readJSON(p, &tp); err != nil {
 			return err
 		}
@@ -254,6 +260,37 @@ type processorList struct {
 	capped []structure.CappedRule
 }
 
+// rawProcRule is one rule of a rule processor.
+type rawProcRule struct {
+	Modifier struct {
+		LootTable string `json:"loot_table"`
+	} `json:"block_entity_modifier"`
+	Input struct {
+		Type        string `json:"predicate_type"`
+		Block       string
+		Probability float32
+	} `json:"input_predicate"`
+	Output biome.Block `json:"output_state"`
+}
+
+// rawProcessor is one processor of a processor list.
+type rawProcessor struct {
+	Type     string `json:"processor_type"`
+	Rules    []rawProcRule
+	Limit    int
+	Delegate *struct {
+		Rules []rawProcRule
+	}
+}
+
+// rawProcessorList is a minecraft:processor_list file.
+type rawProcessorList struct {
+	L struct {
+		Description struct{ Identifier string }
+		Processors  []rawProcessor
+	} `json:"minecraft:processor_list"`
+}
+
 // loadProcessors reads the processor lists of a folder: rule processors
 // (random_block_match and block_match inputs) and capped rule processors.
 func (o *Overworld) loadProcessors(dir string) (map[string]*processorList, error) {
@@ -261,33 +298,9 @@ func (o *Overworld) loadProcessors(dir string) (map[string]*processorList, error
 	if err != nil {
 		return nil, fmt.Errorf("worldgen: list processors: %w", err)
 	}
-	type rule struct {
-		Modifier struct {
-			LootTable string `json:"loot_table"`
-		} `json:"block_entity_modifier"`
-		Input struct {
-			Type        string `json:"predicate_type"`
-			Block       string
-			Probability float32
-		} `json:"input_predicate"`
-		Output biome.Block `json:"output_state"`
-	}
-	type proc struct {
-		Type     string `json:"processor_type"`
-		Rules    []rule
-		Limit    int
-		Delegate *struct {
-			Rules []rule
-		}
-	}
 	out := map[string]*processorList{}
 	for _, f := range files {
-		var doc struct {
-			L struct {
-				Description struct{ Identifier string }
-				Processors  []proc
-			} `json:"minecraft:processor_list"`
-		}
+		var doc rawProcessorList
 		if err := readJSON(f, &doc); err != nil {
 			return nil, err
 		}
@@ -324,6 +337,63 @@ func (o *Overworld) loadProcessors(dir string) (map[string]*processorList, error
 	return out, nil
 }
 
+// rawTrialChambers is data/bds/trial_chambers.json.
+type rawTrialChambers struct {
+	Processors map[string][]struct {
+		Block       string
+		Probability float32
+		Output      string
+		Lit         bool
+	}
+	Pools []struct {
+		Name, Fallback string
+		Elements       []struct {
+			Template   string
+			Weight     int32
+			Processors string
+		}
+	}
+}
+
+// trialSpawnerPrefix is the name prefix of the trial chambers' spawner
+// pools.
+const trialSpawnerPrefix = "minecraft:trial_chambers/spawner/"
+
+// trialElements makes one pool element per (template, processor list)
+// pair, so pools naming the same pair share it.
+type trialElements struct {
+	procs map[string][]structure.BlockRule
+	byKey map[string]*structure.Element
+}
+
+// get returns the element of template tpl with processor list procName.
+func (t trialElements) get(tpl, procName string) *structure.Element {
+	k := tpl + "|" + procName
+	if e := t.byKey[k]; e != nil {
+		return e
+	}
+	e := &structure.Element{ID: tpl, Template: tpl, Rules: t.procs[procName]}
+	t.byKey[k] = e
+	return e
+}
+
+// trialAlias is a spawner alias choosing one of groups.
+func trialAlias(groups ...[][2]string) djAlias { return djAlias{groups: groups} }
+
+// trialRanged binds the ranged and slow ranged spawner contents to the
+// pools of mob kind.
+func trialRanged(kind string) [][2]string {
+	return [][2]string{
+		{trialSpawnerPrefix + "contents/ranged", trialSpawnerPrefix + "ranged/" + kind},
+		{trialSpawnerPrefix + "contents/slow_ranged", trialSpawnerPrefix + "slow_ranged/" + kind},
+	}
+}
+
+// trialContents binds the spawner contents from to the pool to.
+func trialContents(from, to string) [][2]string {
+	return [][2]string{{trialSpawnerPrefix + "contents/" + from, trialSpawnerPrefix + to}}
+}
+
 // loadTrialChambers builds the trial chambers from BDS's code-defined
 // settings (sub_D228C00) and the extracted pools.
 func (o *Overworld) loadTrialChambers() (*djDef, error) {
@@ -331,22 +401,7 @@ func (o *Overworld) loadTrialChambers() (*djDef, error) {
 	if err != nil {
 		return nil, fmt.Errorf("worldgen: read trial_chambers.json: %w", err)
 	}
-	var doc struct {
-		Processors map[string][]struct {
-			Block       string
-			Probability float32
-			Output      string
-			Lit         bool
-		}
-		Pools []struct {
-			Name, Fallback string
-			Elements       []struct {
-				Template   string
-				Weight     int32
-				Processors string
-			}
-		}
-	}
+	var doc rawTrialChambers
 	if err := json.Unmarshal(raw, &doc); err != nil {
 		return nil, fmt.Errorf("worldgen: parse trial_chambers.json: %w", err)
 	}
@@ -363,43 +418,28 @@ func (o *Overworld) loadTrialChambers() (*djDef, error) {
 	d := &djDef{id: "minecraft:trial_chambers", kind: "trial_chambers", start: "minecraft:trial_chambers/chamber/end",
 		maxDepth: 20, maxH: 116, maxV: 116, padBottom: 10, padTop: 10, minY0: -40, maxY0: -20, bury: true,
 		spacing: 34, separation: 12, salt: 94251327, pools: map[string]*structure.Pool{}}
-	elements := map[string]*structure.Element{}
-	element := func(tpl, procName string) *structure.Element {
-		k := tpl + "|" + procName
-		if e := elements[k]; e != nil {
-			return e
-		}
-		e := &structure.Element{ID: tpl, Template: tpl, Rules: procs[procName]}
-		elements[k] = e
-		return e
-	}
+	elements := trialElements{procs: procs, byKey: map[string]*structure.Element{}}
 	for _, p := range doc.Pools {
 		pool := &structure.Pool{Name: p.Name, Fallback: p.Fallback}
 		for _, e := range p.Elements {
-			pool.Entries = append(pool.Entries, structure.PoolEntry{Element: element(e.Template, e.Processors), Weight: e.Weight})
+			pool.Entries = append(pool.Entries, structure.PoolEntry{Element: elements.get(e.Template, e.Processors), Weight: e.Weight})
 		}
 		d.pools[p.Name] = pool
 	}
 	// The pool aliases (sub_D293FC0): the spawner contents, bound once per
 	// chamber. Their targets are one-template pools of the same name.
-	alias := func(groups ...[][2]string) djAlias { return djAlias{groups: groups} }
-	tc := "minecraft:trial_chambers/spawner/"
-	pair := func(kind string) [][2]string {
-		return [][2]string{{tc + "contents/ranged", tc + "ranged/" + kind}, {tc + "contents/slow_ranged", tc + "slow_ranged/" + kind}}
-	}
-	one := func(from, to string) [][2]string { return [][2]string{{tc + "contents/" + from, tc + to}} }
 	d.aliases = []djAlias{
-		alias(pair("skeleton"), pair("stray"), pair("poison_skeleton")),
-		alias(one("melee", "melee/zombie"), one("melee", "melee/husk"), one("melee", "melee/spider")),
-		alias(one("small_melee", "small_melee/slime"), one("small_melee", "small_melee/cave_spider"),
-			one("small_melee", "small_melee/silverfish"), one("small_melee", "small_melee/baby_zombie")),
+		trialAlias(trialRanged("skeleton"), trialRanged("stray"), trialRanged("poison_skeleton")),
+		trialAlias(trialContents("melee", "melee/zombie"), trialContents("melee", "melee/husk"), trialContents("melee", "melee/spider")),
+		trialAlias(trialContents("small_melee", "small_melee/slime"), trialContents("small_melee", "small_melee/cave_spider"),
+			trialContents("small_melee", "small_melee/silverfish"), trialContents("small_melee", "small_melee/baby_zombie")),
 	}
 	for _, a := range d.aliases {
 		for _, g := range a.groups {
 			for _, pr := range g {
 				name := pr[1]
 				d.pools[name] = &structure.Pool{Name: name, Fallback: "minecraft:empty",
-					Entries: []structure.PoolEntry{{Element: element(strings.TrimPrefix(name, "minecraft:"), ""), Weight: 1}}}
+					Entries: []structure.PoolEntry{{Element: elements.get(strings.TrimPrefix(name, "minecraft:"), ""), Weight: 1}}}
 			}
 		}
 	}
@@ -430,7 +470,7 @@ func (d *djDef) pick(o *Overworld, rx, rz int32) (int32, int32) {
 
 // at assembles the structure starting in chunk (cx, cz), nil if none does.
 func (d *djDef) at(o *Overworld, cx, cz int32) *djStructure {
-	if x, z := d.pick(o, floorDivRegion(cx, d.spacing), floorDivRegion(cz, d.spacing)); x != cx || z != cz {
+	if x, z := d.pick(o, structure.Region(cx, d.spacing), structure.Region(cz, d.spacing)); x != cx || z != cz {
 		return nil
 	}
 	if v, ok := d.starts.Load([2]int32{cx, cz}); ok {
@@ -446,8 +486,8 @@ func (d *djDef) at(o *Overworld, cx, cz int32) *djStructure {
 // near calls f with the structures that start within reach of chunk
 // (cx, cz).
 func (d *djDef) near(o *Overworld, cx, cz int32, f func(s *djStructure)) {
-	r0x, r1x := floorDivRegion(cx-d.reach, d.spacing), floorDivRegion(cx+d.reach, d.spacing)
-	r0z, r1z := floorDivRegion(cz-d.reach, d.spacing), floorDivRegion(cz+d.reach, d.spacing)
+	r0x, r1x := structure.Region(cx-d.reach, d.spacing), structure.Region(cx+d.reach, d.spacing)
+	r0z, r1z := structure.Region(cz-d.reach, d.spacing), structure.Region(cz+d.reach, d.spacing)
 	for rx := r0x; rx <= r1x; rx++ {
 		for rz := r0z; rz <= r1z; rz++ {
 			sx, sz := d.pick(o, rx, rz)
@@ -909,28 +949,16 @@ func (o *Overworld) NearestDataJigsaw(kind string, x, z, maxRegions int32) (Scat
 	if d == nil {
 		return Scattered{}, false
 	}
-	type cand struct {
-		cx, cz int32
-		dist   int64
-	}
-	var cands []cand
-	rx0, rz0 := floorDivRegion(x>>4, d.spacing), floorDivRegion(z>>4, d.spacing)
+	var cands []locateCand
+	rx0, rz0 := structure.Region(x>>4, d.spacing), structure.Region(z>>4, d.spacing)
 	for rx := rx0 - maxRegions; rx <= rx0+maxRegions; rx++ {
 		for rz := rz0 - maxRegions; rz <= rz0+maxRegions; rz++ {
 			cx, cz := d.pick(o, rx, rz)
 			dx, dz := int64(cx*16+8-x), int64(cz*16+8-z)
-			cands = append(cands, cand{cx, cz, dx*dx + dz*dz})
+			cands = append(cands, locateCand{cx, cz, dx*dx + dz*dz})
 		}
 	}
-	slices.SortFunc(cands, func(a, b cand) int {
-		switch {
-		case a.dist < b.dist:
-			return -1
-		case a.dist > b.dist:
-			return 1
-		}
-		return 0
-	})
+	slices.SortFunc(cands, compareLocateCand)
 	for _, c := range cands {
 		if s := d.at(o, c.cx, c.cz); s != nil {
 			return Scattered{Kind: kind, X: s.start[0], Y: s.start[1], Z: s.start[2]}, true
@@ -1000,7 +1028,7 @@ func chestsInChunk(p *structure.Piece, cx, cz int32) int {
 	}
 	n := 0
 	for _, b := range p.Template.Template.Blocks {
-		if name := p.Template.Template.Palette[b.State].Name; name != "minecraft:chest" && name != "minecraft:trapped_chest" {
+		if name := p.Template.Template.Palette[b.State].Name; name != blockChest && name != "minecraft:trapped_chest" {
 			continue
 		}
 		rp := structure.RotatePos(b.Pos, p.Rotation)
@@ -1019,7 +1047,7 @@ func structureCells(s *djStructure) map[[3]int32]bool {
 			continue
 		}
 		for _, b := range p.Template.Template.Blocks {
-			if p.Template.Template.Palette[b.State].Name == "minecraft:structure_void" {
+			if p.Template.Template.Palette[b.State].Name == blockStructureVoid {
 				continue
 			}
 			rp := structure.RotatePos(b.Pos, p.Rotation)

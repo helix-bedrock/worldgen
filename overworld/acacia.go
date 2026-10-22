@@ -212,34 +212,29 @@ func (c *acaciaCanopy) place(t *treeFeature, w *featureWorld, x, y, z int32) {
 		big = 2
 	}
 	top := max(s, 1)
-	put := func(px, py, pz int32) {
-		if b, ok := w.block(px, py, pz); t.replaces(b, ok) {
-			w.set(px, py, pz, c.leaf)
-		}
-	}
 	if c.simplify {
 		for dx := 1 - top; dx < top; dx++ {
 			for dz := 1 - top; dz < top; dz++ {
-				put(x+dx, y+1, z+dz)
+				c.put(t, w, x+dx, y+1, z+dz)
 			}
 		}
 	} else {
 		for dx := 2 - big; dx < big-1; dx++ {
 			for dz := 2 - big; dz < big-1; dz++ {
-				put(x+dx, y+1, z+dz)
+				c.put(t, w, x+dx, y+1, z+dz)
 			}
 		}
-		put(x+top-1, y+1, z)
-		put(x+1-top, y+1, z)
-		put(x, y+1, z+top-1)
-		put(x, y+1, z+1-top)
+		c.put(t, w, x+top-1, y+1, z)
+		c.put(t, w, x+1-top, y+1, z)
+		c.put(t, w, x, y+1, z+top-1)
+		c.put(t, w, x, y+1, z+1-top)
 	}
 	for dx := -s; dx <= s; dx++ {
 		for dz := -s; dz <= s; dz++ {
 			if mathx.Abs(dx) == s && mathx.Abs(dz) == s {
 				continue
 			}
-			put(x+dx, y, z+dz)
+			c.put(t, w, x+dx, y, z+dz)
 		}
 	}
 }
@@ -252,33 +247,28 @@ func (c *roofedCanopy) place(w *featureWorld, x, y, z, width int32, r *rand.MT) 
 	if c.hasCore {
 		cx, cz = c.core, c.core
 	}
-	put := func(px, py, pz int32) {
-		if b, ok := w.block(px, py, pz); ok && b == w.o.ids.air {
-			w.set(px, py, pz, c.leaf)
-		}
-	}
 	ro := c.outer
 	for dx := -ro; dx <= 0; dx++ {
 		mx := cx - 1 - dx
 		for dz := -ro; dz <= 0; dz++ {
 			mz := cz - 1 - dz
-			put(x+dx, y-1, z+dz)
-			put(x+mx, y-1, z+dz)
-			put(x+dx, y-1, z+mz)
-			put(x+mx, y-1, z+mz)
+			c.put(w, x+dx, y-1, z+dz)
+			c.put(w, x+mx, y-1, z+dz)
+			c.put(w, x+dx, y-1, z+mz)
+			c.put(w, x+mx, y-1, z+mz)
 			if (dz > 1-ro || dx > -ro) && (dx != 1-ro || dz != -ro) {
 				ty := y + c.height
-				put(x+dx, ty, z+dz)
-				put(x+mx, ty, z+dz)
-				put(x+dx, ty, z+mz)
-				put(x+mx, ty, z+mz)
+				c.put(w, x+dx, ty, z+dz)
+				c.put(w, x+mx, ty, z+dz)
+				c.put(w, x+dx, ty, z+mz)
+				c.put(w, x+mx, ty, z+mz)
 			}
 		}
 	}
 	if nextBool(r) {
 		for i := int32(0); i < cx; i++ {
 			for j := int32(0); j < cz; j++ {
-				put(x+i, y+c.height+1, z+j)
+				c.put(w, x+i, y+c.height+1, z+j)
 			}
 		}
 	}
@@ -294,7 +284,7 @@ func (c *roofedCanopy) place(w *featureWorld, x, y, z, width int32, r *rand.MT) 
 				if mathx.Abs(dx) >= ri && mathx.Abs(dz) >= ri {
 					continue
 				}
-				put(x+dx, y+layer, z+dz)
+				c.put(w, x+dx, y+layer, z+dz)
 			}
 		}
 	}
@@ -342,5 +332,20 @@ func (c *randomSpreadCanopy) place(t *treeFeature, w *featureWorld, trunk []bloc
 				w.set(px, py, pz, c.leaves[i])
 			}
 		}
+	}
+}
+
+// put sets an acacia canopy leaf at (x, y, z) where the tree may replace
+// the block.
+func (c *acaciaCanopy) put(t *treeFeature, w *featureWorld, x, y, z int32) {
+	if b, ok := w.block(x, y, z); t.replaces(b, ok) {
+		w.set(x, y, z, c.leaf)
+	}
+}
+
+// put sets a roofed canopy leaf at (x, y, z) if the block there is air.
+func (c *roofedCanopy) put(w *featureWorld, x, y, z int32) {
+	if b, ok := w.block(x, y, z); ok && b == w.o.ids.air {
+		w.set(x, y, z, c.leaf)
 	}
 }

@@ -41,7 +41,7 @@ func NewTerrainCache(gen *Overworld, size int) *TerrainCache {
 func (t *TerrainCache) Get(chunkX, chunkZ int32) *PackedChunk {
 	return t.structured.Get([2]int32{chunkX, chunkZ}, func() *PackedChunk {
 		raw := t.Raw(chunkX, chunkZ)
-		height := func(x, z int32) int32 { return t.gen.surfaceHeight(t.Raw, x, z) }
+		height := surfaceHeights{t.gen, t.Raw}.at
 		if !t.gen.structuresReach(chunkX, chunkZ, height, t.Raw) {
 			return raw
 		}
@@ -121,3 +121,12 @@ func (t *TerrainCache) Spawners(chunkX, chunkZ int32) []Spawner {
 	}
 	return out
 }
+
+// surfaceHeights reads surface heights from a raw terrain source.
+type surfaceHeights struct {
+	o   *Overworld
+	raw func(cx, cz int32) *PackedChunk
+}
+
+// at is the surface height of column (x, z).
+func (s surfaceHeights) at(x, z int32) int32 { return s.o.surfaceHeight(s.raw, x, z) }

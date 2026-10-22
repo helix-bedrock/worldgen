@@ -40,7 +40,7 @@ func (o *Overworld) rainTop(c *Chunk, x, z int) int32 {
 }
 
 func (o *Overworld) freeze(chunkX, chunkZ int32, c *Chunk) {
-	snow, ok := o.reg.Default("minecraft:snow_layer")
+	snow, ok := o.reg.Default(blockSnowLayer)
 	if !ok {
 		return
 	}
@@ -98,7 +98,7 @@ func (o *Overworld) snowReplaces(b uint32) bool {
 		return true
 	}
 	switch o.blockName(b) {
-	case "minecraft:short_grass", "minecraft:fern", "minecraft:deadbush", "minecraft:short_dry_grass":
+	case blockShortGrass, blockFern, blockDeadBush, "minecraft:short_dry_grass":
 		return true
 	}
 	return false

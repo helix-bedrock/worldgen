@@ -116,16 +116,19 @@ type snapToSurfaceFeature struct {
 	surfaces                          blockMatcher
 }
 
+// rawSnapToSurface is the JSON of a minecraft:snap_to_surface_feature.
+type rawSnapToSurface struct {
+	Feature  string            `json:"feature_to_snap"`
+	Range    int32             `json:"vertical_search_range"`
+	Surface  string            `json:"surface"`
+	Air      *bool             `json:"allow_air_placement"`
+	NonAir   bool              `json:"allow_non_air_placement"`
+	Water    bool              `json:"allow_underwater_placement"`
+	Surfaces []json.RawMessage `json:"allowed_surface_blocks"`
+}
+
 func (o *Overworld) parseSnapToSurface(raw json.RawMessage, set *featureSet) (placer, error) {
-	var r struct {
-		Feature  string            `json:"feature_to_snap"`
-		Range    int32             `json:"vertical_search_range"`
-		Surface  string            `json:"surface"`
-		Air      *bool             `json:"allow_air_placement"`
-		NonAir   bool              `json:"allow_non_air_placement"`
-		Water    bool              `json:"allow_underwater_placement"`
-		Surfaces []json.RawMessage `json:"allowed_surface_blocks"`
-	}
+	var r rawSnapToSurface
 	if err := json.Unmarshal(raw, &r); err != nil {
 		return nil, err
 	}
@@ -209,45 +212,61 @@ func (f *snapToSurfaceFeature) scan(w *featureWorld, x, y, z int32, face int) (b
 	// The scan only runs on through blocks of the start's biome (the
 	// wrapper lambda sub_D2DE640 compares the block target's biome, slot
 	// 25).
-	startBiome := w.biome(x, y, z)
-	cont := func(p blockPos, b uint32) bool {
-		if w.biome(p[0], p[1], p[2]) != startBiome {
-			return false
-		}
-		if solid {
-			return f.allowNonAir && b != o.ids.air && !o.waterMaterial(b)
-		}
-		return f.passable(o, b)
-	}
-	surface := func(b uint32) bool {
-		if !f.surfaces.empty() {
-			return f.surfaces.match(o, b)
-		}
-		if solid {
-			return f.passable(o, b)
-		}
-		return o.sturdyFace(b, face^1)
-	}
-	if !cont(blockPos{x, y, z}, b) {
+	s := surfaceScan{f: f, w: w, solid: solid, startBiome: w.biome(x, y, z), face: face}
+	if !s.cont(blockPos{x, y, z}, b) {
 		return blockPos{}, false
 	}
 	p := blockPos{x + st[0], y + st[1], z + st[2]}
 	var i int32
 	for i < f.rng-1 {
 		b, ok := w.block(p[0], p[1], p[2])
-		if !ok || !cont(p, b) {
+		if !ok || !s.cont(p, b) {
 			break
 		}
 		p = blockPos{p[0] + st[0], p[1] + st[1], p[2] + st[2]}
 		i++
 	}
-	if b, ok := w.block(p[0], p[1], p[2]); !ok || !surface(b) {
+	if b, ok := w.block(p[0], p[1], p[2]); !ok || !s.surface(b) {
 		return blockPos{}, false
 	}
 	if solid {
 		i++
 	}
 	return blockPos{x + st[0]*i, y + st[1]*i, z + st[2]*i}, true
+}
+
+// surfaceScan is one snap-to-surface scan: whether it started in a solid
+// block, the biome it started in and the face it walks toward.
+type surfaceScan struct {
+	f          *snapToSurfaceFeature
+	w          *featureWorld
+	solid      bool
+	startBiome uint32
+	face       int
+}
+
+// cont reports whether the scan goes on through block b at p.
+func (s *surfaceScan) cont(p blockPos, b uint32) bool {
+	o := s.w.o
+	if s.w.biome(p[0], p[1], p[2]) != s.startBiome {
+		return false
+	}
+	if s.solid {
+		return s.f.allowNonAir && b != o.ids.air && !o.waterMaterial(b)
+	}
+	return s.f.passable(o, b)
+}
+
+// surface reports whether block b ends the scan as its surface.
+func (s *surfaceScan) surface(b uint32) bool {
+	o := s.w.o
+	if !s.f.surfaces.empty() {
+		return s.f.surfaces.match(o, b)
+	}
+	if s.solid {
+		return s.f.passable(o, b)
+	}
+	return o.sturdyFace(b, s.face^1)
 }
 
 // vegetationPatchFeature lays a patch of ground blocks on a floor or
@@ -266,20 +285,23 @@ type vegetationPatchFeature struct {
 	waterlog   bool
 }
 
+// rawVegetationPatch is the JSON of a minecraft:vegetation_patch_feature.
+type rawVegetationPatch struct {
+	Replace    []json.RawMessage `json:"replaceable_blocks"`
+	Ground     json.RawMessage   `json:"ground_block"`
+	Vegetation string            `json:"vegetation_feature"`
+	Surface    string            `json:"surface"`
+	Depth      json.RawMessage   `json:"depth"`
+	Deep       float32           `json:"extra_deep_block_chance"`
+	Vertical   int32             `json:"vertical_range"`
+	VegChance  float32           `json:"vegetation_chance"`
+	Radius     json.RawMessage   `json:"horizontal_radius"`
+	Edge       float32           `json:"extra_edge_column_chance"`
+	Waterlog   bool              `json:"waterlogged"`
+}
+
 func (o *Overworld) parseVegetationPatch(raw json.RawMessage, set *featureSet) (placer, error) {
-	var r struct {
-		Replace    []json.RawMessage `json:"replaceable_blocks"`
-		Ground     json.RawMessage   `json:"ground_block"`
-		Vegetation string            `json:"vegetation_feature"`
-		Surface    string            `json:"surface"`
-		Depth      json.RawMessage   `json:"depth"`
-		Deep       float32           `json:"extra_deep_block_chance"`
-		Vertical   int32             `json:"vertical_range"`
-		VegChance  float32           `json:"vegetation_chance"`
-		Radius     json.RawMessage   `json:"horizontal_radius"`
-		Edge       float32           `json:"extra_edge_column_chance"`
-		Waterlog   bool              `json:"waterlogged"`
-	}
+	var r rawVegetationPatch
 	if err := json.Unmarshal(raw, &r); err != nil {
 		return nil, err
 	}
@@ -398,14 +420,24 @@ func (f *vegetationPatchFeature) placeGround(w *featureWorld, x, y, z, dy, depth
 	return true
 }
 
+// faceProbe is a neighbour offset and the face of that neighbour that must
+// be sturdy.
+type faceProbe struct {
+	dx, dy, dz int32
+	face       int
+}
+
+// poolWalls are the four sides and the bottom of a pool block, in the
+// order they are checked.
+func poolWalls() [5]faceProbe {
+	return [5]faceProbe{{0, 0, -1, faceSouth}, {1, 0, 0, faceWest}, {0, 0, 1, faceNorth}, {-1, 0, 0, faceEast}, {0, -1, 0, faceUp}}
+}
+
 // enclosed reports whether a pool block is held in by sturdy blocks on its
 // four sides and below.
 func (f *vegetationPatchFeature) enclosed(w *featureWorld, p blockPos) bool {
 	o := w.o
-	for _, s := range [...]struct {
-		dx, dy, dz int32
-		face       int
-	}{{0, 0, -1, faceSouth}, {1, 0, 0, faceWest}, {0, 0, 1, faceNorth}, {-1, 0, 0, faceEast}, {0, -1, 0, faceUp}} {
+	for _, s := range poolWalls() {
 		b, _ := w.block(p[0]+s.dx, p[1]+s.dy, p[2]+s.dz)
 		if !o.sturdyFace(b, s.face) {
 			return false
@@ -457,15 +489,18 @@ type weightedRange struct {
 	weight float32
 }
 
+// rawGrowingPlant is the JSON of a minecraft:growing_plant_feature.
+type rawGrowingPlant struct {
+	Heights    [][]json.RawMessage `json:"height_distribution"`
+	Direction  string              `json:"growth_direction"`
+	Age        json.RawMessage     `json:"age"`
+	Body       [][]json.RawMessage `json:"body_blocks"`
+	Head       [][]json.RawMessage `json:"head_blocks"`
+	AllowWater bool                `json:"allow_water"`
+}
+
 func (o *Overworld) parseGrowingPlant(raw json.RawMessage) (placer, error) {
-	var r struct {
-		Heights    [][]json.RawMessage `json:"height_distribution"`
-		Direction  string              `json:"growth_direction"`
-		Age        json.RawMessage     `json:"age"`
-		Body       [][]json.RawMessage `json:"body_blocks"`
-		Head       [][]json.RawMessage `json:"head_blocks"`
-		AllowWater bool                `json:"allow_water"`
-	}
+	var r rawGrowingPlant
 	if err := json.Unmarshal(raw, &r); err != nil {
 		return nil, err
 	}
@@ -480,35 +515,40 @@ func (o *Overworld) parseGrowingPlant(raw json.RawMessage) (placer, error) {
 		}
 		f.heights = append(f.heights, weightedRange{parseIntRange(e[0], 0), wgt})
 	}
-	blocks := func(list [][]json.RawMessage) []weightedBlock {
-		var out []weightedBlock
-		for _, e := range list {
-			if len(e) != 2 {
-				return nil
-			}
-			var b biome.Block
-			var wgt float32
-			if json.Unmarshal(e[0], &b) != nil || json.Unmarshal(e[1], &wgt) != nil {
-				return nil
-			}
-			id, ok := o.lookupBlock(b)
-			if !ok {
-				return nil
-			}
-			out = append(out, weightedBlock{id, wgt})
-		}
-		return out
-	}
-	f.body, f.head = blocks(r.Body), blocks(r.Head)
+	f.body, f.head = o.parseWeightedBlocks(r.Body), o.parseWeightedBlocks(r.Head)
 	if len(f.heights) == 0 || len(f.body) == 0 || len(f.head) == 0 {
 		return nil, nil
 	}
 	return f, nil
 }
 
+// parseWeightedBlocks reads a list of [block, weight] pairs; nil when an
+// entry is malformed or its block is missing.
+func (o *Overworld) parseWeightedBlocks(list [][]json.RawMessage) []weightedBlock {
+	var out []weightedBlock
+	for _, e := range list {
+		if len(e) != 2 {
+			return nil
+		}
+		var b biome.Block
+		var wgt float32
+		if json.Unmarshal(e[0], &b) != nil || json.Unmarshal(e[1], &wgt) != nil {
+			return nil
+		}
+		id, ok := o.lookupBlock(b)
+		if !ok {
+			return nil
+		}
+		out = append(out, weightedBlock{id, wgt})
+	}
+	return out
+}
+
+// weightedBlockWeight is the weight of a weighted block entry.
+func weightedBlockWeight(b weightedBlock) float32 { return b.weight }
+
 func (f *growingPlantFeature) place(w *featureWorld, x, y, z int32, r *rand.MT) (blockPos, bool) {
 	o := w.o
-	weightOf := func(b weightedBlock) float32 { return b.weight }
 	h := pickWeighted(r, f.heights, func(e weightedRange) float32 { return e.weight }).r.draw(r)
 	age := f.age.draw(r)
 	dy := int32(-1)
@@ -526,14 +566,14 @@ func (f *growingPlantFeature) place(w *featureWorld, x, y, z int32, r *rand.MT) 
 		}
 		next, _ := w.block(x, py+dy, z)
 		if i == h-1 || next != o.ids.air {
-			head := pickWeighted(r, f.head, weightOf).block
+			head := pickWeighted(r, f.head, weightedBlockWeight).block
 			if f.age.max != 0 {
 				head = o.withProp(head, "growing_plant_age", float64(age))
 			}
 			w.set(x, py, z, head)
 			return blockPos{x, py, z}, true
 		}
-		w.set(x, py, z, pickWeighted(r, f.body, weightOf).block)
+		w.set(x, py, z, pickWeighted(r, f.body, weightedBlockWeight).block)
 	}
 	return blockPos{}, false
 }
@@ -583,18 +623,18 @@ type mossVegetationFeature struct {
 func (o *Overworld) newMossVegetation(id func(string) uint32) *mossVegetationFeature {
 	f := &mossVegetationFeature{double: map[uint32]bool{}}
 	for _, p := range []weightedBlock{{id("minecraft:flowering_azalea"), 4}, {id("minecraft:azalea"), 7},
-		{id("minecraft:moss_carpet"), 25}, {id("minecraft:short_grass"), 50}, {id("minecraft:tall_grass"), 10}} {
+		{id("minecraft:moss_carpet"), 25}, {id(blockShortGrass), 50}, {id(blockTallGrass), 10}} {
 		f.plants = append(f.plants, p)
 	}
-	f.double[id("minecraft:tall_grass")] = true
+	f.double[id(blockTallGrass)] = true
 	return f
 }
 
 // newPaleMossVegetation is the pale garden's VegetationFeature (list built at
 // sub_49BC9C0): pale moss carpet 25, short grass 25, tall grass 10.
 func (o *Overworld) newPaleMossVegetation(id func(string) uint32) *mossVegetationFeature {
-	f := &mossVegetationFeature{double: map[uint32]bool{id("minecraft:tall_grass"): true}}
-	f.plants = []weightedBlock{{id("minecraft:pale_moss_carpet"), 25}, {id("minecraft:short_grass"), 25}, {id("minecraft:tall_grass"), 10}}
+	f := &mossVegetationFeature{double: map[uint32]bool{id(blockTallGrass): true}}
+	f.plants = []weightedBlock{{id("minecraft:pale_moss_carpet"), 25}, {id(blockShortGrass), 25}, {id(blockTallGrass), 10}}
 	return f
 }
 
@@ -661,11 +701,10 @@ func (f *dripleafFeature) placeSmall(w *featureWorld, x, y, z, dir int32) (block
 	b, _ := w.block(x, y, z)
 	above, _ := w.block(x, y+1, z)
 	below, _ := w.block(x, y-1, z)
-	open := func(b uint32) bool { return b == o.ids.air || o.isWater(b) }
-	if !open(b) || !open(above) || !o.plantSurvives(f.small, below) {
+	if !o.airOrWater(b) || !o.airOrWater(above) || !o.plantSurvives(f.small, below) {
 		return blockPos{}, false
 	}
-	lower := o.withProp(o.withProp(f.small, "minecraft:cardinal_direction", legacyDirections[dir]), "upper_block_bit", false)
+	lower := o.withProp(o.withProp(f.small, stateCardinalDirection, legacyDirections[dir]), "upper_block_bit", false)
 	w.set(x, y, z, lower)
 	w.set(x, y+1, z, o.withProp(lower, "upper_block_bit", true))
 	return blockPos{x, y, z}, true

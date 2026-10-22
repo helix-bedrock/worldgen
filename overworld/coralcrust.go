@@ -91,13 +91,16 @@ func (f *coralCrustFeature) palette(o *Overworld, t *crustTemplate, jt *structur
 	return t.conv[rot]
 }
 
+// crustPiece is one placed coral crust template: its variant, rotation
+// and origin.
+type crustPiece struct {
+	crust, rot int32
+	pos        blockPos
+}
+
 func (f *coralCrustFeature) place(w *featureWorld, x, y, z int32, r *rand.MT) (blockPos, bool) {
 	o := w.o
 	crust, rot := r.IntN(5), r.IntN(4)
-	type piece struct {
-		crust, rot int32
-		pos        blockPos
-	}
 	pr := crustProbe[crust][rot]
 	p := blockPos{x + pr[0], y, z + pr[1]}
 	limit := int32(SeaLevel - 9)
@@ -118,7 +121,7 @@ func (f *coralCrustFeature) place(w *featureWorld, x, y, z int32, r *rand.MT) (b
 		return blockPos{}, false
 	}
 	or := crustOrigin[crust][rot]
-	pieces := []piece{{crust, rot, blockPos{p[0] + or[0], p[1], p[2] + or[1]}}}
+	pieces := []crustPiece{{crust, rot, blockPos{p[0] + or[0], p[1], p[2] + or[1]}}}
 	if r.IntN(4) != 0 {
 		n := r.IntN(5) + 4
 		for range n {
@@ -135,7 +138,7 @@ func (f *coralCrustFeature) place(w *featureWorld, x, y, z int32, r *rand.MT) (b
 			q := blockPos{p[0] + dx + cp[0], p[1] - 1, p[2] + dz + cp[1]}
 			if b, _ := w.block(q[0], q[1], q[2]); o.solidMaterial(b) {
 				co := crustOrigin[c][cr]
-				pieces = append(pieces, piece{c, cr, blockPos{q[0] + co[0], p[1], q[2] + co[1]}})
+				pieces = append(pieces, crustPiece{c, cr, blockPos{q[0] + co[0], p[1], q[2] + co[1]}})
 			}
 		}
 		if len(pieces) > 1 {
@@ -168,10 +171,10 @@ func (f *coralCrustFeature) placeTemplate(w *featureWorld, t *crustTemplate, at 
 		rp := structure.RotatePos(tb.Pos, rot)
 		p := blockPos{at[0] + rp[0], at[1] + rp[1], at[2] + rp[2]}
 		switch jt.Template.Palette[tb.State].Name {
-		case "minecraft:structure_block":
+		case blockStructureBlock:
 			markers = append(markers, p)
 			continue
-		case "minecraft:jigsaw", "minecraft:structure_void":
+		case blockJigsaw, blockStructureVoid:
 			continue
 		}
 		if cs := conv[tb.State]; cs.OK {
@@ -186,22 +189,19 @@ func (f *coralCrustFeature) placeTemplate(w *featureWorld, t *crustTemplate, at 
 // fans on the sides. VERIFY: BDS walks the markers in its hash map's
 // order; they are taken in template order here.
 func (f *coralCrustFeature) growMarkers(w *featureWorld, markers []blockPos, r *rand.MT) {
-	o := w.o
 	cf := f.coral
 	color := int(r.IntN(5))
 	b := &coralBuild{f: cf, w: w, r: r, block: cf.blocks[color], color: color}
-	solid := func(p blockPos) bool { return o.solidMaterial(b.at(p)) }
-	water := func(p blockPos) bool { return o.waterMaterial(b.at(p)) }
 	for _, p := range markers {
-		if !solid(up(p, -1)) {
+		if !b.solidAt(up(p, -1)) {
 			continue
 		}
-		if solid(p) {
+		if b.solidAt(p) {
 			p = up(p, 1)
 		}
 		if r.IntN(4) != 0 {
 			n := r.IntN(3)
-			if !water(p) {
+			if !b.waterAt(p) {
 				continue
 			}
 			b.put(p)
@@ -253,7 +253,7 @@ func (f *coralCrustFeature) growMarkers(w *featureWorld, markers []blockPos, r *
 		}
 	}
 	for _, p := range b.tops {
-		if !water(p) || water(up(p, -1)) || !solid(up(p, -1)) {
+		if !b.waterAt(p) || b.waterAt(up(p, -1)) || !b.solidAt(up(p, -1)) {
 			continue
 		}
 		fan := r.IntN(5)
@@ -270,10 +270,16 @@ func (f *coralCrustFeature) growMarkers(w *featureWorld, markers []blockPos, r *
 		nd := row[r.IntN(3)]
 		v := facingVec[nd]
 		t := blockPos{s.pos[0] + v[0], s.pos[1] + v[1], s.pos[2] + v[2]}
-		if !water(t) || !attach {
+		if !b.waterAt(t) || !attach {
 			continue
 		}
 		c := min(max(r.IntN(2)+2*r.IntN(3), 0), 4)
 		w.set(t[0], t[1], t[2], cf.wallFans[c][wallFanDirection[nd-2]])
 	}
 }
+
+// solidAt reports whether the block at p has a solid material.
+func (b *coralBuild) solidAt(p blockPos) bool { return b.w.o.solidMaterial(b.at(p)) }
+
+// waterAt reports whether the block at p has water material.
+func (b *coralBuild) waterAt(p blockPos) bool { return b.w.o.waterMaterial(b.at(p)) }

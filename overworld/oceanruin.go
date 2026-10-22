@@ -1,7 +1,6 @@
 package overworld
 
 import (
-	"cmp"
 	"encoding/json"
 	"fmt"
 	"slices"
@@ -125,20 +124,11 @@ func (o *Overworld) initOceanStructures(biomeIDs map[string]uint32, n uint32) er
 			o.ruinBiome[id] = rb
 		}
 	}
-	set := func(names []string) []bool {
-		s := make([]bool, n)
-		for _, name := range names {
-			if id, ok := biomeIDs[name]; ok {
-				s[id] = true
-			}
-		}
-		return s
-	}
-	o.monumentDeep, o.monumentWater = set(monumentDeep), set(monumentWater)
-	o.shipBiome, o.shipBeach = set(shipBiomes), set(shipBeaches)
-	o.treasureBiome = set(treasureBiomes)
-	o.outpostBiome = set(outpostBiomes)
-	o.mansionBiome = set(mansionBiomes)
+	o.monumentDeep, o.monumentWater = biomeMask(biomeIDs, n, monumentDeep), biomeMask(biomeIDs, n, monumentWater)
+	o.shipBiome, o.shipBeach = biomeMask(biomeIDs, n, shipBiomes), biomeMask(biomeIDs, n, shipBeaches)
+	o.treasureBiome = biomeMask(biomeIDs, n, treasureBiomes)
+	o.outpostBiome = biomeMask(biomeIDs, n, outpostBiomes)
+	o.mansionBiome = biomeMask(biomeIDs, n, mansionBiomes)
 	h, err := structure.LoadLiquidHolders()
 	if err != nil {
 		return err
@@ -191,7 +181,7 @@ func (o *Overworld) monumentPick(rx, rz int32) (int32, int32) {
 // isMonumentChunk reports whether an ocean monument starts in chunk
 // (cx, cz).
 func (o *Overworld) isMonumentChunk(cx, cz int32) bool {
-	x, z := o.monumentPick(floorDivRegion(cx, monumentSpacing), floorDivRegion(cz, monumentSpacing))
+	x, z := o.monumentPick(structure.Region(cx, monumentSpacing), structure.Region(cz, monumentSpacing))
 	if x != cx || z != cz {
 		return false
 	}
@@ -203,8 +193,8 @@ func (o *Overworld) isMonumentChunk(cx, cz int32) bool {
 // monumentNear reports whether a monument starts in chunks cx0..cx1,
 // cz0..cz1 (the ruin test asks each chunk; only region picks can answer).
 func (o *Overworld) monumentNear(cx0, cz0, cx1, cz1 int32) bool {
-	for rx := floorDivRegion(cx0, monumentSpacing); rx <= floorDivRegion(cx1, monumentSpacing); rx++ {
-		for rz := floorDivRegion(cz0, monumentSpacing); rz <= floorDivRegion(cz1, monumentSpacing); rz++ {
+	for rx := structure.Region(cx0, monumentSpacing); rx <= structure.Region(cx1, monumentSpacing); rx++ {
+		for rz := structure.Region(cz0, monumentSpacing); rz <= structure.Region(cz1, monumentSpacing); rz++ {
 			x, z := o.monumentPick(rx, rz)
 			if x >= cx0 && x <= cx1 && z >= cz0 && z <= cz1 && o.isMonumentChunk(x, z) {
 				return true
@@ -226,7 +216,7 @@ func (o *Overworld) ruinPick(rx, rz int32) (int32, int32) {
 // ruinAt returns the settings of the ocean ruin starting in chunk (cx, cz);
 // ok is false if none does.
 func (o *Overworld) ruinAt(cx, cz int32) ruinBiome {
-	x, z := o.ruinPick(floorDivRegion(cx, ruinSpacing), floorDivRegion(cz, ruinSpacing))
+	x, z := o.ruinPick(structure.Region(cx, ruinSpacing), structure.Region(cz, ruinSpacing))
 	if x != cx || z != cz {
 		return ruinBiome{}
 	}
@@ -303,14 +293,10 @@ func addRuin(pieces []ruinPiece, r *rand.MT, x, z int32, rot int, integrity floa
 		group = ruinColdBig
 	}
 	name := group[r.IntN(int32(len(group)))]
-	layer := func(kind string, integrity float32) ruinPiece {
-		path := name
-		if path != "ruin4" {
-			path = fmt.Sprintf(name, kind)
-		}
-		return ruinPiece{"ruin/" + path, x, z, rot, integrity, big, warm}
-	}
-	return append(pieces, layer("brick", integrity), layer("cracked", 0.7), layer("mossy", 0.5))
+	return append(pieces,
+		ruinLayer(name, "brick", x, z, rot, integrity, big, warm),
+		ruinLayer(name, "cracked", x, z, rot, 0.7, big, warm),
+		ruinLayer(name, "mossy", x, z, rot, 0.5, big, warm))
 }
 
 // ruinStart returns the pieces of the ruin starting in chunk (sx, sz), nil
@@ -343,8 +329,8 @@ func (o *Overworld) ruinBox(p ruinPiece) (structure.Box, *structure.JigsawTempla
 // with its pieces. Pieces reach at most 3 chunks from the start.
 func (o *Overworld) ruinsReach(cx, cz int32, f func(sx, sz int32, pieces []ruinPiece)) {
 	chunk := structure.NewBox(cx*16, MinY, cz*16, cx*16+15, MaxY-1, cz*16+15)
-	for rx := floorDivRegion(cx-3, ruinSpacing); rx <= floorDivRegion(cx+3, ruinSpacing); rx++ {
-		for rz := floorDivRegion(cz-3, ruinSpacing); rz <= floorDivRegion(cz+3, ruinSpacing); rz++ {
+	for rx := structure.Region(cx-3, ruinSpacing); rx <= structure.Region(cx+3, ruinSpacing); rx++ {
+		for rz := structure.Region(cz-3, ruinSpacing); rz <= structure.Region(cz+3, ruinSpacing); rz++ {
 			sx, sz := o.ruinPick(rx, rz)
 			if sx < cx-3 || sx > cx+3 || sz < cz-3 || sz > cz+3 {
 				continue
@@ -388,16 +374,9 @@ func (o *Overworld) placeRuins(cx, cz int32, c *Chunk, raw func(cx, cz int32) *P
 // moved down to the lowest floor under the piece when that floor is more
 // than 3 below and most columns are that deep, then one lower.
 func (o *Overworld) ruinY(p ruinPiece, area structure.Box, raw func(cx, cz int32) *PackedChunk) int32 {
-	at := func(x, y, z int32) uint32 {
-		c := raw(x>>4, z>>4)
-		if c == nil {
-			return o.ids.air
-		}
-		return c.at(int(y-MinY)<<8 | int(z&15)<<4 | int(x&15))
-	}
 	h := int32(MinY)
 	for y := MaxY - 1; y >= MinY; y-- {
-		if s := at(p.x, int32(y), p.z); s != o.ids.air && o.reg.LightDampening(s) >= 15 {
+		if s := o.rawBlock(raw, p.x, int32(y), p.z); s != o.ids.air && o.reg.LightDampening(s) >= fullLightDampening {
 			h = int32(y + 1)
 			break
 		}
@@ -407,7 +386,7 @@ func (o *Overworld) ruinY(p ruinPiece, area structure.Box, raw func(cx, cz int32
 		for z := area.Z0; z <= area.Z1; z++ {
 			y := h - 1
 			for y > MinY+1 {
-				s := at(x, y, z)
+				s := o.rawBlock(raw, x, y, z)
 				if s != o.ids.air && s != o.ids.water && s != o.ids.flowingWater {
 					break
 				}
@@ -445,13 +424,13 @@ func (b *scBuild) ruinPiece(p ruinPiece, raw func(cx, cz int32) *PackedChunk) {
 		rp := structure.RotatePos(tb.Pos, p.rot)
 		pos := [3]int32{p.x + rp[0], y0 + rp[1], p.z + rp[2]}
 		switch st.Name {
-		case "minecraft:structure_block":
+		case blockStructureBlock:
 			// Structure blocks and jigsaws are ignored before the draw.
 			if m, _ := tb.NBT["metadata"].(string); m == "chest" {
 				markers = append(markers, templateMarker{pos, m})
 			}
 			continue
-		case "minecraft:jigsaw", "minecraft:structure_void":
+		case blockJigsaw, blockStructureVoid:
 			continue
 		}
 		if p.integrity < 1 && float64(p.integrity) < float64(ir.Uint32())*0x1p-32 {
@@ -464,7 +443,7 @@ func (b *scBuild) ruinPiece(p ruinPiece, raw func(cx, cz int32) *PackedChunk) {
 		id, name := cs.ID, o.blockName(cs.ID)
 		below := pos[1] < SeaLevel
 		if id == o.ids.air && below {
-			id, name = o.ids.water, "minecraft:water"
+			id, name = o.ids.water, blockWater
 		}
 		if !b.setWorld(pos[0], pos[1], pos[2], id) {
 			continue
@@ -491,7 +470,7 @@ func (b *scBuild) ruinChest(p ruinPiece, pos [3]int32) {
 	if !b.cbox.Contains(pos) {
 		return
 	}
-	fill := "minecraft:water"
+	fill := blockWater
 	if p.warm {
 		fill = "minecraft:sandstone"
 	}
@@ -507,7 +486,7 @@ func (b *scBuild) ruinChest(p ruinPiece, pos [3]int32) {
 	}
 	cy := pos[1] - 1
 	// State index 3 of minecraft:cardinal_direction.
-	chest := o.state("minecraft:chest", map[string]any{"minecraft:cardinal_direction": cardinalNames[3]})
+	chest := o.state(blockChest, map[string]any{stateCardinalDirection: cardinalNames[3]})
 	if !b.setWorld(pos[0], cy, pos[2], chest) {
 		return
 	}
@@ -532,20 +511,16 @@ func (b *scBuild) ruinChest(p ruinPiece, pos [3]int32) {
 // "ocean_ruin_cold"; X, Z are the main piece's corner and Y its bottom. It
 // is safe for concurrent use.
 func (o *Overworld) NearestOceanRuin(x, z int32, maxRegions int32) (Scattered, bool) {
-	type cand struct {
-		cx, cz int32
-		d      int64
-	}
-	var cands []cand
-	rx0, rz0 := floorDivRegion(x>>4, ruinSpacing), floorDivRegion(z>>4, ruinSpacing)
+	var cands []locateCand
+	rx0, rz0 := structure.Region(x>>4, ruinSpacing), structure.Region(z>>4, ruinSpacing)
 	for rx := rx0 - maxRegions; rx <= rx0+maxRegions; rx++ {
 		for rz := rz0 - maxRegions; rz <= rz0+maxRegions; rz++ {
 			cx, cz := o.ruinPick(rx, rz)
 			dx, dz := int64(cx*16+8-x), int64(cz*16+8-z)
-			cands = append(cands, cand{cx, cz, dx*dx + dz*dz})
+			cands = append(cands, locateCand{cx, cz, dx*dx + dz*dz})
 		}
 	}
-	slices.SortFunc(cands, func(a, b cand) int { return cmp.Compare(a.d, b.d) })
+	slices.SortFunc(cands, compareLocateCand)
 	for _, c := range cands {
 		cfg := o.ruinAt(c.cx, c.cz)
 		if !cfg.ok {
@@ -556,23 +531,12 @@ func (o *Overworld) NearestOceanRuin(x, z int32, maxRegions int32) (Scattered, b
 		if jt == nil {
 			continue
 		}
-		raw := map[[2]int32]*PackedChunk{}
-		get := func(cx, cz int32) *PackedChunk {
-			k := [2]int32{cx, cz}
-			if pc, ok := raw[k]; ok {
-				return pc
-			}
-			var ch Chunk
-			o.GenerateChunk(cx, cz, &ch)
-			pc := Pack(&ch)
-			raw[k] = pc
-			return pc
-		}
+		raw := newRawChunks(o)
 		kind := "ocean_ruin_cold"
 		if cfg.warm {
 			kind = "ocean_ruin_warm"
 		}
-		return Scattered{Kind: kind, X: p.x, Y: o.ruinY(p, area, get), Z: p.z}, true
+		return Scattered{Kind: kind, X: p.x, Y: o.ruinY(p, area, raw.get), Z: p.z}, true
 	}
 	return Scattered{}, false
 }
@@ -583,4 +547,25 @@ func (b *scBuild) dropEntity(p [3]int32) {
 	b.c.BlockEntities = slices.DeleteFunc(b.c.BlockEntities, func(be structure.BlockEntity) bool {
 		return be.X == p[0] && be.Y == p[1] && be.Z == p[2]
 	})
+}
+
+// biomeMask marks the biomes of names in a slice of n biome IDs.
+func biomeMask(biomeIDs map[string]uint32, n uint32, names []string) []bool {
+	s := make([]bool, n)
+	for _, name := range names {
+		if id, ok := biomeIDs[name]; ok {
+			s[id] = true
+		}
+	}
+	return s
+}
+
+// ruinLayer is one layer of a cold ruin: template name with kind filled
+// in (ruin4 has none).
+func ruinLayer(name, kind string, x, z int32, rot int, integrity float32, big, warm bool) ruinPiece {
+	path := name
+	if path != "ruin4" {
+		path = fmt.Sprintf(name, kind)
+	}
+	return ruinPiece{"ruin/" + path, x, z, rot, integrity, big, warm}
 }

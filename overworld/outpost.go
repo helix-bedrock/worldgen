@@ -1,7 +1,6 @@
 package overworld
 
 import (
-	"cmp"
 	"slices"
 
 	"github.com/helix-bedrock/worldgen/rand"
@@ -68,7 +67,7 @@ func (o *Overworld) outpostPick(rx, rz int32) (int32, int32) {
 // isOutpostChunk reports whether a pillager outpost starts in chunk
 // (cx, cz).
 func (o *Overworld) isOutpostChunk(cx, cz int32) bool {
-	x, z := o.outpostPick(floorDivRegion(cx, outpostSpacing), floorDivRegion(cz, outpostSpacing))
+	x, z := o.outpostPick(structure.Region(cx, outpostSpacing), structure.Region(cz, outpostSpacing))
 	if x != cx || z != cz {
 		return false
 	}
@@ -89,7 +88,7 @@ func (o *Overworld) outpostAt(cx, cz int32) []outpostPiece {
 		// The start continues the region's random after the spread draws,
 		// as villages do (the rotation matches BDS's outposts).
 		var r rand.MT
-		structureSeed(&r, o.seed, floorDivRegion(cx, outpostSpacing), floorDivRegion(cz, outpostSpacing), outpostSalt)
+		structureSeed(&r, o.seed, structure.Region(cx, outpostSpacing), structure.Region(cz, outpostSpacing), outpostSalt)
 		for range 4 {
 			r.IntN(outpostSpacing - outpostSeparation)
 		}
@@ -132,8 +131,8 @@ func (o *Overworld) outpostBox(p outpostPiece) (structure.Box, *structure.Jigsaw
 // Pieces reach at most 3 chunks from the start.
 func (o *Overworld) outpostsReach(cx, cz int32, f func(pieces []outpostPiece)) {
 	chunk := structure.NewBox(cx*16, MinY, cz*16, cx*16+15, MaxY-1, cz*16+15)
-	for rx := floorDivRegion(cx-3, outpostSpacing); rx <= floorDivRegion(cx+3, outpostSpacing); rx++ {
-		for rz := floorDivRegion(cz-3, outpostSpacing); rz <= floorDivRegion(cz+3, outpostSpacing); rz++ {
+	for rx := structure.Region(cx-3, outpostSpacing); rx <= structure.Region(cx+3, outpostSpacing); rx++ {
+		for rz := structure.Region(cz-3, outpostSpacing); rz <= structure.Region(cz+3, outpostSpacing); rz++ {
 			sx, sz := o.outpostPick(rx, rz)
 			if sx < cx-3 || sx > cx+3 || sz < cz-3 || sz > cz+3 {
 				continue
@@ -160,21 +159,6 @@ func (o *Overworld) outpostReaches(cx, cz int32) bool {
 // (sub_4E84CE0).
 func (o *Overworld) outpostY(p outpostPiece, bb structure.Box, raw func(cx, cz int32) *PackedChunk) (int32, bool) {
 	hw, hd := (bb.X1-bb.X0+1)/2, (bb.Z1-bb.Z0+1)/2
-	at := func(x, y, z int32) uint32 {
-		c := raw(x>>4, z>>4)
-		if c == nil {
-			return o.ids.air
-		}
-		return c.at(int(y-MinY)<<8 | int(z&15)<<4 | int(x&15))
-	}
-	height := func(x, z int32) int32 {
-		for y := int32(MaxY - 1); y >= MinY; y-- {
-			if s := at(x, y, z); s != o.ids.air && o.reg.LightDampening(s) >= 15 {
-				return y + 1
-			}
-		}
-		return MinY
-	}
 	samples := [5][2]int32{
 		{bb.X0 + hw, bb.Z0 + hd}, {bb.X0 + 2*hw, bb.Z0 + hd}, {bb.X0 + hw, bb.Z0 + 2*hd},
 		{bb.X0, bb.Z0 + hd}, {bb.X0 + hw, bb.Z0},
@@ -182,14 +166,14 @@ func (o *Overworld) outpostY(p outpostPiece, bb structure.Box, raw func(cx, cz i
 	var hs [5]int32
 	lo, hi := int32(MaxY), int32(MinY)
 	for i, s := range samples {
-		hs[i] = height(s[0], s[1])
+		hs[i] = o.opaqueTop(raw, s[0], s[1])
 		lo, hi = min(lo, hs[i]), max(hi, hs[i])
 	}
 	lo = max(lo, SeaLevel)
 	if p.feature {
 		// BDS looks under the samples at its placeholder height 90.
 		for _, s := range samples {
-			if o.liquidMaterial(at(s[0], 89, s[1])) {
+			if o.liquidMaterial(o.rawBlock(raw, s[0], 89, s[1])) {
 				return 0, false
 			}
 		}
@@ -242,12 +226,12 @@ func (b *scBuild) outpostPiece(p outpostPiece, raw func(cx, cz int32) *PackedChu
 		rp := structure.RotatePos(tb.Pos, p.rot)
 		pos := [3]int32{p.x + rp[0], y0 + rp[1], p.z + rp[2]}
 		switch st.Name {
-		case "minecraft:structure_block":
+		case blockStructureBlock:
 			if m, _ := tb.NBT["metadata"].(string); m != "" {
 				markers = append(markers, templateMarker{pos, m})
 			}
 			continue
-		case "minecraft:jigsaw", "minecraft:structure_void":
+		case blockJigsaw, blockStructureVoid:
 			continue
 		}
 		if p.integrity < 1 && float64(p.integrity) < float64(ir.Uint32())*0x1p-32 {
@@ -284,7 +268,7 @@ func (b *scBuild) outpostPiece(p outpostPiece, raw func(cx, cz int32) *PackedChu
 			cp := [3]int32{m.pos[0], m.pos[1] - 1, m.pos[2]}
 			for i := range b.c.BlockEntities {
 				be := &b.c.BlockEntities[i]
-				if be.X == cp[0] && be.Y == cp[1] && be.Z == cp[2] && o.blockName(b.c.Block(int(cp[0]&15), int(cp[1]), int(cp[2]&15))) == "minecraft:chest" {
+				if be.X == cp[0] && be.Y == cp[1] && be.Z == cp[2] && o.blockName(b.c.Block(int(cp[0]&15), int(cp[1]), int(cp[2]&15))) == blockChest {
 					be.LootTable = "loot_tables/chests/pillager_outpost.json"
 					be.Data["LootTable"] = be.LootTable
 					be.Data["LootTableSeed"] = int32(b.r.Uint32() >> 1)
@@ -299,32 +283,17 @@ func (b *scBuild) outpostPiece(p outpostPiece, raw func(cx, cz int32) *PackedChu
 // returns its watchtower's corner and bottom. It is safe for concurrent
 // use.
 func (o *Overworld) NearestOutpost(x, z int32, maxRegions int32) (Scattered, bool) {
-	type cand struct {
-		cx, cz int32
-		d      int64
-	}
-	var cands []cand
-	rx0, rz0 := floorDivRegion(x>>4, outpostSpacing), floorDivRegion(z>>4, outpostSpacing)
+	var cands []locateCand
+	rx0, rz0 := structure.Region(x>>4, outpostSpacing), structure.Region(z>>4, outpostSpacing)
 	for rx := rx0 - maxRegions; rx <= rx0+maxRegions; rx++ {
 		for rz := rz0 - maxRegions; rz <= rz0+maxRegions; rz++ {
 			cx, cz := o.outpostPick(rx, rz)
 			dx, dz := int64(cx*16+8-x), int64(cz*16+8-z)
-			cands = append(cands, cand{cx, cz, dx*dx + dz*dz})
+			cands = append(cands, locateCand{cx, cz, dx*dx + dz*dz})
 		}
 	}
-	slices.SortFunc(cands, func(a, b cand) int { return cmp.Compare(a.d, b.d) })
-	raw := map[[2]int32]*PackedChunk{}
-	get := func(cx, cz int32) *PackedChunk {
-		k := [2]int32{cx, cz}
-		if pc, ok := raw[k]; ok {
-			return pc
-		}
-		var ch Chunk
-		o.GenerateChunk(cx, cz, &ch)
-		pc := Pack(&ch)
-		raw[k] = pc
-		return pc
-	}
+	slices.SortFunc(cands, compareLocateCand)
+	raw := newRawChunks(o)
 	for _, c := range cands {
 		pieces := o.outpostAt(c.cx, c.cz)
 		if len(pieces) == 0 {
@@ -334,8 +303,32 @@ func (o *Overworld) NearestOutpost(x, z int32, maxRegions int32) (Scattered, boo
 		if jt == nil {
 			continue
 		}
-		y, _ := o.outpostY(pieces[0], bb, get)
+		y, _ := o.outpostY(pieces[0], bb, raw.get)
 		return Scattered{Kind: "pillager_outpost", X: (bb.X0 + bb.X1) / 2, Y: y, Z: (bb.Z0 + bb.Z1) / 2}, true
 	}
 	return Scattered{}, false
 }
+
+// rawBlock is the block at (x, y, z) of the terrain raw gives; air where
+// raw has no chunk.
+func (o *Overworld) rawBlock(raw func(cx, cz int32) *PackedChunk, x, y, z int32) uint32 {
+	c := raw(x>>4, z>>4)
+	if c == nil {
+		return o.ids.air
+	}
+	return c.at(int(y-MinY)<<8 | int(z&15)<<4 | int(x&15))
+}
+
+// opaqueTop is one above the highest block of column (x, z) that is not air
+// and blocks all light, or MinY.
+func (o *Overworld) opaqueTop(raw func(cx, cz int32) *PackedChunk, x, z int32) int32 {
+	for y := int32(MaxY - 1); y >= MinY; y-- {
+		if s := o.rawBlock(raw, x, y, z); s != o.ids.air && o.reg.LightDampening(s) >= fullLightDampening {
+			return y + 1
+		}
+	}
+	return MinY
+}
+
+// fullLightDampening is the light dampening of a block no light passes.
+const fullLightDampening = 15

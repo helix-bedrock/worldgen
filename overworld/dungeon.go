@@ -86,8 +86,7 @@ func (o *Overworld) lake(w *featureWorld, x, y, z int32, r *rand.MT, liquid, bor
 	}
 	y -= 4
 
-	var cells [16 * 16 * 8]bool
-	at := func(i, j, k int32) bool { return cells[(i*16+k)*8+j] }
+	var cells lakeCells
 	for n := r.IntN(4) + 4; n > 0; n-- {
 		sx := r.Float()*6 + 3
 		sy := r.Float()*4 + 2
@@ -114,18 +113,10 @@ func (o *Overworld) lake(w *featureWorld, x, y, z int32, r *rand.MT, liquid, bor
 			}
 		}
 	}
-	edge := func(i, j, k int32) bool {
-		if at(i, j, k) {
-			return false
-		}
-		return i < 15 && at(i+1, j, k) || i > 0 && at(i-1, j, k) ||
-			k < 15 && at(i, j, k+1) || k > 0 && at(i, j, k-1) ||
-			j < 7 && at(i, j+1, k) || j > 0 && at(i, j-1, k)
-	}
 	for i := int32(0); i < 16; i++ {
 		for k := int32(0); k < 16; k++ {
 			for j := int32(0); j < 8; j++ {
-				if !edge(i, j, k) {
+				if !cells.edge(i, j, k) {
 					continue
 				}
 				b, ok := w.block(x+i, y+j, z+k)
@@ -147,7 +138,7 @@ func (o *Overworld) lake(w *featureWorld, x, y, z int32, r *rand.MT, liquid, bor
 	for i := int32(0); i < 16; i++ {
 		for k := int32(0); k < 16; k++ {
 			for j := int32(0); j < 8; j++ {
-				if !at(i, j, k) {
+				if !cells.at(i, j, k) {
 					continue
 				}
 				if j < 4 {
@@ -163,7 +154,7 @@ func (o *Overworld) lake(w *featureWorld, x, y, z int32, r *rand.MT, liquid, bor
 	for i := int32(0); i < 16; i++ {
 		for k := int32(0); k < 16; k++ {
 			for j := int32(4); j < 8; j++ {
-				if !at(i, j, k) {
+				if !cells.at(i, j, k) {
 					continue
 				}
 				if b, ok := w.block(x+i, y+j-1, z+k); ok && (b == o.ids.dirt || b == o.ids.coarseDirt) && w.seesSky(x+i, y+j, z+k) {
@@ -178,7 +169,7 @@ func (o *Overworld) lake(w *featureWorld, x, y, z int32, r *rand.MT, liquid, bor
 	for i := int32(0); i < 16; i++ {
 		for k := int32(0); k < 16; k++ {
 			for j := int32(0); j < 8; j++ {
-				if !edge(i, j, k) || j >= 4 && r.IntN(2) == 0 {
+				if !cells.edge(i, j, k) || j >= 4 && r.IntN(2) == 0 {
 					continue
 				}
 				if b, ok := w.block(x+i, y+j, z+k); ok && o.solidMaterial(b) {
@@ -213,22 +204,14 @@ func (o *Overworld) monsterRoom(w *featureWorld, x, y, z int32, r *rand.MT) {
 	rx := r.IntN(2) + 2
 	rz := r.IntN(2) + 2
 	x0, x1, z0, z1 := x-rx-1, x+rx+1, z-rz-1, z+rz+1
-	solid := func(px, py, pz int32) bool {
-		b, ok := w.block(px, py, pz)
-		return ok && o.solidMaterial(b)
-	}
-	air := func(px, py, pz int32) bool {
-		b, ok := w.block(px, py, pz)
-		return ok && b == o.ids.air
-	}
 	doors := 0
 	for px := x0; px <= x1; px++ {
 		for py := y - 1; py <= y+4; py++ {
 			for pz := z0; pz <= z1; pz++ {
-				if (py == y-1 || py == y+4) && !solid(px, py, pz) {
+				if (py == y-1 || py == y+4) && !w.solidAt(px, py, pz) {
 					return
 				}
-				if (px == x0 || px == x1 || pz == z0 || pz == z1) && py == y && air(px, py, pz) && air(px, py+1, pz) {
+				if (px == x0 || px == x1 || pz == z0 || pz == z1) && py == y && w.airAt(px, py, pz) && w.airAt(px, py+1, pz) {
 					doors++
 				}
 			}
@@ -243,11 +226,11 @@ func (o *Overworld) monsterRoom(w *featureWorld, x, y, z int32, r *rand.MT) {
 		for py := y + 3; py >= y-1; py-- {
 			for pz := z0; pz <= z1; pz++ {
 				wall := px == x0 || px == x1 || pz == z0 || pz == z1 || py == y-1
-				if !wall || py >= MinY && !solid(px, py-1, pz) {
+				if !wall || py >= MinY && !w.solidAt(px, py-1, pz) {
 					w.set(px, py, pz, o.ids.air)
 					continue
 				}
-				if !solid(px, py, pz) {
+				if !w.solidAt(px, py, pz) {
 					continue
 				}
 				if py == y-1 && r.IntN(4) != 0 {
@@ -263,12 +246,12 @@ func (o *Overworld) monsterRoom(w *featureWorld, x, y, z int32, r *rand.MT) {
 			dz := r.IntN(2*rz+1) - rz
 			dx := r.IntN(2*rx+1) - rx
 			cx, cz := x+dx, z+dz
-			if !air(cx, y, cz) {
+			if !w.airAt(cx, y, cz) {
 				continue
 			}
 			n := 0
 			for _, d := range [4][2]int32{{-1, 0}, {1, 0}, {0, -1}, {0, 1}} {
-				if solid(cx+d[0], y, cz+d[1]) {
+				if w.solidAt(cx+d[0], y, cz+d[1]) {
 					n++
 				}
 			}
@@ -293,35 +276,8 @@ func (o *Overworld) monsterRoom(w *featureWorld, x, y, z int32, r *rand.MT) {
 // the room's centre, facing away from the wall it stands against. Its loot
 // seed is the next number of the room's random, as BDS draws it.
 func (o *Overworld) dungeonChest(w *featureWorld, x, y, z, dx, dz int32, r *rand.MT) {
-	notAir := func(px, pz int32) bool {
-		b, ok := w.block(px, y, pz)
-		return ok && b != o.ids.air
-	}
-	// BDS's facing choice, as minecraft:cardinal_direction indexes.
-	facing := func() int {
-		if dz > 0 && notAir(x, z+1) {
-			return 2
-		}
-		if dz < 0 && notAir(x, z-1) {
-			return 0
-		}
-		if dx < 0 && notAir(x-1, z) {
-			return 3
-		}
-		if dx > 0 && notAir(x+1, z) {
-			return 1
-		}
-		switch {
-		case dz != 0:
-			return 2 * int(b2i(dz > 0))
-		case dx < 0:
-			return 3
-		case dx > 0:
-			return 1
-		}
-		return 2
-	}()
-	id, ok := o.reg.Lookup("minecraft:chest", map[string]any{"minecraft:cardinal_direction": cardinalNames[facing]})
+	facing := chestFacing(w, x, y, z, dx, dz)
+	id, ok := o.reg.Lookup(blockChest, map[string]any{stateCardinalDirection: cardinalNames[facing]})
 	if !ok {
 		return
 	}
@@ -340,4 +296,67 @@ func b2i(b bool) int32 {
 		return 1
 	}
 	return 0
+}
+
+// lakeCells marks the blocks of a lake's 16x8x16 box that the lake fills,
+// indexed (x*16+z)*8+y.
+type lakeCells [16 * 16 * 8]bool
+
+// at reports whether cell (i, j, k) is filled.
+func (c *lakeCells) at(i, j, k int32) bool { return c[(i*16+k)*8+j] }
+
+// edge reports whether cell (i, j, k) is empty with a filled cell beside,
+// above or below it.
+func (c *lakeCells) edge(i, j, k int32) bool {
+	if c.at(i, j, k) {
+		return false
+	}
+	return i < 15 && c.at(i+1, j, k) || i > 0 && c.at(i-1, j, k) ||
+		k < 15 && c.at(i, j, k+1) || k > 0 && c.at(i, j, k-1) ||
+		j < 7 && c.at(i, j+1, k) || j > 0 && c.at(i, j-1, k)
+}
+
+// solidAt reports whether the block at (x, y, z) is loaded and solid.
+func (w *featureWorld) solidAt(x, y, z int32) bool {
+	b, ok := w.block(x, y, z)
+	return ok && w.o.solidMaterial(b)
+}
+
+// airAt reports whether the block at (x, y, z) is loaded and air.
+func (w *featureWorld) airAt(x, y, z int32) bool {
+	b, ok := w.block(x, y, z)
+	return ok && b == w.o.ids.air
+}
+
+// nonAirAt reports whether the block at (x, y, z) is loaded and not air.
+func (w *featureWorld) nonAirAt(x, y, z int32) bool {
+	b, ok := w.block(x, y, z)
+	return ok && b != w.o.ids.air
+}
+
+// chestFacing is BDS's facing choice for a dungeon chest, as a
+// minecraft:cardinal_direction index: away from a wall beside it, else
+// away from the room's centre.
+func chestFacing(w *featureWorld, x, y, z, dx, dz int32) int {
+	if dz > 0 && w.nonAirAt(x, y, z+1) {
+		return 2
+	}
+	if dz < 0 && w.nonAirAt(x, y, z-1) {
+		return 0
+	}
+	if dx < 0 && w.nonAirAt(x-1, y, z) {
+		return 3
+	}
+	if dx > 0 && w.nonAirAt(x+1, y, z) {
+		return 1
+	}
+	switch {
+	case dz != 0:
+		return 2 * int(b2i(dz > 0))
+	case dx < 0:
+		return 3
+	case dx > 0:
+		return 1
+	}
+	return 2
 }

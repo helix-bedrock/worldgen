@@ -20,21 +20,12 @@ type desertWellFeature struct {
 }
 
 func (o *Overworld) newDesertWell() *desertWellFeature {
-	id := func(name string) uint32 {
-		b, _ := o.reg.Default("minecraft:" + name)
-		return b
-	}
 	return &desertWellFeature{sand: o.ids.sand, redSand: o.ids.redSand, sandstone: o.ids.sandstone,
-		slab: id("sandstone_slab"), water: o.ids.water, sus: o.ids.suspiciousSand}
+		slab: o.blockID("minecraft:sandstone_slab"), water: o.ids.water, sus: o.ids.suspiciousSand}
 }
 
 func (f *desertWellFeature) place(w *featureWorld, x, y, z int32, r *rand.MT) (blockPos, bool) {
-	air := w.o.ids.air
-	isAir := func(x, y, z int32) bool {
-		b, ok := w.block(x, y, z)
-		return ok && b == air
-	}
-	for isAir(x, y, z) && y > MinY+2 {
+	for w.airAt(x, y, z) && y > MinY+2 {
 		y--
 	}
 	// VERIFY: BDS tests a block family list (xmmword_F613D10); taken to
@@ -44,7 +35,7 @@ func (f *desertWellFeature) place(w *featureWorld, x, y, z int32, r *rand.MT) (b
 	}
 	for dx := int32(-2); dx <= 2; dx++ {
 		for dz := int32(-2); dz <= 2; dz++ {
-			if isAir(x+dx, y-1, z+dz) && isAir(x+dx, y-2, z+dz) {
+			if w.airAt(x+dx, y-1, z+dz) && w.airAt(x+dx, y-2, z+dz) {
 				return blockPos{}, false
 			}
 		}
@@ -123,11 +114,14 @@ type fossilFeature struct {
 	maxEmpty int32
 }
 
+// rawFossil is the JSON of a minecraft:fossil_feature.
+type rawFossil struct {
+	Ore      json.RawMessage `json:"ore_block"`
+	MaxEmpty int32           `json:"max_empty_corners"`
+}
+
 func (o *Overworld) parseFossil(raw json.RawMessage) (placer, error) {
-	var d struct {
-		Ore      json.RawMessage `json:"ore_block"`
-		MaxEmpty int32           `json:"max_empty_corners"`
-	}
+	var d rawFossil
 	if err := json.Unmarshal(raw, &d); err != nil {
 		return nil, err
 	}
@@ -198,7 +192,7 @@ func (f *fossilFeature) place(w *featureWorld, x, y, z int32, r *rand.MT) (block
 		for _, tb := range jt.Template.Blocks {
 			st := jt.Template.Palette[tb.State]
 			switch st.Name {
-			case "minecraft:air", "minecraft:structure_block", "minecraft:structure_void", "minecraft:jigsaw":
+			case "minecraft:air", blockStructureBlock, blockStructureVoid, blockJigsaw:
 				// Air is the settings' ignored block.
 				// VERIFY: ignored before the integrity draw.
 				continue

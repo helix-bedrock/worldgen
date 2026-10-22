@@ -205,26 +205,15 @@ func (t *treeFeature) baseClusters(w *featureWorld, x, y, z, width int32, r *ran
 	if len(t.baseBlocks) == 0 {
 		return
 	}
-	ring := func(cx, cz int32) {
-		rad := t.clusterRadius
-		for dx := -rad; dx <= rad; dx++ {
-			for dz := -rad; dz <= rad; dz++ {
-				if mathx.Abs(dx) == rad && mathx.Abs(dz) == rad {
-					continue
-				}
-				t.clusterColumn(w, cx+dx, y, cz+dz)
-			}
-		}
-	}
-	ring(x-1, z-1)
-	ring(x+width, z-1)
-	ring(x-1, z+width)
-	ring(x+width, z+width)
+	t.clusterRing(w, x-1, z-1, y)
+	t.clusterRing(w, x+width, z-1, y)
+	t.clusterRing(w, x-1, z+width, y)
+	t.clusterRing(w, x+width, z+width, y)
 	for range t.clusters {
 		v := r.IntN(64)
 		col := v % 8
 		if v>>3 == 7 || v < 8 || col == 0 || col == 7 {
-			ring(x+col-3, z+v/8-3)
+			t.clusterRing(w, x+col-3, z+v/8-3, y)
 		}
 	}
 }
@@ -246,6 +235,20 @@ func (t *treeFeature) clusterColumn(w *featureWorld, x, y, z int32) {
 		if t.clusterReplace.empty() || t.clusterReplace.match(t.o, b) {
 			w.set(x, y+dy, z, pod)
 			return
+		}
+	}
+}
+
+// clusterRing is one base cluster: a ring of clusterRadius around (cx, cz)
+// with its corners cut, each spot a cluster column.
+func (t *treeFeature) clusterRing(w *featureWorld, cx, cz, y int32) {
+	rad := t.clusterRadius
+	for dx := -rad; dx <= rad; dx++ {
+		for dz := -rad; dz <= rad; dz++ {
+			if mathx.Abs(dx) == rad && mathx.Abs(dz) == rad {
+				continue
+			}
+			t.clusterColumn(w, cx+dx, y, cz+dz)
 		}
 	}
 }

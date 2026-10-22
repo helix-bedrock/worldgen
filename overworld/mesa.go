@@ -54,27 +54,17 @@ func (m *mesaNoises) buildBands(mt *rand.MT) {
 		b[p] = bandOrange
 		i = p + 1
 	}
-	strip := func(colour uint8, extra int32) {
-		for n := mt.IntN(10) + 6; n > 0; n-- {
-			w := mt.IntN(3) + extra
-			s := mt.IntN(bandCount)
-			for k := s; k <= s+min(w, bandCount-1-s); k++ {
-				b[k] = colour
-			}
-		}
-	}
-	strip(bandYellow, 0)
-	strip(bandBrown, 1)
-	strip(bandRed, 0)
-	nextBool := func() bool { return mt.Uint32()>>27&1 == 1 }
+	m.strip(mt, bandYellow, 0)
+	m.strip(mt, bandBrown, 1)
+	m.strip(mt, bandRed, 0)
 	n := mt.IntN(7) + 8
 	p := int32(0)
 	for k := int32(0); k <= n && p < bandCount; k++ {
 		b[p] = bandWhite
-		if p >= 2 && nextBool() {
+		if p >= 2 && nextBool(mt) {
 			b[p-1] = bandLightGray
 		}
-		if p <= bandCount-2 && nextBool() {
+		if p <= bandCount-2 && nextBool(mt) {
 			b[p+1] = bandLightGray
 		}
 		p += mt.IntN(16) + 4
@@ -232,6 +222,19 @@ func (o *Overworld) mesaSurface(c *Chunk, mt *rand.MT, col *surfaceColumn, b *bi
 		}
 		if ly <= start {
 			return
+		}
+	}
+}
+
+// strip lays 6 to 15 runs of colour, each 1 to 3 bands plus extra wide,
+// at random heights.
+func (m *mesaNoises) strip(mt *rand.MT, colour uint8, extra int32) {
+	b := &m.bands
+	for n := mt.IntN(10) + 6; n > 0; n-- {
+		w := mt.IntN(3) + extra
+		s := mt.IntN(bandCount)
+		for k := s; k <= s+min(w, bandCount-1-s); k++ {
+			b[k] = colour
 		}
 	}
 }

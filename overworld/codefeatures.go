@@ -14,97 +14,88 @@ import (
 // file with the same identifier wins, as in BDS, which only registers a
 // built-in when the name is still free.
 func (o *Overworld) builtinFeatures(set *featureSet) {
-	id := func(name string) uint32 {
-		b, _ := o.reg.Default(name)
-		return b
-	}
 	dirt := []uint32{o.ids.dirt, o.ids.coarseDirt}
-	add := func(name string, p placer) {
-		if _, ok := set.byID[name]; !ok {
-			set.byID[name] = p
-		}
-	}
-	add("minecraft:clay_feature", &clayFeature{clay: id("minecraft:clay"), mud: id("minecraft:mud"), replace: dirt, radius: 4})
-	add("minecraft:sand_feature", &discFeature{block: o.ids.sand, replace: dirt, radius: 7})
-	add("minecraft:gravel_feature", &discFeature{block: o.ids.gravel, replace: dirt, radius: 6})
-	add("minecraft:reeds_feature", &reedsFeature{reeds: id("minecraft:reeds"), farmland: id("minecraft:farmland"), frostedIce: id("minecraft:frosted_ice")})
-	add("minecraft:pumpkin_feature", &pumpkinFeature{pumpkin: id("minecraft:pumpkin"), count: 96})
+	set.addBuiltin("minecraft:clay_feature", &clayFeature{clay: o.blockID("minecraft:clay"), mud: o.blockID("minecraft:mud"), replace: dirt, radius: 4})
+	set.addBuiltin("minecraft:sand_feature", &discFeature{block: o.ids.sand, replace: dirt, radius: 7})
+	set.addBuiltin("minecraft:gravel_feature", &discFeature{block: o.ids.gravel, replace: dirt, radius: 6})
+	set.addBuiltin("minecraft:reeds_feature", &reedsFeature{reeds: o.blockID("minecraft:reeds"), farmland: o.blockID("minecraft:farmland"), frostedIce: o.blockID("minecraft:frosted_ice")})
+	set.addBuiltin("minecraft:pumpkin_feature", &pumpkinFeature{pumpkin: o.blockID("minecraft:pumpkin"), count: 96})
 	// Block piles of village streets (vtable off_EE54AC0).
-	add("minecraft:hay_pile_feature", &pileFeature{block: id("minecraft:hay_block"), kind: pileHay})
-	add("minecraft:melon_pile_feature", &pileFeature{block: id("minecraft:melon_block")})
-	add("minecraft:snow_pile_feature", &pileFeature{block: id("minecraft:snow")})
-	add("minecraft:ice_pile_feature", &pileFeature{block: id("minecraft:packed_ice"), kind: pileIce, other: id("minecraft:blue_ice")})
-	add("minecraft:pumpkin_pile_feature", &pileFeature{block: id("minecraft:pumpkin"), kind: pilePumpkin, other: id("minecraft:carved_pumpkin")})
+	set.addBuiltin("minecraft:hay_pile_feature", &pileFeature{block: o.blockID("minecraft:hay_block"), kind: pileHay})
+	set.addBuiltin("minecraft:melon_pile_feature", &pileFeature{block: o.blockID("minecraft:melon_block")})
+	set.addBuiltin("minecraft:snow_pile_feature", &pileFeature{block: o.blockID("minecraft:snow")})
+	set.addBuiltin("minecraft:ice_pile_feature", &pileFeature{block: o.blockID("minecraft:packed_ice"), kind: pileIce, other: o.blockID("minecraft:blue_ice")})
+	set.addBuiltin("minecraft:pumpkin_pile_feature", &pileFeature{block: o.blockID("minecraft:pumpkin"), kind: pilePumpkin, other: o.blockID("minecraft:carved_pumpkin")})
 	// Mushroom tries: 1, or 64 in old worlds (sub_4E2BB50 picks by a base
 	// game version check, as for the seagrass count).
-	soil := []uint32{id("minecraft:mycelium"), id("minecraft:podzol")}
-	add("minecraft:brown_mushroom_feature", &mushroomFeature{block: id("minecraft:brown_mushroom"), count: 1, soil: soil})
-	add("minecraft:red_mushroom_feature", &mushroomFeature{block: id("minecraft:red_mushroom"), count: 1, soil: soil})
-	add("minecraft:moss_vegetation_feature", o.newMossVegetation(id))
-	add("minecraft:pale_moss_vegetation_feature", o.newPaleMossVegetation(id))
-	drip := speleothemBlocks{base: id("minecraft:dripstone_block"), tip: id("minecraft:pointed_dripstone"),
-		replace: []uint32{o.ids.dirt, o.ids.coarseDirt, o.ids.stone, id("minecraft:tuff"), o.ids.deepslate},
-		tips:    []uint32{id("minecraft:pointed_dripstone"), id("minecraft:sulfur_spike")}}
-	add("minecraft:pointed_dripstone_feature", &pointedFeature{drip})
-	add("minecraft:dripstone_cluster_feature", &clusterFeature{speleothemBlocks: drip,
-		stone: []uint32{o.ids.stone, o.ids.deepslate, id("minecraft:tuff")}, minHeight: 3, maxHeight: 5,
+	soil := []uint32{o.blockID("minecraft:mycelium"), o.blockID("minecraft:podzol")}
+	set.addBuiltin("minecraft:brown_mushroom_feature", &mushroomFeature{block: o.blockID("minecraft:brown_mushroom"), count: 1, soil: soil})
+	set.addBuiltin("minecraft:red_mushroom_feature", &mushroomFeature{block: o.blockID("minecraft:red_mushroom"), count: 1, soil: soil})
+	set.addBuiltin("minecraft:moss_vegetation_feature", o.newMossVegetation(o.blockID))
+	set.addBuiltin("minecraft:pale_moss_vegetation_feature", o.newPaleMossVegetation(o.blockID))
+	drip := speleothemBlocks{base: o.blockID("minecraft:dripstone_block"), tip: o.blockID("minecraft:pointed_dripstone"),
+		replace: []uint32{o.ids.dirt, o.ids.coarseDirt, o.ids.stone, o.blockID("minecraft:tuff"), o.ids.deepslate},
+		tips:    []uint32{o.blockID("minecraft:pointed_dripstone"), o.blockID("minecraft:sulfur_spike")}}
+	set.addBuiltin("minecraft:pointed_dripstone_feature", &pointedFeature{drip})
+	set.addBuiltin("minecraft:dripstone_cluster_feature", &clusterFeature{speleothemBlocks: drip,
+		stone: []uint32{o.ids.stone, o.ids.deepslate, o.blockID("minecraft:tuff")}, minHeight: 3, maxHeight: 5,
 		wetBase: 0.1, wetScale: 0.3, wetMin: 0.1, wetMax: 1})
 	// Sulfur caves use the same classes (sulfur, cinnabar list xmmword_F60D660).
-	sulfur := speleothemBlocks{base: id("minecraft:sulfur"), tip: id("minecraft:sulfur_spike"),
-		replace: []uint32{id("minecraft:sulfur"), id("minecraft:cinnabar")}}
-	add("minecraft:sulfur_spike_feature", &pointedFeature{sulfur})
-	add("minecraft:sulfur_pool", &lakeFeature{liquid: o.ids.water, border: sulfur.base, avoid: []string{"minecraft:sulfur_spike"}})
-	add("minecraft:sulfur_spike_cluster_feature", &clusterFeature{speleothemBlocks: sulfur,
-		stone: []uint32{o.ids.stone, o.ids.deepslate, id("minecraft:tuff")}, minHeight: 1, maxHeight: 4})
-	add("minecraft:large_dripstone_feature", &largeFeature{drip})
-	add("minecraft:dripleaf_feature", o.newDripleaf(id, set))
-	singleVine := &vinesSingleFaceFeature{vine: id("minecraft:vine"), invisibleBedrock: id("minecraft:invisible_bedrock")}
-	add("minecraft:vines_single_face_feature", singleVine)
-	add("minecraft:vines_feature", &vinesFeature{single: singleVine})
-	add("minecraft:wildflowers_feature", o.newFlowerBed("minecraft:wildflowers"))
-	add("minecraft:leaf_litter_feature", o.newFlowerBed("minecraft:leaf_litter"))
-	add("minecraft:pink_petals_feature", o.newFlowerBed("minecraft:pink_petals"))
+	sulfur := speleothemBlocks{base: o.blockID("minecraft:sulfur"), tip: o.blockID("minecraft:sulfur_spike"),
+		replace: []uint32{o.blockID("minecraft:sulfur"), o.blockID("minecraft:cinnabar")}}
+	set.addBuiltin("minecraft:sulfur_spike_feature", &pointedFeature{sulfur})
+	set.addBuiltin("minecraft:sulfur_pool", &lakeFeature{liquid: o.ids.water, border: sulfur.base, avoid: []string{"minecraft:sulfur_spike"}})
+	set.addBuiltin("minecraft:sulfur_spike_cluster_feature", &clusterFeature{speleothemBlocks: sulfur,
+		stone: []uint32{o.ids.stone, o.ids.deepslate, o.blockID("minecraft:tuff")}, minHeight: 1, maxHeight: 4})
+	set.addBuiltin("minecraft:large_dripstone_feature", &largeFeature{drip})
+	set.addBuiltin("minecraft:dripleaf_feature", o.newDripleaf(o.blockID, set))
+	singleVine := &vinesSingleFaceFeature{vine: o.blockID(blockVine), invisibleBedrock: o.blockID("minecraft:invisible_bedrock")}
+	set.addBuiltin("minecraft:vines_single_face_feature", singleVine)
+	set.addBuiltin("minecraft:vines_feature", &vinesFeature{single: singleVine})
+	set.addBuiltin("minecraft:wildflowers_feature", o.newFlowerBed("minecraft:wildflowers"))
+	set.addBuiltin("minecraft:leaf_litter_feature", o.newFlowerBed("minecraft:leaf_litter"))
+	set.addBuiltin("minecraft:pink_petals_feature", o.newFlowerBed("minecraft:pink_petals"))
 	for name, kind := range map[string]flowerKind{"flower_forest": flowersFlowerForest, "forest": flowersForest,
 		"overworld": flowersOverworld, "plains": flowersPlains, "swamp": flowersSwamp} {
-		add("minecraft:legacy:"+name+"_flower_feature", o.newLegacyFlower(kind, id))
+		set.addBuiltin("minecraft:legacy:"+name+"_flower_feature", o.newLegacyFlower(kind, o.blockID))
 	}
-	add("minecraft:meadow_flower_feature", &meadowFlowerFeature{blocks: [8]uint32{id("minecraft:allium"), id("minecraft:poppy"),
-		id("minecraft:cornflower"), id("minecraft:oxeye_daisy"), id("minecraft:azure_bluet"), id("minecraft:dandelion"),
-		id("minecraft:short_grass"), id("minecraft:tall_grass")}})
-	add("minecraft:sweet_berry_bush_feature", o.newSweetBerry())
-	add("minecraft:desert_well_feature", o.newDesertWell())
-	add("minecraft:huge_mushroom_feature", o.newHugeMushroom())
-	add("minecraft:forest_rock_feature", &blockBlobFeature{block: id("minecraft:mossy_cobblestone")})
-	add("minecraft:legacy:forest_rock_feature", &legacyForestRockFeature{rock: featureRef{"minecraft:forest_rock_feature", set}})
+	set.addBuiltin("minecraft:meadow_flower_feature", &meadowFlowerFeature{blocks: [8]uint32{o.blockID("minecraft:allium"), o.blockID("minecraft:poppy"),
+		o.blockID("minecraft:cornflower"), o.blockID("minecraft:oxeye_daisy"), o.blockID("minecraft:azure_bluet"), o.blockID("minecraft:dandelion"),
+		o.blockID(blockShortGrass), o.blockID(blockTallGrass)}})
+	set.addBuiltin("minecraft:sweet_berry_bush_feature", o.newSweetBerry())
+	set.addBuiltin("minecraft:desert_well_feature", o.newDesertWell())
+	set.addBuiltin("minecraft:huge_mushroom_feature", o.newHugeMushroom())
+	set.addBuiltin("minecraft:forest_rock_feature", &blockBlobFeature{block: o.blockID("minecraft:mossy_cobblestone")})
+	set.addBuiltin("minecraft:legacy:forest_rock_feature", &legacyForestRockFeature{rock: featureRef{"minecraft:forest_rock_feature", set}})
 	spike := o.newIceSpike()
-	add("minecraft:ice_spike_feature", spike)
-	add("minecraft:ice_patch_feature", &icePatchFeature{spike: spike, radius: 4})
-	add("minecraft:grass_disc_feature", &grassDiscFeature{grass: o.ids.grass, dirt: o.ids.dirt, mud: id("minecraft:mud"), radius: 5})
-	add("minecraft:waterlily_feature", &waterlilyFeature{lily: id("minecraft:waterlily")})
-	add("minecraft:melon_feature", &melonFeature{melon: id("minecraft:melon_block")})
-	add("minecraft:cactus_feature", &cactusFeature{cactus: id("minecraft:cactus"), flower: id("minecraft:cactus_flower"), flowers: true})
-	add("minecraft:bamboo_feature", o.newBamboo())
-	add("minecraft:podzol_area_feature", &podzolAreaFeature{podzol: id("minecraft:podzol"), dirt: o.ids.dirt})
+	set.addBuiltin("minecraft:ice_spike_feature", spike)
+	set.addBuiltin("minecraft:ice_patch_feature", &icePatchFeature{spike: spike, radius: 4})
+	set.addBuiltin("minecraft:grass_disc_feature", &grassDiscFeature{grass: o.ids.grass, dirt: o.ids.dirt, mud: o.blockID("minecraft:mud"), radius: 5})
+	set.addBuiltin("minecraft:waterlily_feature", &waterlilyFeature{lily: o.blockID("minecraft:waterlily")})
+	set.addBuiltin("minecraft:melon_feature", &melonFeature{melon: o.blockID("minecraft:melon_block")})
+	set.addBuiltin("minecraft:cactus_feature", &cactusFeature{cactus: o.blockID("minecraft:cactus"), flower: o.blockID("minecraft:cactus_flower"), flowers: true})
+	set.addBuiltin("minecraft:bamboo_feature", o.newBamboo())
+	set.addBuiltin("minecraft:podzol_area_feature", &podzolAreaFeature{podzol: o.blockID("minecraft:podzol"), dirt: o.ids.dirt})
 	// Registered only with the new-world check that also turns on cactus
 	// flowers.
-	add("minecraft:firefly_bush_cluster_feature", &fireflyBushFeature{bush: id("minecraft:firefly_bush")})
-	add("minecraft:firefly_bush_water_cluster_feature", &fireflyBushFeature{bush: id("minecraft:firefly_bush"), water: true})
-	foliage := [3]uint32{id("minecraft:lilac"), id("minecraft:rose_bush"), id("minecraft:peony")}
-	add("minecraft:legacy:flower_forest_foliage_feature", &forestFoliageFeature{fewer: 1, plants: foliage})
-	add("minecraft:legacy:forest_foliage_feature", &forestFoliageFeature{fewer: 3, plants: foliage})
-	add("minecraft:eyeblossom_feature", &eyeblossomFeature{flower: id("minecraft:closed_eyeblossom")})
-	roots := &rootSystemFeature{tree: featureRef{"minecraft:azalea_tree_feature", set}, hanging: id("minecraft:hanging_roots"),
-		roots: id("minecraft:dirt_with_roots"), replace: map[string]bool{}}
+	set.addBuiltin("minecraft:firefly_bush_cluster_feature", &fireflyBushFeature{bush: o.blockID("minecraft:firefly_bush")})
+	set.addBuiltin("minecraft:firefly_bush_water_cluster_feature", &fireflyBushFeature{bush: o.blockID("minecraft:firefly_bush"), water: true})
+	foliage := [3]uint32{o.blockID("minecraft:lilac"), o.blockID("minecraft:rose_bush"), o.blockID("minecraft:peony")}
+	set.addBuiltin("minecraft:legacy:flower_forest_foliage_feature", &forestFoliageFeature{fewer: 1, plants: foliage})
+	set.addBuiltin("minecraft:legacy:forest_foliage_feature", &forestFoliageFeature{fewer: 3, plants: foliage})
+	set.addBuiltin("minecraft:eyeblossom_feature", &eyeblossomFeature{flower: o.blockID("minecraft:closed_eyeblossom")})
+	roots := &rootSystemFeature{tree: featureRef{"minecraft:azalea_tree_feature", set}, hanging: o.blockID("minecraft:hanging_roots"),
+		roots: o.blockID("minecraft:dirt_with_roots"), replace: map[string]bool{}}
 	// The root list (off_F329F10).
 	for _, n := range []string{"clay", "moss_block", "sand", "gravel", "dirt", "podzol", "dirt_with_roots", "grass_block", "mycelium",
 		"stone", "deepslate", "tuff", "cave_vines", "cave_vines_head_with_berries", "moss_carpet", "short_grass", "fern"} {
 		roots.replace["minecraft:"+n] = true
 	}
-	add("minecraft:azalea_root_system_feature", roots)
+	set.addBuiltin("minecraft:azalea_root_system_feature", roots)
 	// The same class leads sulfur caves to a spring on the surface, the
 	// trail of sulfur in the column below (xmmword_F60D648).
 	sulfurTrail := &rootSystemFeature{tree: featureRef{"minecraft:random_sulfur_spring_with_tuff_feature", set},
-		hanging: id("minecraft:sulfur"), roots: id("minecraft:sulfur"), replace: map[string]bool{}, space: sulfurSpringSpace}
+		hanging: o.blockID("minecraft:sulfur"), roots: o.blockID("minecraft:sulfur"), replace: map[string]bool{}, space: sulfurSpringSpace}
 	for _, n := range []string{"powder_snow", "snow", "sand", "gravel", "clay", "red_sand", "dirt", "mud", "moss_block",
 		"grass_block", "stone", "granite", "diorite", "andesite", "tuff", "deepslate", "white_terracotta",
 		"orange_terracotta", "magenta_terracotta", "light_blue_terracotta", "yellow_terracotta", "lime_terracotta",
@@ -112,19 +103,15 @@ func (o *Overworld) builtinFeatures(set *featureSet) {
 		"blue_terracotta", "brown_terracotta", "green_terracotta", "red_terracotta", "black_terracotta"} {
 		sulfurTrail.replace["minecraft:"+n] = true
 	}
-	add("minecraft:sulfur_spring_trail_to_surface_feature", sulfurTrail)
-	add("minecraft:dead_bush_feature", &deadBushFeature{bush: id("minecraft:deadbush")})
+	set.addBuiltin("minecraft:sulfur_spring_trail_to_surface_feature", sulfurTrail)
+	set.addBuiltin("minecraft:dead_bush_feature", &deadBushFeature{bush: o.blockID(blockDeadBush)})
 
-	grass := func(typ string) uint32 {
-		b, _ := o.reg.Lookup("minecraft:seagrass", map[string]any{"sea_grass_type": typ})
-		return b
-	}
-	short, top, bottom := grass("default"), grass("double_top"), grass("double_bot")
+	short, top, bottom := o.seagrass("default"), o.seagrass("double_top"), o.seagrass("double_bot")
 	// BDS sets the seagrass and kelp counts to 1, or 10 in a mode this
 	// world does not use (sub_4E2BB50, v147).
 	for name, tall := range map[string]float32{"minecraft:seagrass_feature": 0.6, "minecraft:taller_seagrass_feature": 0.8,
 		"minecraft:shorter_seagrass_feature": 0.4, "minecraft:shortest_seagrass_feature": 0.3} {
-		add(name, &seagrassFeature{short: short, top: top, bottom: bottom, count: 1, tall: tall})
+		set.addBuiltin(name, &seagrassFeature{short: short, top: top, bottom: bottom, count: 1, tall: tall})
 	}
 	var ages []uint32
 	for a := 0; ; a++ {
@@ -134,24 +121,24 @@ func (o *Overworld) builtinFeatures(set *featureSet) {
 		}
 		ages = append(ages, b)
 	}
-	add("minecraft:kelp_feature", &kelpFeature{ages: ages, count: 1})
+	set.addBuiltin("minecraft:kelp_feature", &kelpFeature{ages: ages, count: 1})
 	var pf pickleFeature
 	for i := range pf.pickles {
 		pf.pickles[i], _ = o.reg.Lookup("minecraft:sea_pickle", map[string]any{"cluster_count": int32(i)})
 	}
-	add("minecraft:pickle_feature", &pf)
+	set.addBuiltin("minecraft:pickle_feature", &pf)
 
-	ib := &icebergFeature{air: o.ids.air, water: o.ids.water, snow: id("minecraft:snow"), packedIce: o.ids.packedIce,
-		blueIce: o.ids.blueIce, ice: o.ids.ice, flowingWater: o.ids.flowingWater, snowLayer: id("minecraft:snow_layer")}
+	ib := &icebergFeature{air: o.ids.air, water: o.ids.water, snow: o.blockID("minecraft:snow"), packedIce: o.ids.packedIce,
+		blueIce: o.ids.blueIce, ice: o.ids.ice, flowingWater: o.ids.flowingWater, snowLayer: o.blockID(blockSnowLayer)}
 	bi := &blueIceFeature{ice: ib}
-	add("minecraft:iceberg_feature", ib)
-	add("minecraft:blue_ice_feature", bi)
-	add("minecraft:legacy:ice_feature", &legacyIceFeature{iceberg: ib, blueIce: bi})
+	set.addBuiltin("minecraft:iceberg_feature", ib)
+	set.addBuiltin("minecraft:blue_ice_feature", bi)
+	set.addBuiltin("minecraft:legacy:ice_feature", &legacyIceFeature{iceberg: ib, blueIce: bi})
 
 	cf := &coralFeature{stone: o.ids.stone}
 	for i, c := range []string{"tube", "brain", "bubble", "fire", "horn"} {
-		cf.blocks[i] = id("minecraft:" + c + "_coral_block")
-		cf.blocks[i+5] = id("minecraft:dead_" + c + "_coral_block")
+		cf.blocks[i] = o.blockID("minecraft:" + c + "_coral_block")
+		cf.blocks[i+5] = o.blockID("minecraft:dead_" + c + "_coral_block")
 		for d := range 2 {
 			cf.fans[i][d], _ = o.reg.Lookup("minecraft:"+c+"_coral_fan", map[string]any{"coral_fan_direction": int32(d)})
 		}
@@ -159,29 +146,32 @@ func (o *Overworld) builtinFeatures(set *featureSet) {
 			cf.wallFans[i][d], _ = o.reg.Lookup("minecraft:"+c+"_coral_wall_fan", map[string]any{"coral_direction": int32(d)})
 		}
 	}
-	add("minecraft:coral_feature", cf)
-	add("minecraft:coral_hang_feature", &coralHangFeature{coral: cf})
-	add("minecraft:coral_crust_feature", newCoralCrust(cf))
+	set.addBuiltin("minecraft:coral_feature", cf)
+	set.addBuiltin("minecraft:coral_hang_feature", &coralHangFeature{coral: cf})
+	set.addBuiltin("minecraft:coral_crust_feature", newCoralCrust(cf))
 	sa := &seaAnemoneFeature{coral: cf}
 	for i, c := range []string{"tube", "brain", "bubble", "fire", "horn"} {
-		sa.plants[i] = id("minecraft:" + c + "_coral")
+		sa.plants[i] = o.blockID("minecraft:" + c + "_coral")
 	}
-	add("minecraft:sea_anemone_feature", sa)
+	set.addBuiltin("minecraft:sea_anemone_feature", sa)
 	rock := map[string]bool{}
 	for _, n := range []string{"stone", "deepslate", "tuff", "calcite", "snow", "powder_snow", "packed_ice", "dirt", "coarse_dirt"} {
 		rock["minecraft:"+n] = true
 	}
 	waterSpring := &springFeature{liquid: o.ids.water, rock: rock}
 	lavaSpring := &springFeature{liquid: o.ids.lava, rock: rock}
-	add("minecraft:water_spring_feature", waterSpring)
-	add("minecraft:lava_spring_feature", lavaSpring)
-	add("minecraft:legacy:springs_feature", &legacySpringsFeature{water: waterSpring, lava: lavaSpring})
+	set.addBuiltin("minecraft:water_spring_feature", waterSpring)
+	set.addBuiltin("minecraft:lava_spring_feature", lavaSpring)
+	set.addBuiltin("minecraft:legacy:springs_feature", &legacySpringsFeature{water: waterSpring, lava: lavaSpring})
 }
 
 // isWater reports whether a block is water.
 func (o *Overworld) isWater(b uint32) bool {
 	return b == o.ids.water || b == o.ids.flowingWater
 }
+
+// airOrWater reports whether a block is air or water.
+func (o *Overworld) airOrWater(b uint32) bool { return b == o.ids.air || o.isWater(b) }
 
 // waterMaterial reports whether a block's material is water (BDS material
 // type 5): water, and the underwater plants kelp and seagrass.
@@ -190,7 +180,7 @@ func (o *Overworld) waterMaterial(b uint32) bool {
 		return true
 	}
 	switch o.blockName(b) {
-	case "minecraft:kelp", "minecraft:seagrass":
+	case "minecraft:kelp", blockSeagrass:
 		return true
 	}
 	return false
@@ -406,10 +396,6 @@ func (f *seagrassFeature) place(w *featureWorld, x, y, z int32, r *rand.MT) (blo
 	if b, ok := w.block(x, y, z); !ok || !w.o.solidMaterial(b) {
 		return blockPos{}, false
 	}
-	water := func(x, y, z int32) bool {
-		b, ok := w.block(x, y, z)
-		return ok && w.o.waterMaterial(b)
-	}
 	cold := w.temperatureAtBlock(x, y, z) < 0.15
 	px, pz := x, z
 	for range f.count {
@@ -426,11 +412,11 @@ func (f *seagrassFeature) place(w *featureWorld, x, y, z int32, r *rand.MT) (blo
 		below, _ := w.block(px, py-1, pz)
 		if at, ok := w.block(px, py, pz); ok && w.o.isWater(at) && w.o.supportsWaterPlant(below) {
 			if f.tall > r.Float() {
-				if water(px, py+1, pz) && (!cold || water(px, py+2, pz)) {
+				if w.waterAt(px, py+1, pz) && (!cold || w.waterAt(px, py+2, pz)) {
 					w.set(px, py, pz, f.bottom)
 					w.set(px, py+1, pz, f.top)
 				}
-			} else if !cold || water(px, py+1, pz) {
+			} else if !cold || w.waterAt(px, py+1, pz) {
 				w.set(px, py, pz, f.short)
 			}
 		}
@@ -673,4 +659,24 @@ func (f *pileFeature) pick(o *Overworld, r *rand.MT) uint32 {
 		}
 	}
 	return f.block
+}
+
+// addBuiltin registers a code-defined feature unless a data file already
+// took its identifier.
+func (s *featureSet) addBuiltin(name string, p placer) {
+	if _, ok := s.byID[name]; !ok {
+		s.byID[name] = p
+	}
+}
+
+// seagrass is the seagrass state of the given sea_grass_type.
+func (o *Overworld) seagrass(typ string) uint32 {
+	b, _ := o.reg.Lookup(blockSeagrass, map[string]any{"sea_grass_type": typ})
+	return b
+}
+
+// waterAt reports whether the block at (x, y, z) has water material.
+func (w *featureWorld) waterAt(x, y, z int32) bool {
+	b, ok := w.block(x, y, z)
+	return ok && w.o.waterMaterial(b)
 }

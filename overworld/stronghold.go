@@ -339,7 +339,6 @@ func shDoor(r *rand.MT) int32 {
 // factory makes a piece of kind k at (x, y, z) heading o if its box is
 // high enough and free.
 func (l *shLayout) factory(k uint8, r *rand.MT, x, y, z, o, depth int32) *shPiece {
-	fits := func(bb structure.Box) bool { return bb.Y0 > 10 && !l.collides(bb) }
 	var bb structure.Box
 	switch k {
 	case shStraight, shChestCorridor:
@@ -360,13 +359,13 @@ func (l *shLayout) factory(k uint8, r *rand.MT, x, y, z, o, depth int32) *shPiec
 		bb = orientedBox(x, y, z, -4, -1, 11, 8, 16, o)
 	case shLibrary:
 		bb = orientedBox(x, y, z, -4, -1, 14, 11, 15, o)
-		if !fits(bb) {
+		if !l.fits(bb) {
 			bb = orientedBox(x, y, z, -4, -1, 14, 6, 15, o)
 		}
 	default:
 		return nil
 	}
-	if !fits(bb) {
+	if !l.fits(bb) {
 		return nil
 	}
 	p := &shPiece{kind: k, bb: bb, orient: o, depth: depth}
@@ -480,11 +479,6 @@ func (l *shLayout) filler(x, y, z, o, depth int32) *shPiece {
 		return nil
 	}
 	h := hit.bb
-	// within is the flat test of the piece in the way against a column
-	// span; the spans can be empty, as in BDS.
-	within := func(x0, z0, x1, z1 int32) bool {
-		return h.Z0 <= z1 && h.Z1 >= z0 && h.X1 >= x0 && h.X0 <= x1
-	}
 	length := int32(3)
 	var x0, z0, x1, z1 int32
 	switch o {
@@ -497,14 +491,14 @@ func (l *shLayout) filler(x, y, z, o, depth int32) *shPiece {
 	default:
 		x0, z0, x1, z1 = x, z-1, x+1, z+3
 	}
-	if within(x0, z0, x1, z1) {
+	if flatOverlaps(h, x0, z0, x1, z1) {
 		length = 2
 		if o == 1 || o == 3 {
 			x0, z0, x1, z1 = x, z-1, x, z+3
 		} else {
 			x0, z0, x1, z1 = x-1, z, x+3, z
 		}
-		if within(x0, z0, x1, z1) {
+		if flatOverlaps(h, x0, z0, x1, z1) {
 			length = 1
 			switch o {
 			case 0:
@@ -516,7 +510,7 @@ func (l *shLayout) filler(x, y, z, o, depth int32) *shPiece {
 			default:
 				x0, z0, x1, z1 = x, z-1, x-1, z+3
 			}
-			if within(x0, z0, x1, z1) {
+			if flatOverlaps(h, x0, z0, x1, z1) {
 				return nil
 			}
 		}
@@ -812,7 +806,7 @@ func (b *shBuild) cardinal(v int32) int32 {
 }
 
 func (b *shBuild) torch(v int32) uint32 {
-	return b.o.state("minecraft:torch", map[string]any{"torch_facing_direction": shTorch[v]})
+	return b.o.state(blockTorch, map[string]any{"torch_facing_direction": shTorch[v]})
 }
 
 // sideTorch is the torch value of a west-wall torch: 1 for pieces running
@@ -833,31 +827,17 @@ func shTable(t [4]int32, o int32) int32 {
 
 // smallDoor is the door between pieces at (x, y, z), facing along z.
 func (b *shBuild) smallDoor(kind, x, y, z int32) {
-	frame := func(s uint32) {
-		b.put(s, x, y, z)
-		b.put(s, x, y+1, z)
-		b.put(s, x, y+2, z)
-		b.put(s, x+1, y+2, z)
-		b.put(s, x+2, y+2, z)
-		b.put(s, x+2, y+1, z)
-		b.put(s, x+2, y, z)
-	}
-	door := func(name string) {
-		d := shCard[b.cardinal(3)]
-		b.put(b.o.state("minecraft:"+name, map[string]any{"minecraft:cardinal_direction": d}), x+1, y, z)
-		b.put(b.o.state("minecraft:"+name, map[string]any{"minecraft:cardinal_direction": d, "upper_block_bit": uint8(1)}), x+1, y+1, z)
-	}
 	switch kind {
 	case shWoodDoor:
-		frame(b.stoneBricks)
-		door("wooden_door")
+		b.doorFrame(b.stoneBricks, x, y, z)
+		b.door("minecraft:wooden_door", x, y, z)
 	case shGrates:
 		b.put(b.air, x+1, y, z)
 		b.put(b.air, x+1, y+1, z)
-		frame(b.bars)
+		b.doorFrame(b.bars, x, y, z)
 	case shIronDoor:
-		frame(b.stoneBricks)
-		door("iron_door")
+		b.doorFrame(b.stoneBricks, x, y, z)
+		b.door("minecraft:iron_door", x, y, z)
 		b.put(b.o.state("minecraft:stone_button", map[string]any{"facing_direction": b.facing(2)}), x+2, y+1, z+1)
 		b.put(b.o.state("minecraft:stone_button", map[string]any{"facing_direction": b.facing(3)}), x+2, y+1, z-1)
 	default:
@@ -869,10 +849,10 @@ func (b *shBuild) smallDoor(kind, x, y, z int32) {
 // with a loot table, unless a chest is already there.
 func (b *shBuild) chest(x, y, z, facing int32, table string) {
 	wx, wy, wz := b.p.worldPos(x, y, z)
-	if !b.cbox.Contains([3]int32{wx, wy, wz}) || b.o.blockName(b.at(x, y, z)) == "minecraft:chest" {
+	if !b.cbox.Contains([3]int32{wx, wy, wz}) || b.o.blockName(b.at(x, y, z)) == blockChest {
 		return
 	}
-	b.put(b.o.state("minecraft:chest", map[string]any{"minecraft:cardinal_direction": cardinalOf[facing]}), x, y, z)
+	b.put(b.o.state(blockChest, map[string]any{stateCardinalDirection: cardinalOf[facing]}), x, y, z)
 	d := b.o.st.BlockEntityFor(b.c.Block(int(wx&15), int(wy), int(wz&15)), "", wx, wy, wz)
 	if d == nil {
 		return
@@ -910,15 +890,25 @@ func (b *shBuild) build() {
 	}
 }
 
+// shBlock is one block of a piece: its state and local position.
+type shBlock struct {
+	s       uint32
+	x, y, z int32
+}
+
+// portalFrame is one end portal frame of the portal room: its local
+// position and the direction it faces.
+type portalFrame struct {
+	x, z int32
+	dir  int32
+}
+
 func (b *shBuild) buildStairsDown() {
 	b.stones(0, 0, 0, 4, 10, 4)
 	b.smallDoor(b.p.door, 1, 7, 0)
 	b.smallDoor(shOpening, 1, 1, 4)
 	sb, sl := b.stoneBricks, b.slab
-	for _, s := range [...]struct {
-		s       uint32
-		x, y, z int32
-	}{
+	for _, s := range [...]shBlock{
 		{sb, 2, 6, 1}, {sb, 1, 5, 1}, {sl, 1, 6, 1}, {sb, 1, 5, 2}, {sb, 1, 4, 3}, {sl, 1, 5, 3},
 		{sb, 2, 4, 3}, {sb, 3, 3, 3}, {sl, 3, 4, 3}, {sb, 3, 3, 2}, {sb, 3, 2, 1}, {sl, 3, 3, 1},
 		{sb, 2, 2, 1}, {sb, 1, 1, 1}, {sl, 1, 2, 1}, {sb, 1, 1, 2}, {sl, 1, 1, 3},
@@ -1216,10 +1206,7 @@ func (b *shBuild) buildPortalRoom() {
 	if o >= 0 && o <= 3 {
 		dirs = [4]int32{o, [4]int32{2, 3, 0, 1}[o], [4]int32{3, 0, 3, 0}[o], [4]int32{1, 2, 1, 2}[o]}
 	}
-	frames := [12]struct {
-		x, z int32
-		dir  int32
-	}{
+	frames := [12]portalFrame{
 		{4, 8, dirs[0]}, {5, 8, dirs[0]}, {6, 8, dirs[0]},
 		{4, 12, dirs[1]}, {5, 12, dirs[1]}, {6, 12, dirs[1]},
 		{3, 9, dirs[2]}, {3, 10, dirs[2]}, {3, 11, dirs[2]},
@@ -1230,7 +1217,7 @@ func (b *shBuild) buildPortalRoom() {
 		eye := b.r.Float() > 0.9
 		all = all && eye
 		b.put(b.o.state("minecraft:end_portal_frame", map[string]any{
-			"minecraft:cardinal_direction": shCard[f.dir&3], "end_portal_eye_bit": uint8(b2i(eye))}), f.x, 3, f.z)
+			stateCardinalDirection: shCard[f.dir&3], "end_portal_eye_bit": uint8(b2i(eye))}), f.x, 3, f.z)
 	}
 	if all {
 		for x := int32(4); x <= 6; x++ {
@@ -1273,28 +1260,22 @@ func (b *shBuild) buildFiller() {
 // a spot inside its portal room (or its start, if it has none). It is
 // safe for concurrent use.
 func (o *Overworld) NearestStronghold(x, z, maxCells int32) (Scattered, bool) {
-	best, found := int64(-1), [2]int32{}
-	try := func(cx, cz int32) {
-		dx, dz := int64(cx*16+8-x), int64(cz*16+8-z)
-		if d := dx*dx + dz*dz; best < 0 || d < best {
-			best, found = d, [2]int32{cx, cz}
-		}
-	}
+	n := nearestChunk{x: x, z: z, best: -1}
 	for _, c := range o.strongholdFirst() {
-		try(c[0], c[1])
+		n.try(c[0], c[1])
 	}
 	gx0, gz0 := int32(math.Floor(float64(x>>4)/200)), int32(math.Floor(float64(z>>4)/200))
 	for gx := gx0 - maxCells; gx <= gx0+maxCells; gx++ {
 		for gz := gz0 - maxCells; gz <= gz0+maxCells; gz++ {
 			if cx, cz, ok := o.strongholdCell(gx*200, gz*200); ok && uint32(cx*cx+cz*cz) >= 100 {
-				try(cx, cz)
+				n.try(cx, cz)
 			}
 		}
 	}
-	if best < 0 {
+	if n.best < 0 {
 		return Scattered{}, false
 	}
-	s := o.strongholdAt(found[0], found[1])
+	s := o.strongholdAt(n.found[0], n.found[1])
 	if s == nil {
 		return Scattered{}, false
 	}
@@ -1307,4 +1288,46 @@ func (o *Overworld) NearestStronghold(x, z, maxCells int32) (Scattered, bool) {
 		px, py, pz = p.worldPos(2, 1, 2)
 	}
 	return Scattered{Kind: "stronghold", X: px, Y: py, Z: pz}, true
+}
+
+// fits reports whether a piece box is high enough and free.
+func (l *shLayout) fits(bb structure.Box) bool { return bb.Y0 > 10 && !l.collides(bb) }
+
+// flatOverlaps is the flat test of box h against a column span; the span
+// can be empty, as in BDS.
+func flatOverlaps(h structure.Box, x0, z0, x1, z1 int32) bool {
+	return h.Z0 <= z1 && h.Z1 >= z0 && h.X1 >= x0 && h.X0 <= x1
+}
+
+// doorFrame is the frame of a small door at (x, y, z), of block s.
+func (b *shBuild) doorFrame(s uint32, x, y, z int32) {
+	b.put(s, x, y, z)
+	b.put(s, x, y+1, z)
+	b.put(s, x, y+2, z)
+	b.put(s, x+1, y+2, z)
+	b.put(s, x+2, y+2, z)
+	b.put(s, x+2, y+1, z)
+	b.put(s, x+2, y, z)
+}
+
+// door is the two-block door name in the frame at (x, y, z).
+func (b *shBuild) door(name string, x, y, z int32) {
+	d := shCard[b.cardinal(3)]
+	b.put(b.o.state(name, map[string]any{stateCardinalDirection: d}), x+1, y, z)
+	b.put(b.o.state(name, map[string]any{stateCardinalDirection: d, "upper_block_bit": uint8(1)}), x+1, y+1, z)
+}
+
+// nearestChunk keeps the chunk nearest to block (x, z) of those tried.
+type nearestChunk struct {
+	x, z  int32
+	best  int64 // squared distance, -1 before the first try
+	found [2]int32
+}
+
+// try offers chunk (cx, cz), measured from its centre.
+func (n *nearestChunk) try(cx, cz int32) {
+	dx, dz := int64(cx*16+8-n.x), int64(cz*16+8-n.z)
+	if d := dx*dx + dz*dz; n.best < 0 || d < n.best {
+		n.best, n.found = d, [2]int32{cx, cz}
+	}
 }

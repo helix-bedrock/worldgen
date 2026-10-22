@@ -75,6 +75,13 @@ func stripComments(b []byte) []byte {
 	return out
 }
 
+// rawFeatureHeader is the description every feature file has.
+type rawFeatureHeader struct {
+	Description struct {
+		Identifier string `json:"identifier"`
+	} `json:"description"`
+}
+
 // loadFeatures reads every feature under dir and keeps the types the runtime
 // implements.
 func (o *Overworld) loadFeatures(fsys fs.FS, dir string) (*featureSet, error) {
@@ -97,11 +104,7 @@ func (o *Overworld) loadFeatures(fsys fs.FS, dir string) (*featureSet, error) {
 			if !strings.HasPrefix(typ, "minecraft:") {
 				continue
 			}
-			var d struct {
-				Description struct {
-					Identifier string `json:"identifier"`
-				} `json:"description"`
-			}
+			var d rawFeatureHeader
 			if err := json.Unmarshal(raw, &d); err != nil {
 				return nil, fmt.Errorf("worldgen: %s: %w", f, err)
 			}
@@ -122,6 +125,39 @@ func (o *Overworld) loadFeatures(fsys fs.FS, dir string) (*featureSet, error) {
 	return set, nil
 }
 
+// rawAggregateFeature is the JSON of a minecraft:aggregate_feature.
+type rawAggregateFeature struct {
+	Features []string `json:"features"`
+	EarlyOut string   `json:"early_out"`
+}
+
+// rawSequenceFeature is the JSON of a minecraft:sequence_feature.
+type rawSequenceFeature struct {
+	Features []string `json:"features"`
+}
+
+// rawWeightedFeature is the JSON of a minecraft:weighted_random_feature.
+type rawWeightedFeature struct {
+	Features [][]json.RawMessage `json:"features"`
+}
+
+// rawSearchFeature is the JSON of a minecraft:search_feature.
+type rawSearchFeature struct {
+	Places string `json:"places_feature"`
+	Volume struct {
+		Min [3]int32 `json:"min"`
+		Max [3]int32 `json:"max"`
+	} `json:"search_volume"`
+	Axis     string `json:"search_axis"`
+	Required int32  `json:"required_successes"`
+}
+
+// rawSurfaceThresholdFeature is the JSON of a minecraft:surface_relative_threshold_feature.
+type rawSurfaceThresholdFeature struct {
+	Feature string `json:"feature_to_place"`
+	Min     int32  `json:"minimum_distance_below_surface"`
+}
+
 func (o *Overworld) parseFeature(typ string, raw json.RawMessage, set *featureSet) (placer, error) {
 	switch typ {
 	case "minecraft:ore_feature":
@@ -131,10 +167,7 @@ func (o *Overworld) parseFeature(typ string, raw json.RawMessage, set *featureSe
 		}
 		return ore, err
 	case "minecraft:aggregate_feature":
-		var r struct {
-			Features []string `json:"features"`
-			EarlyOut string   `json:"early_out"`
-		}
+		var r rawAggregateFeature
 		if err := json.Unmarshal(raw, &r); err != nil {
 			return nil, err
 		}
@@ -144,9 +177,7 @@ func (o *Overworld) parseFeature(typ string, raw json.RawMessage, set *featureSe
 		}
 		return f, nil
 	case "minecraft:sequence_feature":
-		var r struct {
-			Features []string `json:"features"`
-		}
+		var r rawSequenceFeature
 		if err := json.Unmarshal(raw, &r); err != nil {
 			return nil, err
 		}
@@ -156,9 +187,7 @@ func (o *Overworld) parseFeature(typ string, raw json.RawMessage, set *featureSe
 		}
 		return f, nil
 	case "minecraft:weighted_random_feature":
-		var r struct {
-			Features [][]json.RawMessage `json:"features"`
-		}
+		var r rawWeightedFeature
 		if err := json.Unmarshal(raw, &r); err != nil {
 			return nil, err
 		}
@@ -181,15 +210,7 @@ func (o *Overworld) parseFeature(typ string, raw json.RawMessage, set *featureSe
 	case "minecraft:single_block_feature":
 		return o.parseSingleBlock(raw)
 	case "minecraft:search_feature":
-		var r struct {
-			Places string `json:"places_feature"`
-			Volume struct {
-				Min [3]int32 `json:"min"`
-				Max [3]int32 `json:"max"`
-			} `json:"search_volume"`
-			Axis     string `json:"search_axis"`
-			Required int32  `json:"required_successes"`
-		}
+		var r rawSearchFeature
 		if err := json.Unmarshal(raw, &r); err != nil {
 			return nil, err
 		}
@@ -217,10 +238,7 @@ func (o *Overworld) parseFeature(typ string, raw json.RawMessage, set *featureSe
 	case "minecraft:structure_template_feature":
 		return o.parseStructureTemplate(raw)
 	case "minecraft:surface_relative_threshold_feature":
-		var r struct {
-			Feature string `json:"feature_to_place"`
-			Min     int32  `json:"minimum_distance_below_surface"`
-		}
+		var r rawSurfaceThresholdFeature
 		if err := json.Unmarshal(raw, &r); err != nil {
 			return nil, err
 		}
@@ -321,22 +339,28 @@ type scatterFeature struct {
 	toFloor    bool
 }
 
-func (o *Overworld) parseScatter(raw json.RawMessage, set *featureSet) (placer, error) {
-	var r struct {
-		Places     string          `json:"places_feature"`
+// rawScatterFeature is the JSON of a minecraft:scatter_feature.
+type rawScatterFeature struct {
+	Places     string          `json:"places_feature"`
+	Iterations json.RawMessage `json:"iterations"`
+	Scatter    json.RawMessage `json:"scatter_chance"`
+	Order      string          `json:"coordinate_eval_order"`
+	X, Y, Z    json.RawMessage
+	ToFloor    bool `json:"project_input_to_floor"`
+	// Newer files nest the distribution in its own object.
+	Dist *struct {
 		Iterations json.RawMessage `json:"iterations"`
 		Scatter    json.RawMessage `json:"scatter_chance"`
 		Order      string          `json:"coordinate_eval_order"`
 		X, Y, Z    json.RawMessage
-		ToFloor    bool `json:"project_input_to_floor"`
-		// Newer files nest the distribution in its own object.
-		Dist *struct {
-			Iterations json.RawMessage `json:"iterations"`
-			Scatter    json.RawMessage `json:"scatter_chance"`
-			Order      string          `json:"coordinate_eval_order"`
-			X, Y, Z    json.RawMessage
-		} `json:"distribution"`
-	}
+	} `json:"distribution"`
+}
+
+// rawScatterFraction is the fraction form of a scatter chance.
+type rawScatterFraction struct{ Numerator, Denominator int32 }
+
+func (o *Overworld) parseScatter(raw json.RawMessage, set *featureSet) (placer, error) {
+	var r rawScatterFeature
 	if err := json.Unmarshal(raw, &r); err != nil {
 		return nil, err
 	}
@@ -349,7 +373,7 @@ func (o *Overworld) parseScatter(raw json.RawMessage, set *featureSet) (placer, 
 		return nil, nil //nolint:nilerr // a rule whose Molang is not supported yet is skipped
 	}
 	if len(r.Scatter) > 0 {
-		var frac struct{ Numerator, Denominator int32 }
+		var frac rawScatterFraction
 		if bytes.HasPrefix(bytes.TrimSpace(r.Scatter), []byte("{")) {
 			if err := json.Unmarshal(r.Scatter, &frac); err != nil {
 				return nil, err
@@ -391,6 +415,14 @@ func molangValue(raw json.RawMessage, def float32) (molang, error) {
 	return parseMolang(s)
 }
 
+// rawScatterGrid is a fixed_grid scatter axis.
+type rawScatterGrid struct {
+	Distribution string  `json:"distribution"`
+	Extent       []int32 `json:"extent"`
+	Step         int32   `json:"step_size"`
+	Offset       int32   `json:"grid_offset"`
+}
+
 func parseScatterAxis(raw json.RawMessage) (scatterAxis, bool) {
 	if len(raw) == 0 {
 		return scatterAxis{}, true
@@ -398,12 +430,7 @@ func parseScatterAxis(raw json.RawMessage) (scatterAxis, bool) {
 	if a, ok := parseAxis(raw); ok {
 		return scatterAxis{axis: a}, true
 	}
-	var g struct {
-		Distribution string  `json:"distribution"`
-		Extent       []int32 `json:"extent"`
-		Step         int32   `json:"step_size"`
-		Offset       int32   `json:"grid_offset"`
-	}
+	var g rawScatterGrid
 	if json.Unmarshal(raw, &g) != nil || g.Distribution != "fixed_grid" || len(g.Extent) != 2 {
 		return scatterAxis{}, false
 	}
@@ -478,6 +505,15 @@ var searchOrder = map[string][3][2]int32{
 	"+z": {{2, 1}, {1, 1}, {0, -1}},
 }
 
+// span is the first and last offset of the search along loop axis a (an
+// {axis, step} pair), in the order of the step.
+func (f *searchFeature) span(a [2]int32) (int32, int32) {
+	if a[1] < 0 {
+		return f.max[a[0]], f.min[a[0]]
+	}
+	return f.min[a[0]], f.max[a[0]]
+}
+
 func (f *searchFeature) place(w *featureWorld, x, y, z int32, r *rand.MT) (blockPos, bool) {
 	order, ok := searchOrder[f.axis]
 	if !ok {
@@ -487,19 +523,13 @@ func (f *searchFeature) place(w *featureWorld, x, y, z int32, r *rand.MT) (block
 	// count is reached; vanilla always requires one, so the first success
 	// is kept directly.
 	origin := [3]int32{x, y, z}
-	from := func(a [2]int32) (int32, int32) {
-		if a[1] < 0 {
-			return f.max[a[0]], f.min[a[0]]
-		}
-		return f.min[a[0]], f.max[a[0]]
-	}
 	got := int32(0)
 	var pos [3]int32
-	o0, o1 := from(order[0])
+	o0, o1 := f.span(order[0])
 	for v0 := o0; ; v0 += order[0][1] {
-		m0, m1 := from(order[1])
+		m0, m1 := f.span(order[1])
 		for v1 := m0; ; v1 += order[1][1] {
-			i0, i1 := from(order[2])
+			i0, i1 := f.span(order[2])
 			for v2 := i0; ; v2 += order[2][1] {
 				pos[order[0][0]] = origin[order[0][0]] + v0
 				pos[order[1][0]] = origin[order[1][0]] + v1
@@ -532,6 +562,12 @@ type blockMatcher struct {
 
 var anyTagArg = regexp.MustCompile(`'([^']+)'`)
 
+// rawBlockDescriptor is the object form of a block descriptor.
+type rawBlockDescriptor struct {
+	Name string `json:"name"`
+	Tags string `json:"tags"`
+}
+
 // parseMatcher reads a list of block descriptors: names, {"name": ...} or
 // {"tags": "query.any_tag('dirt', ...)"}.
 func parseMatcher(raw []json.RawMessage) blockMatcher {
@@ -542,10 +578,7 @@ func parseMatcher(raw []json.RawMessage) blockMatcher {
 			m.names[s] = true
 			continue
 		}
-		var d struct {
-			Name string `json:"name"`
-			Tags string `json:"tags"`
-		}
+		var d rawBlockDescriptor
 		if json.Unmarshal(e, &d) != nil {
 			continue
 		}
@@ -621,34 +654,53 @@ type singleBlockFeature struct {
 // z- 2, x+ 3).
 var rotationSides = [4]int{3, 4, 2, 5}
 
-func (o *Overworld) parseSingleBlock(raw json.RawMessage) (placer, error) {
-	var r struct {
-		Places     json.RawMessage   `json:"places_block"`
-		Placement  bool              `json:"enforce_placement_rules"`
-		Survive    bool              `json:"enforce_survivability_rules"`
-		MayReplace []json.RawMessage `json:"may_replace"`
-		Attach     *struct {
-			Min    int             `json:"min_sides_must_attach"`
-			Rotate *bool           `json:"auto_rotate"`
-			Sides  json.RawMessage `json:"sides"`
-			Top    json.RawMessage `json:"top"`
-			Bottom json.RawMessage `json:"bottom"`
-			North  json.RawMessage `json:"north"`
-			South  json.RawMessage `json:"south"`
-			West   json.RawMessage `json:"west"`
-			East   json.RawMessage `json:"east"`
-		} `json:"may_attach_to"`
+// rawSingleBlock is the JSON of a minecraft:single_block_feature.
+type rawSingleBlock struct {
+	Places     json.RawMessage   `json:"places_block"`
+	Placement  bool              `json:"enforce_placement_rules"`
+	Survive    bool              `json:"enforce_survivability_rules"`
+	MayReplace []json.RawMessage `json:"may_replace"`
+	Attach     *struct {
+		Min    int             `json:"min_sides_must_attach"`
+		Rotate *bool           `json:"auto_rotate"`
+		Sides  json.RawMessage `json:"sides"`
+		Top    json.RawMessage `json:"top"`
+		Bottom json.RawMessage `json:"bottom"`
+		North  json.RawMessage `json:"north"`
+		South  json.RawMessage `json:"south"`
+		West   json.RawMessage `json:"west"`
+		East   json.RawMessage `json:"east"`
+	} `json:"may_attach_to"`
+}
+
+// rawWeightedBlock is one entry of a weighted places_block list.
+type rawWeightedBlock struct {
+	Block  biome.Block `json:"block"`
+	Weight int32       `json:"weight"`
+}
+
+// parseAttachSide reads one side of may_attach_to: a block descriptor or a
+// list of them. It reports false when the side is not given.
+func parseAttachSide(raw json.RawMessage) (blockMatcher, bool) {
+	if len(raw) == 0 {
+		return blockMatcher{}, false
 	}
+	var arr []json.RawMessage
+	if json.Unmarshal(raw, &arr) != nil {
+		arr = []json.RawMessage{raw}
+	}
+	return parseMatcher(arr), true
+}
+
+func (o *Overworld) parseSingleBlock(raw json.RawMessage) (placer, error) {
+	var r rawSingleBlock
 	if err := json.Unmarshal(raw, &r); err != nil {
 		return nil, err
 	}
 	var b biome.Block
 	var choices []weightedBlock
 	if err := json.Unmarshal(r.Places, &b); err != nil {
-		var list []struct {
-			Block  biome.Block `json:"block"`
-			Weight int32       `json:"weight"`
-		}
+		var list []rawWeightedBlock
 		if json.Unmarshal(r.Places, &list) != nil || len(list) == 0 {
 			return nil, nil //nolint:nilerr // skipped, not an error
 		}
@@ -672,7 +724,7 @@ func (o *Overworld) parseSingleBlock(raw json.RawMessage) (placer, error) {
 	if r.Placement || r.Survive {
 		// Use the resolved name: data files may use old names (tallgrass).
 		switch name := o.blockName(id); {
-		case name == "minecraft:deadbush", name == "minecraft:short_dry_grass", name == "minecraft:tall_dry_grass":
+		case name == blockDeadBush, name == "minecraft:short_dry_grass", name == "minecraft:tall_dry_grass":
 			// Dry grass takes the dead bush's ground (ShortDryGrassBlock's
 			// mayPlaceOn, sub_CF1FB20).
 			f.sand = true
@@ -685,20 +737,10 @@ func (o *Overworld) parseSingleBlock(raw json.RawMessage) (placer, error) {
 	if r.Attach != nil {
 		f.hasAttach = true
 		f.minAttach = r.Attach.Min
-		list := func(raw json.RawMessage) (blockMatcher, bool) {
-			if len(raw) == 0 {
-				return blockMatcher{}, false
-			}
-			var arr []json.RawMessage
-			if json.Unmarshal(raw, &arr) != nil {
-				arr = []json.RawMessage{raw}
-			}
-			return parseMatcher(arr), true
-		}
 		for i, raw := range []json.RawMessage{r.Attach.Top, r.Attach.Bottom, r.Attach.North, r.Attach.South, r.Attach.West, r.Attach.East} {
-			f.attach[i], f.hasSide[i] = list(raw)
+			f.attach[i], f.hasSide[i] = parseAttachSide(raw)
 		}
-		if m, ok := list(r.Attach.Sides); ok {
+		if m, ok := parseAttachSide(r.Attach.Sides); ok {
 			for i := 2; i < 6; i++ {
 				if !f.hasSide[i] {
 					f.attach[i], f.hasSide[i] = m, true

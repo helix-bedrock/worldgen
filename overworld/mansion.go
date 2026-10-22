@@ -1,7 +1,6 @@
 package overworld
 
 import (
-	"cmp"
 	"slices"
 	"strconv"
 	"strings"
@@ -226,23 +225,17 @@ func (l *mansionLayout) corridor(g *mansionGrid, x, y, dir, length int32) {
 // (sub_4FCE3A0) and reports whether it changed any.
 func cleanEdges(g *mansionGrid) bool {
 	touched := false
-	b := func(ok bool) int {
-		if ok {
-			return 1
-		}
-		return 0
-	}
 	for y := range int32(11) {
 		for x := range int32(11) {
 			if g.get(x, y) != 0 {
 				continue
 			}
-			n := b(g.house(x+1, y)) + b(g.house(x-1, y)) + b(g.house(x, y+1)) + b(g.house(x, y-1))
+			n := b2i(g.house(x+1, y)) + b2i(g.house(x-1, y)) + b2i(g.house(x, y+1)) + b2i(g.house(x, y-1))
 			if n >= 3 {
 				g.set(x, y, 2)
 				touched = true
 			} else if n == 2 {
-				d := b(g.house(x+1, y+1)) + b(g.house(x-1, y+1)) + b(g.house(x+1, y-1)) + b(g.house(x-1, y-1))
+				d := b2i(g.house(x+1, y+1)) + b2i(g.house(x-1, y+1)) + b2i(g.house(x+1, y-1)) + b2i(g.house(x-1, y-1))
 				if d <= 1 {
 					g.set(x, y, 2)
 					touched = true
@@ -269,31 +262,30 @@ func (l *mansionLayout) identifyRooms(base, rooms *mansionGrid) {
 		cells[j], cells[k] = cells[k], cells[j]
 	}
 	id := int32(10)
-	free := func(x, y int32) bool { return rooms.get(x, y) == 0 }
 	for _, c := range cells {
 		x, y := c[0], c[1]
-		if !free(x, y) {
+		if !rooms.free(x, y) {
 			continue
 		}
 		x0, x1, y0, y1 := x, x, y, y
 		typ := int32(room1x1)
 		switch {
-		case free(x+1, y) && free(x, y+1) && free(x+1, y+1) &&
+		case rooms.free(x+1, y) && rooms.free(x, y+1) && rooms.free(x+1, y+1) &&
 			base.get(x+1, y) == 2 && base.get(x, y+1) == 2 && base.get(x+1, y+1) == 2:
 			x1, y1, typ = x+1, y+1, room2x2
-		case free(x-1, y) && free(x, y+1) && free(x-1, y+1) &&
+		case rooms.free(x-1, y) && rooms.free(x, y+1) && rooms.free(x-1, y+1) &&
 			base.get(x-1, y) == 2 && base.get(x, y+1) == 2 && base.get(x-1, y+1) == 2:
 			x0, y1, typ = x-1, y+1, room2x2
-		case free(x-1, y) && free(x, y-1) && free(x-1, y-1) &&
+		case rooms.free(x-1, y) && rooms.free(x, y-1) && rooms.free(x-1, y-1) &&
 			base.get(x-1, y) == 2 && base.get(x, y-1) == 2 && base.get(x-1, y-1) == 2:
 			x0, y0, typ = x-1, y-1, room2x2
-		case free(x+1, y) && base.get(x+1, y) == 2:
+		case rooms.free(x+1, y) && base.get(x+1, y) == 2:
 			x1, typ = x+1, room1x2
-		case free(x, y+1) && base.get(x, y+1) == 2:
+		case rooms.free(x, y+1) && base.get(x, y+1) == 2:
 			y1, typ = y+1, room1x2
-		case free(x-1, y) && base.get(x-1, y) == 2:
+		case rooms.free(x-1, y) && base.get(x-1, y) == 2:
 			x0, typ = x-1, room1x2
-		case free(x, y-1) && base.get(x, y-1) == 2:
+		case rooms.free(x, y-1) && base.get(x, y-1) == 2:
 			y0, typ = y-1, room1x2
 		}
 		dx := x1
@@ -304,19 +296,13 @@ func (l *mansionLayout) identifyRooms(base, rooms *mansionGrid) {
 		if nextBool(l.r) {
 			dy = y0
 		}
-		flip := func(v, a, b int32) int32 {
-			if v == a {
-				return b
-			}
-			return a
-		}
 		door := int32(roomStart | roomDoor)
 		if !base.edgesTo(dx, dy, 1) {
-			dx, dy = flip(dx, x0, x1), flip(dy, y0, y1)
+			dx, dy = flipEnd(dx, x0, x1), flipEnd(dy, y0, y1)
 			if !base.edgesTo(dx, dy, 1) {
-				dy = flip(dy, y0, y1)
+				dy = flipEnd(dy, y0, y1)
 				if !base.edgesTo(dx, dy, 1) {
-					dx, dy = flip(dx, x0, x1), flip(dy, y0, y1)
+					dx, dy = flipEnd(dx, x0, x1), flipEnd(dy, y0, y1)
 					if !base.edgesTo(dx, dy, 1) {
 						door, dx, dy = roomStart, x0, y0
 					}
@@ -531,10 +517,9 @@ func cellPos(base [3]int32, rot int, x, y, dx int32) [3]int32 {
 // building, the small walls where it has, then the roof corners.
 func (p *mansionPlacer) roof(origin [3]int32, rot int, g, upper *mansionGrid) {
 	n, e, s, w := rotDir(rot, dirNorth), rotDir(rot, dirEast), rotDir(rot, dirSouth), rotDir(rot, dirWest)
-	upperHouse := func(x, y int32) bool { return upper != nil && upper.house(x, y) }
 	for y := range int32(11) {
 		for x := range int32(11) {
-			if !g.house(x, y) || upperHouse(x, y) {
+			if !g.house(x, y) || houseAt(upper, x, y) {
 				continue
 			}
 			c := cellPos(origin, rot, x, y, 0)
@@ -593,7 +578,7 @@ func (p *mansionPlacer) roof(origin [3]int32, rot int, g, upper *mansionGrid) {
 	}
 	for y := range int32(11) {
 		for x := range int32(11) {
-			if !g.house(x, y) || upperHouse(x, y) {
+			if !g.house(x, y) || houseAt(upper, x, y) {
 				continue
 			}
 			c := cellPos(origin, rot, x, y, 0)
@@ -645,8 +630,6 @@ func (p *mansionPlacer) floor(f int, origin [3]int32, rot int, l *mansionLayout)
 		corridor, carpetS, carpetW = "corridor_floor", "carpet_south", "carpet_west"
 		wall, doorName = "indoors_wall", "indoors_door"
 	}
-	up := func(q [3]int32) [3]int32 { return [3]int32{q[0], q[1] + 1, q[2]} }
-	open := func(x, y int32) bool { return g.get(x, y) == 1 || rooms.get(x, y)&roomEntry != 0 }
 	for y := range int32(11) {
 		for x := range int32(11) {
 			if g.get(x, y) != 1 {
@@ -654,16 +637,16 @@ func (p *mansionPlacer) floor(f int, origin [3]int32, rot int, l *mansionLayout)
 			}
 			c := cellPos(base, rot, x, y, 0)
 			p.add(corridor, c, rot, structure.MirrorNone)
-			if open(x, y-1) {
-				p.add("carpet_north", up(rel(c, e, 1)), rot, structure.MirrorNone)
+			if corridorOpen(g, rooms, x, y-1) {
+				p.add("carpet_north", oneUp(rel(c, e, 1)), rot, structure.MirrorNone)
 			}
-			if open(x+1, y) {
-				p.add("carpet_east", up(rel(rel(c, s, 1), e, 5)), rot, structure.MirrorNone)
+			if corridorOpen(g, rooms, x+1, y) {
+				p.add("carpet_east", oneUp(rel(rel(c, s, 1), e, 5)), rot, structure.MirrorNone)
 			}
-			if open(x, y+1) {
+			if corridorOpen(g, rooms, x, y+1) {
 				p.add(carpetS, rel(rel(c, s, 5), w, 1), rot, structure.MirrorNone)
 			}
-			if open(x-1, y) {
+			if corridorOpen(g, rooms, x-1, y) {
 				p.add(carpetW, rel(rel(c, w, 1), n, 1), rot, structure.MirrorNone)
 			}
 		}
@@ -694,24 +677,18 @@ func (p *mansionPlacer) floor(f int, origin [3]int32, rot int, l *mansionLayout)
 			if door == dirNone && room&roomStart != 0 {
 				door = dirUp
 			}
-			pick := func(d int32) string {
-				if door == d {
-					return doorName
-				}
-				return wall
-			}
 			c := cellPos(base, rot, x, y, -1)
 			if g.house(x-1, y) && rooms.get(x-1, y)&0xFFFF != id {
-				p.add(pick(dirWest), c, rot, structure.MirrorNone)
+				p.add(wallOrDoor(door, dirWest, doorName, wall), c, rot, structure.MirrorNone)
 			}
 			if g.get(x+1, y) == 1 && !entry {
-				p.add(pick(dirEast), rel(c, e, 8), rot, structure.MirrorNone)
+				p.add(wallOrDoor(door, dirEast, doorName, wall), rel(c, e, 8), rot, structure.MirrorNone)
 			}
 			if g.house(x, y+1) && rooms.get(x, y+1)&0xFFFF != id {
-				p.add(pick(dirSouth), rel(rel(c, s, 7), e, 7), rot+1, structure.MirrorNone)
+				p.add(wallOrDoor(door, dirSouth, doorName, wall), rel(rel(c, s, 7), e, 7), rot+1, structure.MirrorNone)
 			}
 			if g.get(x, y-1) == 1 && !entry {
-				p.add(pick(dirNorth), rel(rel(c, n, 1), e, 7), rot+1, structure.MirrorNone)
+				p.add(wallOrDoor(door, dirNorth, doorName, wall), rel(rel(c, n, 1), e, 7), rot+1, structure.MirrorNone)
 			}
 			switch {
 			case typ == room1x1:
@@ -880,7 +857,7 @@ func (o *Overworld) mansionPick(rx, rz int32) (int32, int32) {
 // isMansionChunk reports whether a woodland mansion starts in chunk
 // (cx, cz).
 func (o *Overworld) isMansionChunk(cx, cz int32) bool {
-	x, z := o.mansionPick(floorDivRegion(cx, mansionSpacing), floorDivRegion(cz, mansionSpacing))
+	x, z := o.mansionPick(structure.Region(cx, mansionSpacing), structure.Region(cz, mansionSpacing))
 	if x != cx || z != cz {
 		return false
 	}
@@ -935,8 +912,8 @@ const mansionReach = 8
 // mansionsReach calls f for each mansion with a piece in chunk (cx, cz).
 func (o *Overworld) mansionsReach(cx, cz int32, raw func(cx, cz int32) *PackedChunk, f func(m *mansion)) {
 	chunk := structure.NewBox(cx*16, MinY, cz*16, cx*16+15, MaxY-1, cz*16+15)
-	for rx := floorDivRegion(cx-mansionReach, mansionSpacing); rx <= floorDivRegion(cx+mansionReach, mansionSpacing); rx++ {
-		for rz := floorDivRegion(cz-mansionReach, mansionSpacing); rz <= floorDivRegion(cz+mansionReach, mansionSpacing); rz++ {
+	for rx := structure.Region(cx-mansionReach, mansionSpacing); rx <= structure.Region(cx+mansionReach, mansionSpacing); rx++ {
+		for rz := structure.Region(cz-mansionReach, mansionSpacing); rz <= structure.Region(cz+mansionReach, mansionSpacing); rz++ {
 			sx, sz := o.mansionPick(rx, rz)
 			if sx < cx-mansionReach || sx > cx+mansionReach || sz < cz-mansionReach || sz > cz+mansionReach {
 				continue
@@ -998,7 +975,7 @@ func (o *Overworld) mansionBlockAt(m *mansion, pos [3]int32) uint32 {
 			continue
 		}
 		switch jt.Template.Palette[st].Name {
-		case "minecraft:structure_block", "minecraft:structure_void", "minecraft:jigsaw":
+		case blockStructureBlock, blockStructureVoid, blockJigsaw:
 			continue
 		}
 		if cs := o.st.TemplateStatesMirror(jt, p.rot, p.mirror)[st]; cs.OK {
@@ -1023,12 +1000,12 @@ func (b *scBuild) mansionPiece(p mansionPiece) {
 		rp := structure.RotatePos(structure.MirrorPos(tb.Pos, p.mirror), p.rot)
 		pos := [3]int32{p.pos[0] + rp[0], p.pos[1] + rp[1], p.pos[2] + rp[2]}
 		switch st.Name {
-		case "minecraft:structure_block":
+		case blockStructureBlock:
 			if m, _ := tb.NBT["metadata"].(string); m != "" {
 				markers = append(markers, templateMarker{pos, m})
 			}
 			continue
-		case "minecraft:jigsaw", "minecraft:structure_void":
+		case blockJigsaw, blockStructureVoid:
 			continue
 		}
 		cs := conv[tb.State]
@@ -1123,6 +1100,13 @@ func (b *scBuild) mansionFoundation(m *mansion) {
 	}
 }
 
+// mansionStepRun is one run of entrance stairs: its distance south of the
+// start and the direction it steps down.
+type mansionStepRun struct {
+	south int32
+	dir   int32
+}
+
 // mansionSteps lays the two runs of cobblestone stairs beside the entrance
 // (sub_4FBF5B0 with sub_4FBFD00): each starts 9 east of the start, 2 and
 // 12 south, two columns wide, and steps down outward (north for the first,
@@ -1133,10 +1117,7 @@ func (b *scBuild) mansionSteps(m *mansion) {
 	// weirdo_direction of a stair rising toward the mansion, by the run's
 	// direction (east, west, south, north rise from west, east, north, south).
 	rise := map[int32]int32{dirWest: 0, dirEast: 1, dirNorth: 2, dirSouth: 3}
-	for _, run := range [2]struct {
-		south int32
-		dir   int32
-	}{{2, n}, {12, s}} {
+	for _, run := range [2]mansionStepRun{{2, n}, {12, s}} {
 		st := b.o.state("minecraft:stone_stairs", map[string]any{"weirdo_direction": rise[run.dir], "upside_down_bit": false})
 		start := rel(rel(origin, e, 9), s, run.south)
 		for col := range int32(2) {
@@ -1161,41 +1142,57 @@ func (b *scBuild) stepRun(pos [3]int32, dir int32, st uint32) {
 // returns its start column at the top of its box (the roof). It is safe
 // for concurrent use.
 func (o *Overworld) NearestMansion(x, z int32, maxRegions int32) (Scattered, bool) {
-	type cand struct {
-		cx, cz int32
-		d      int64
-	}
-	var cands []cand
-	rx0, rz0 := floorDivRegion(x>>4, mansionSpacing), floorDivRegion(z>>4, mansionSpacing)
+	var cands []locateCand
+	rx0, rz0 := structure.Region(x>>4, mansionSpacing), structure.Region(z>>4, mansionSpacing)
 	for rx := rx0 - maxRegions; rx <= rx0+maxRegions; rx++ {
 		for rz := rz0 - maxRegions; rz <= rz0+maxRegions; rz++ {
 			cx, cz := o.mansionPick(rx, rz)
 			dx, dz := int64(cx*16+8-x), int64(cz*16+8-z)
-			cands = append(cands, cand{cx, cz, dx*dx + dz*dz})
+			cands = append(cands, locateCand{cx, cz, dx*dx + dz*dz})
 		}
 	}
-	slices.SortFunc(cands, func(a, b cand) int { return cmp.Compare(a.d, b.d) })
-	raw := map[[2]int32]*PackedChunk{}
-	get := func(cx, cz int32) *PackedChunk {
-		k := [2]int32{cx, cz}
-		if pc, ok := raw[k]; ok {
-			return pc
-		}
-		var ch Chunk
-		o.GenerateChunk(cx, cz, &ch)
-		pc := Pack(&ch)
-		raw[k] = pc
-		return pc
-	}
+	slices.SortFunc(cands, compareLocateCand)
+	raw := newRawChunks(o)
 	for _, c := range cands {
 		if !o.isMansionChunk(c.cx, c.cz) {
 			continue
 		}
-		m := o.mansionAt(c.cx, c.cz, get)
+		m := o.mansionAt(c.cx, c.cz, raw.get)
 		if m == nil {
 			continue
 		}
 		return Scattered{Kind: "mansion", X: m.origin[0], Y: m.bb.Y1, Z: m.origin[2]}, true
 	}
 	return Scattered{}, false
+}
+
+// free reports whether cell (x, y) is empty.
+func (g *mansionGrid) free(x, y int32) bool { return g.get(x, y) == 0 }
+
+// houseAt reports whether g, which may be nil, has building at (x, y).
+func houseAt(g *mansionGrid, x, y int32) bool { return g != nil && g.house(x, y) }
+
+// flipEnd is the other end of span [a, b] from v.
+func flipEnd(v, a, b int32) int32 {
+	if v == a {
+		return b
+	}
+	return a
+}
+
+// oneUp is q one block higher.
+func oneUp(q [3]int32) [3]int32 { return [3]int32{q[0], q[1] + 1, q[2]} }
+
+// corridorOpen reports whether cell (x, y) is corridor or a room entrance.
+func corridorOpen(g, rooms *mansionGrid, x, y int32) bool {
+	return g.get(x, y) == 1 || rooms.get(x, y)&roomEntry != 0
+}
+
+// wallOrDoor is the door piece on the room's door side d, the wall piece
+// elsewhere.
+func wallOrDoor(door, d int32, doorName, wall string) string {
+	if door == d {
+		return doorName
+	}
+	return wall
 }
