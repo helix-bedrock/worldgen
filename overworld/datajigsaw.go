@@ -3,7 +3,6 @@ package overworld
 import (
 	"encoding/json"
 	"fmt"
-	"github.com/helix-bedrock/worldgen"
 	"io/fs"
 	"math"
 	"path"
@@ -11,8 +10,11 @@ import (
 	"strings"
 	"sync"
 
+	"github.com/helix-bedrock/worldgen"
+
 	"github.com/helix-bedrock/worldgen/biome"
 	"github.com/helix-bedrock/worldgen/rand"
+	"github.com/helix-bedrock/worldgen/structure"
 )
 
 // Data-driven jigsaw structures (br::worldgen::JigsawStructure), written
@@ -39,7 +41,7 @@ import (
 // djDef is one data-driven jigsaw structure.
 type djDef struct {
 	id                  string
-	pools               map[string]*jigsawPool
+	pools               map[string]*structure.Pool
 	start               string
 	maxDepth            int
 	maxH, maxV          int32
@@ -74,20 +76,11 @@ type djAlias struct {
 
 // djStructure is an assembled structure.
 type djStructure struct {
-	pieces []*jigsawPiece
-	bb     box
+	pieces []*structure.Piece
+	bb     structure.Box
 	// start is the start position: the start piece's centre at the start
 	// height (what BDS's locate reports).
 	start [3]int32
-}
-
-// cappedRule is a capped processor: up to limit blocks of the piece that
-// are block after the rules turn into output, picked in a shuffled order.
-type cappedRule struct {
-	limit  int
-	block  string
-	output uint32
-	loot   string
 }
 
 // djSetJSON is a vanilla minecraft:structure_set file.
@@ -152,7 +145,7 @@ func (o *Overworld) loadAbandonedCamps() (*djDef, error) {
 }
 
 // loadDJStructure reads a minecraft:jigsaw structure file.
-func loadDJStructure(file string, pools map[string]*jigsawPool) (*djDef, error) {
+func loadDJStructure(file string, pools map[string]*structure.Pool) (*djDef, error) {
 	var st struct {
 		J struct {
 			Description struct{ Identifier string }
@@ -189,12 +182,12 @@ func loadDJStructure(file string, pools map[string]*jigsawPool) (*djDef, error) 
 
 // loadPools reads the template pools of one folder, with the processors
 // they name.
-func (o *Overworld) loadPools(root, dir string) (map[string]*jigsawPool, error) {
+func (o *Overworld) loadPools(root, dir string) (map[string]*structure.Pool, error) {
 	procs, err := o.loadProcessors(root + "/processors")
 	if err != nil {
 		return nil, err
 	}
-	pools := map[string]*jigsawPool{}
+	pools := map[string]*structure.Pool{}
 	err = fs.WalkDir(worldgen.Data, root+"/template_pools/"+dir, func(p string, e fs.DirEntry, err error) error {
 		if err != nil || e.IsDir() || path.Ext(p) != ".json" {
 			return err
@@ -217,24 +210,24 @@ func (o *Overworld) loadPools(root, dir string) (map[string]*jigsawPool, error) 
 		if err := readJSON(p, &tp); err != nil {
 			return err
 		}
-		pool := &jigsawPool{name: tp.P.Description.Identifier, fallback: tp.P.Fallback}
-		if pool.fallback == "" {
-			pool.fallback = "minecraft:empty"
+		pool := &structure.Pool{Name: tp.P.Description.Identifier, Fallback: tp.P.Fallback}
+		if pool.Fallback == "" {
+			pool.Fallback = "minecraft:empty"
 		}
 		for _, el := range tp.P.Elements {
-			je := &jigsawElement{id: el.Element.Location, template: el.Element.Location}
+			je := &structure.Element{ID: el.Element.Location, Template: el.Element.Location}
 			if pr := procs[el.Element.Processors]; pr != nil {
-				je.rules, je.capped = pr.rules, pr.capped
+				je.Rules, je.Capped = pr.rules, pr.capped
 			}
 			switch el.Element.Type {
 			case "minecraft:empty_pool_element":
-				je.template = ""
+				je.Template = ""
 			case "minecraft:feature_pool_element":
-				je.id, je.template, je.feature = el.Element.Feature, "", el.Element.Feature
+				je.ID, je.Template, je.Feature = el.Element.Feature, "", el.Element.Feature
 			}
-			pool.entries = append(pool.entries, jigsawEntry{je, el.Weight})
+			pool.Entries = append(pool.Entries, structure.PoolEntry{Element: je, Weight: el.Weight})
 		}
-		pools[pool.name] = pool
+		pools[pool.Name] = pool
 		return nil
 	})
 	if err != nil {
@@ -255,8 +248,8 @@ func readJSON(p string, v any) error {
 }
 
 type processorList struct {
-	rules  []blockRule
-	capped []cappedRule
+	rules  []structure.BlockRule
+	capped []structure.CappedRule
 }
 
 // loadProcessors reads the processor lists of a folder: rule processors
@@ -309,7 +302,7 @@ func (o *Overworld) loadProcessors(dir string) (map[string]*processorList, error
 					if r.Input.Type == "minecraft:block_match" {
 						chance = 1
 					}
-					pl.rules = append(pl.rules, blockRule{block: r.Input.Block, chance: chance, output: id})
+					pl.rules = append(pl.rules, structure.BlockRule{Block: r.Input.Block, Chance: chance, Output: id})
 				}
 			case "minecraft:capped":
 				if p.Delegate == nil {
@@ -320,7 +313,7 @@ func (o *Overworld) loadProcessors(dir string) (map[string]*processorList, error
 					if !ok {
 						continue
 					}
-					pl.capped = append(pl.capped, cappedRule{limit: p.Limit, block: r.Input.Block, output: id, loot: r.Modifier.LootTable})
+					pl.capped = append(pl.capped, structure.CappedRule{Limit: p.Limit, Block: r.Input.Block, Output: id, Loot: r.Modifier.LootTable})
 				}
 			}
 		}
@@ -355,33 +348,33 @@ func (o *Overworld) loadTrialChambers() (*djDef, error) {
 	if err := json.Unmarshal(raw, &doc); err != nil {
 		return nil, fmt.Errorf("worldgen: parse trial_chambers.json: %w", err)
 	}
-	procs := map[string][]blockRule{}
+	procs := map[string][]structure.BlockRule{}
 	for name, rs := range doc.Processors {
 		for _, r := range rs {
 			props := map[string]any{}
 			if r.Lit {
 				props["lit"] = uint8(1)
 			}
-			procs[name] = append(procs[name], blockRule{block: r.Block, chance: r.Probability, output: o.state(r.Output, props)})
+			procs[name] = append(procs[name], structure.BlockRule{Block: r.Block, Chance: r.Probability, Output: o.state(r.Output, props)})
 		}
 	}
 	d := &djDef{id: "minecraft:trial_chambers", kind: "trial_chambers", start: "minecraft:trial_chambers/chamber/end",
 		maxDepth: 20, maxH: 116, maxV: 116, padBottom: 10, padTop: 10, minY0: -40, maxY0: -20, bury: true,
-		spacing: 34, separation: 12, salt: 94251327, pools: map[string]*jigsawPool{}}
-	elements := map[string]*jigsawElement{}
-	element := func(tpl, procName string) *jigsawElement {
+		spacing: 34, separation: 12, salt: 94251327, pools: map[string]*structure.Pool{}}
+	elements := map[string]*structure.Element{}
+	element := func(tpl, procName string) *structure.Element {
 		k := tpl + "|" + procName
 		if e := elements[k]; e != nil {
 			return e
 		}
-		e := &jigsawElement{id: tpl, template: tpl, rules: procs[procName]}
+		e := &structure.Element{ID: tpl, Template: tpl, Rules: procs[procName]}
 		elements[k] = e
 		return e
 	}
 	for _, p := range doc.Pools {
-		pool := &jigsawPool{name: p.Name, fallback: p.Fallback}
+		pool := &structure.Pool{Name: p.Name, Fallback: p.Fallback}
 		for _, e := range p.Elements {
-			pool.entries = append(pool.entries, jigsawEntry{element(e.Template, e.Processors), e.Weight})
+			pool.Entries = append(pool.Entries, structure.PoolEntry{Element: element(e.Template, e.Processors), Weight: e.Weight})
 		}
 		d.pools[p.Name] = pool
 	}
@@ -403,8 +396,8 @@ func (o *Overworld) loadTrialChambers() (*djDef, error) {
 		for _, g := range a.groups {
 			for _, pr := range g {
 				name := pr[1]
-				d.pools[name] = &jigsawPool{name: name, fallback: "minecraft:empty",
-					entries: []jigsawEntry{{element(strings.TrimPrefix(name, "minecraft:"), ""), 1}}}
+				d.pools[name] = &structure.Pool{Name: name, Fallback: "minecraft:empty",
+					Entries: []structure.PoolEntry{{Element: element(strings.TrimPrefix(name, "minecraft:"), ""), Weight: 1}}}
 			}
 		}
 	}
@@ -466,17 +459,6 @@ func (d *djDef) near(o *Overworld, cx, cz int32, f func(s *djStructure)) {
 	}
 }
 
-// expanded is a pool's elements, each repeated weight times.
-func (p *jigsawPool) expanded() []*jigsawElement {
-	var out []*jigsawElement
-	for _, e := range p.entries {
-		for range e.weight {
-			out = append(out, e.el)
-		}
-	}
-	return out
-}
-
 // intN is a random that draws bounded ints.
 type intN interface{ IntN(n int32) int32 }
 
@@ -490,16 +472,16 @@ func shuffleBack[T any](s []T, r intN) {
 
 // djRegion is free space: inside in, clear of out.
 type djRegion struct {
-	in  box
-	out []box
+	in  structure.Box
+	out []structure.Box
 }
 
-func (g *djRegion) fits(bb box) bool {
-	if !bb.inside(g.in) {
+func (g *djRegion) fits(bb structure.Box) bool {
+	if !bb.Inside(g.in) {
 		return false
 	}
 	for _, b := range g.out {
-		if bb.intersects(b) {
+		if bb.Intersects(b) {
 			return false
 		}
 	}
@@ -507,7 +489,7 @@ func (g *djRegion) fits(bb box) bool {
 }
 
 type djState struct {
-	p      *jigsawPiece
+	p      *structure.Piece
 	region *djRegion
 	prio   int32
 }
@@ -517,11 +499,11 @@ type djAssembly struct {
 	d      *djDef
 	r      *rand.Java
 	pools  map[string]string // bound aliases
-	pieces []*jigsawPiece
+	pieces []*structure.Piece
 	queue  []djState
 }
 
-func (a *djAssembly) pool(name string) *jigsawPool {
+func (a *djAssembly) pool(name string) *structure.Pool {
 	if to, ok := a.pools[name]; ok {
 		name = to
 	}
@@ -532,14 +514,14 @@ func (a *djAssembly) pool(name string) *jigsawPool {
 }
 
 // emptyPool is minecraft:empty: a pool with no elements.
-var emptyPool = jigsawPool{name: "minecraft:empty", fallback: "minecraft:empty"}
+var emptyPool = structure.Pool{Name: "minecraft:empty", Fallback: "minecraft:empty"}
 
 // sortedJigsaws are a piece's jigsaws shuffled, then sorted by selection
 // priority, highest first (sub_D1EEED0).
-func (a *djAssembly) sortedJigsaws(p *jigsawPiece) []jigsawBlock {
-	js := p.placedJigsaws()
+func (a *djAssembly) sortedJigsaws(p *structure.Piece) []structure.JigsawBlock {
+	js := p.PlacedJigsaws()
 	shuffleBack(js, a.r)
-	slices.SortStableFunc(js, func(x, y jigsawBlock) int { return int(y.selPrio) - int(x.selPrio) })
+	slices.SortStableFunc(js, func(x, y structure.JigsawBlock) int { return int(y.SelPrio) - int(x.SelPrio) })
 	return js
 }
 
@@ -600,27 +582,27 @@ func (d *djDef) assembleOne(o *Overworld, cx, cz int32) *djStructure {
 	if start == nil {
 		return nil
 	}
-	list := start.expanded()
+	list := start.Expanded()
 	if len(list) == 0 {
 		return nil
 	}
 	el := list[r.IntN(int32(len(list)))]
-	tpl := o.template(el.template)
+	tpl := o.st.Template(el.Template)
 	if tpl == nil {
 		return nil
 	}
-	p := &jigsawPiece{el: el, tpl: tpl, pos: [3]int32{cx * 16, y, cz * 16}, rotation: rot, ground: 1}
-	p.bb = tplBox(tpl.tpl, p.pos, rot)
-	mx := p.bb.x0 + (p.bb.x1-p.bb.x0+1)>>1
-	mz := p.bb.z0 + (p.bb.z1-p.bb.z0+1)>>1
+	p := &structure.Piece{Element: el, Template: tpl, Pos: [3]int32{cx * 16, y, cz * 16}, Rotation: rot, Ground: 1}
+	p.BB = structure.TemplateBox(tpl.Template, p.Pos, rot)
+	mx := p.BB.X0 + (p.BB.X1-p.BB.X0+1)>>1
+	mz := p.BB.Z0 + (p.BB.Z1-p.BB.Z0+1)>>1
 	if d.project {
 		y += o.surfaceNoStructures(mx, mz)
 	}
 	// The piece's ground (one above its bottom) goes to y.
-	dy := y - 1 - p.bb.y0
-	p.pos[1] += dy
-	p.bb = p.bb.raise(dy)
-	if p.bb.y0 < MinY+d.padBottom || p.bb.y1 > MaxY-1-d.padTop {
+	dy := y - 1 - p.BB.Y0
+	p.Pos[1] += dy
+	p.BB = p.BB.Raise(dy)
+	if p.BB.Y0 < MinY+d.padBottom || p.BB.Y1 > MaxY-1-d.padTop {
 		return nil
 	}
 	// The biome is checked at the start position.
@@ -633,7 +615,7 @@ func (d *djDef) assembleOne(o *Overworld, cx, cz int32) *djStructure {
 	if d.biomes != nil && (int(b) >= len(d.biomes) || !d.biomes[b]) {
 		return nil
 	}
-	a := &djAssembly{o: o, d: d, r: &r, pieces: []*jigsawPiece{p}, pools: map[string]string{}}
+	a := &djAssembly{o: o, d: d, r: &r, pieces: []*structure.Piece{p}, pools: map[string]string{}}
 	if len(d.aliases) > 0 {
 		// The aliases are bound with Java's legacy positional random
 		// (sub_D23EC10): Random(world seed), forked with one nextLong,
@@ -649,9 +631,10 @@ func (d *djDef) assembleOne(o *Overworld, cx, cz int32) *djStructure {
 		}
 	}
 	root := &djRegion{
-		in: box{mx - d.maxH, max(y-d.maxV, MinY+d.padBottom), mz - d.maxH,
-			mx + d.maxH, min(y+d.maxV, MaxY-1-d.padTop), mz + d.maxH},
-		out: []box{p.bb},
+		in: structure.NewBox(mx-d.maxH, max(y-d.maxV, MinY+d.padBottom), mz-d.maxH,
+			mx+d.maxH, min(y+d.maxV, MaxY-1-d.padTop), mz+d.maxH),
+
+		out: []structure.Box{p.BB},
 	}
 	a.queue = []djState{{p, root, 0}}
 	for len(a.queue) > 0 {
@@ -666,10 +649,11 @@ func (d *djDef) assembleOne(o *Overworld, cx, cz int32) *djStructure {
 		a.queue = append(a.queue[:best], a.queue[best+1:]...)
 		a.children(q)
 	}
-	s := &djStructure{pieces: a.pieces, bb: p.bb, start: [3]int32{mx, y, mz}}
+	s := &djStructure{pieces: a.pieces, bb: p.BB, start: [3]int32{mx, y, mz}}
 	for _, q := range a.pieces[1:] {
-		s.bb = box{min(s.bb.x0, q.bb.x0), min(s.bb.y0, q.bb.y0), min(s.bb.z0, q.bb.z0),
-			max(s.bb.x1, q.bb.x1), max(s.bb.y1, q.bb.y1), max(s.bb.z1, q.bb.z1)}
+		s.bb = structure.NewBox(min(s.bb.X0, q.BB.X0), min(s.bb.Y0, q.BB.Y0), min(s.bb.Z0, q.BB.Z0),
+			max(s.bb.X1, q.BB.X1), max(s.bb.Y1, q.BB.Y1), max(s.bb.Z1, q.BB.Z1))
+
 	}
 	return s
 }
@@ -679,30 +663,30 @@ func (a *djAssembly) children(q djState) {
 	p := q.p
 	var inner *djRegion
 	for _, j := range a.sortedJigsaws(p) {
-		pool := a.pool(j.pool)
-		if pool == nil || len(pool.entries) == 0 {
+		pool := a.pool(j.Pool)
+		if pool == nil || len(pool.Entries) == 0 {
 			continue
 		}
-		fallback := a.pool(pool.fallback)
+		fallback := a.pool(pool.Fallback)
 		if fallback == nil {
 			continue
 		}
-		dir := jigsawDir(j.facing)
-		target := [3]int32{j.pos[0] + dir[0], j.pos[1] + dir[1], j.pos[2] + dir[2]}
+		dir := structure.JigsawDir(j.Facing)
+		target := [3]int32{j.Pos[0] + dir[0], j.Pos[1] + dir[1], j.Pos[2] + dir[2]}
 		region := q.region
-		if p.bb.contains(target) {
+		if p.BB.Contains(target) {
 			if inner == nil {
-				inner = &djRegion{in: p.bb}
+				inner = &djRegion{in: p.BB}
 			}
 			region = inner
 		}
-		var cands []*jigsawElement
-		if p.depth != a.d.maxDepth {
-			l := pool.expanded()
+		var cands []*structure.Element
+		if p.Depth != a.d.maxDepth {
+			l := pool.Expanded()
 			shuffleBack(l, a.r)
 			cands = l
 		}
-		l := fallback.expanded()
+		l := fallback.Expanded()
 		shuffleBack(l, a.r)
 		cands = append(cands, l...)
 		a.fit(q, j, target, region, cands)
@@ -710,10 +694,10 @@ func (a *djAssembly) children(q djState) {
 }
 
 // fit attaches the first candidate that fits to jigsaw j.
-func (a *djAssembly) fit(q djState, j jigsawBlock, target [3]int32, region *djRegion, cands []*jigsawElement) {
-	want := opposite(j.facing)
+func (a *djAssembly) fit(q djState, j structure.JigsawBlock, target [3]int32, region *djRegion, cands []*structure.Element) {
+	want := structure.Opposite(j.Facing)
 	for _, el := range cands {
-		if el.template == "" && el.feature == "" {
+		if el.Template == "" && el.Feature == "" {
 			return
 		}
 		tpl := a.o.elementTemplate(el)
@@ -723,25 +707,25 @@ func (a *djAssembly) fit(q djState, j jigsawBlock, target [3]int32, region *djRe
 		rots := []int{0, 1, 2, 3}
 		shuffleBack(rots, a.r)
 		for _, rot := range rots {
-			cand := &jigsawPiece{el: el, tpl: tpl, rotation: rot}
+			cand := &structure.Piece{Element: el, Template: tpl, Rotation: rot}
 			for _, cj := range a.sortedJigsaws(cand) {
-				if cj.facing != want || cj.name != j.target || j.aligned && cj.top != j.top {
+				if cj.Facing != want || cj.Name != j.Target || j.Aligned && cj.Top != j.Top {
 					continue
 				}
-				pos := [3]int32{target[0] - cj.pos[0], target[1] - cj.pos[1], target[2] - cj.pos[2]}
-				bb := tplBox(tpl.tpl, pos, rot)
+				pos := [3]int32{target[0] - cj.Pos[0], target[1] - cj.Pos[1], target[2] - cj.Pos[2]}
+				bb := structure.TemplateBox(tpl.Template, pos, rot)
 				if !region.fits(bb) {
 					continue
 				}
 				region.out = append(region.out, bb)
-				cand.pos, cand.bb, cand.depth = pos, bb, q.p.depth+1
+				cand.Pos, cand.BB, cand.Depth = pos, bb, q.p.Depth+1
 				// The joining jigsaw's height in the piece is its
 				// ground, as for villages.
 				// VERIFY: for data-driven structures.
-				cand.ground = cj.pos[1]
+				cand.Ground = cj.Pos[1]
 				a.pieces = append(a.pieces, cand)
-				if cand.depth <= a.d.maxDepth {
-					a.queue = append(a.queue, djState{cand, region, j.placePrio})
+				if cand.Depth <= a.d.maxDepth {
+					a.queue = append(a.queue, djState{cand, region, j.PlacePrio})
 				}
 				return
 			}
@@ -754,16 +738,16 @@ func (a *djAssembly) fit(q djState, j jigsawBlock, target [3]int32, region *djRe
 // sub_D231C90, returns 0), with one jigsaw at its origin facing down, named
 // minecraft:bottom and joining nothing (sub_D231DD0), so the assembly's
 // draws run as they should. The features are placed during decoration.
-var featureTemplate = &jigsawTemplate{tpl: &Template{},
-	jigsaws: []jigsawBlock{{facing: "down", top: "south", name: "minecraft:bottom", target: "minecraft:empty", pool: "minecraft:empty",
-		attachment: "minecraft:bottom"}}}
+var featureTemplate = &structure.JigsawTemplate{Template: &structure.Template{},
+	Jigsaws: []structure.JigsawBlock{{Facing: "down", Top: "south", Name: "minecraft:bottom", Target: "minecraft:empty", Pool: "minecraft:empty",
+		Attachment: "minecraft:bottom"}}}
 
 // elementTemplate is the template an element places.
-func (o *Overworld) elementTemplate(el *jigsawElement) *jigsawTemplate {
-	if el.feature != "" {
+func (o *Overworld) elementTemplate(el *structure.Element) *structure.JigsawTemplate {
+	if el.Feature != "" {
 		return featureTemplate
 	}
-	return o.template(el.template)
+	return o.st.Template(el.Template)
 }
 
 // dataJigsawBeards lists the beards of beard_thin data-driven structures
@@ -779,11 +763,11 @@ func (o *Overworld) dataJigsawBeards(cx, cz int32) []beardBox {
 		}
 		d.near(o, cx, cz, func(s *djStructure) {
 			for _, p := range s.pieces {
-				if p.el.feature != "" {
+				if p.Element.Feature != "" {
 					continue
 				}
-				if (p.bb.x0-12)>>4 <= cx && cx <= (p.bb.x1+12)>>4 && (p.bb.z0-12)>>4 <= cz && cz <= (p.bb.z1+12)>>4 {
-					out = append(out, beardBox{x0: p.bb.x0, z0: p.bb.z0, x1: p.bb.x1, z1: p.bb.z1, ground: p.bb.y0 + 1})
+				if (p.BB.X0-12)>>4 <= cx && cx <= (p.BB.X1+12)>>4 && (p.BB.Z0-12)>>4 <= cz && cz <= (p.BB.Z1+12)>>4 {
+					out = append(out, beardBox{x0: p.BB.X0, z0: p.BB.Z0, x1: p.BB.X1, z1: p.BB.Z1, ground: p.BB.Y0 + 1})
 				}
 			}
 		})
@@ -828,20 +812,20 @@ func (o *Overworld) plainHeightMap(cx, cz int32) *[256]int16 {
 // (cx, cz), for the terrain fill.
 // VERIFY: pieces are registered within 12 blocks of the chunk, as the
 // city's beards are; trial chambers' encapsulate is taken as bury.
-func (o *Overworld) buryBoxes(cx, cz int32) []box {
-	var out []box
-	area := box{cx*16 - 12, MinY, cz*16 - 12, cx*16 + 27, MaxY - 1, cz*16 + 27}
+func (o *Overworld) buryBoxes(cx, cz int32) []structure.Box {
+	var out []structure.Box
+	area := structure.NewBox(cx*16-12, MinY, cz*16-12, cx*16+27, MaxY-1, cz*16+27)
 	for _, d := range o.dataJigsaws {
 		if !d.bury {
 			continue
 		}
 		d.near(o, cx, cz, func(s *djStructure) {
-			if !s.bb.intersects(area) {
+			if !s.bb.Intersects(area) {
 				return
 			}
 			for _, p := range s.pieces {
-				if p.bb.intersects(area) {
-					out = append(out, p.bb)
+				if p.BB.Intersects(area) {
+					out = append(out, p.BB)
 				}
 			}
 		})
@@ -851,12 +835,12 @@ func (o *Overworld) buryBoxes(cx, cz int32) []box {
 
 // buryAt is the bury density at (x, y, z): 1 - d/6 for each box within 6
 // blocks, d the whole distance to the box with y halved (sub_D1EE730).
-func buryAt(bs []box, x, y, z int32) float32 {
+func buryAt(bs []structure.Box, x, y, z int32) float32 {
 	var sum float32
 	for _, b := range bs {
-		cy := min(max(y, b.y0), b.y1)
-		dx := max(b.x0-x, x-b.x1, 0)
-		dz := max(b.z0-z, z-b.z1, 0)
+		cy := min(max(y, b.Y0), b.Y1)
+		dx := max(b.X0-x, x-b.X1, 0)
+		dz := max(b.Z0-z, z-b.Z1, 0)
 		dy := int32(float32(y-cy) * 0.5)
 		if dx > 6 || dz > 6 || dy > 6 || dy < -6 {
 			continue
@@ -873,14 +857,14 @@ func buryAt(bs []box, x, y, z int32) float32 {
 // placeDataJigsaws writes the pieces of data-driven jigsaw structures that
 // reach chunk (cx, cz) into c.
 func (o *Overworld) placeDataJigsaws(cx, cz int32, c *Chunk) {
-	chunkBox := box{cx * 16, MinY, cz * 16, cx*16 + 15, MaxY - 1, cz*16 + 15}
+	chunkBox := structure.NewBox(cx*16, MinY, cz*16, cx*16+15, MaxY-1, cz*16+15)
 	for _, d := range o.dataJigsaws {
 		d.near(o, cx, cz, func(s *djStructure) {
-			if !s.bb.intersects(chunkBox) {
+			if !s.bb.Intersects(chunkBox) {
 				return
 			}
 			for _, p := range s.pieces {
-				if p.bb.intersects(chunkBox) {
+				if p.BB.Intersects(chunkBox) {
 					o.placePiece(p, c, chunkBox, nil)
 				}
 			}
@@ -891,15 +875,15 @@ func (o *Overworld) placeDataJigsaws(cx, cz int32, c *Chunk) {
 // dataJigsawsReach reports whether a data-driven jigsaw structure has a
 // piece in chunk (cx, cz).
 func (o *Overworld) dataJigsawsReach(cx, cz int32) bool {
-	chunkBox := box{cx * 16, MinY, cz * 16, cx*16 + 15, MaxY - 1, cz*16 + 15}
+	chunkBox := structure.NewBox(cx*16, MinY, cz*16, cx*16+15, MaxY-1, cz*16+15)
 	hit := false
 	for _, d := range o.dataJigsaws {
 		d.near(o, cx, cz, func(s *djStructure) {
-			if hit || !s.bb.intersects(chunkBox) {
+			if hit || !s.bb.Intersects(chunkBox) {
 				return
 			}
 			for _, p := range s.pieces {
-				if p.bb.intersects(chunkBox) {
+				if p.BB.Intersects(chunkBox) {
 					hit = true
 					return
 				}
@@ -907,57 +891,6 @@ func (o *Overworld) dataJigsawsReach(cx, cz int32) bool {
 		})
 	}
 	return hit
-}
-
-// cappedPicks are the template blocks a piece's capped processors turn,
-// by block index: computed once per piece from the whole template, in an
-// order shuffled with a positional Xoroshiro at the piece's position.
-// VERIFY: Java's CappedProcessor; the random (BDS's
-// StructurePoolBlockPredicateCappedArcheologyBlockReplacement) is taken as
-// the world seed's positional Xoroshiro.
-func (o *Overworld) cappedPicks(p *jigsawPiece) map[int]cappedRule {
-	p.cappedOnce.Do(func() {
-		t := p.tpl.tpl
-		conv := o.templateStates(p.tpl, p.rotation)
-		names := make([]string, len(t.Blocks))
-		for i, b := range t.Blocks {
-			cs := conv[b.State]
-			if !cs.ok {
-				continue
-			}
-			rp := rotatePos(b.Pos, p.rotation)
-			x, y, z := rp[0]+p.pos[0], rp[1]+p.pos[1], rp[2]+p.pos[2]
-			if len(p.el.rules) > 0 {
-				cs = o.applyRules(p.el.rules, cs, x, y, z, o.ids.air)
-			}
-			names[i] = o.blockName(cs.id)
-		}
-		picks := map[int]cappedRule{}
-		for _, cr := range p.el.capped {
-			r := rand.NewPositional(rand.Seed128(o.seed)).At(p.pos[0], p.pos[1], p.pos[2])
-			order := make([]int, len(t.Blocks))
-			for i := range order {
-				order[i] = i
-			}
-			for i := len(order); i > 1; i-- {
-				j := r.IntN(int32(i))
-				order[i-1], order[j] = order[j], order[i-1]
-			}
-			n := 0
-			for _, i := range order {
-				if n >= cr.limit {
-					break
-				}
-				if _, done := picks[i]; done || names[i] != cr.block {
-					continue
-				}
-				picks[i] = cr
-				n++
-			}
-		}
-		p.capped = picks
-	})
-	return p.capped
 }
 
 // NearestDataJigsaw finds the trail ruins, trial chambers or abandoned camp
@@ -1023,7 +956,7 @@ func (o *Overworld) dataJigsawFeatures(w *featureWorld, ox, oz int32, pop uint32
 		d.near(o, ox, oz, func(s *djStructure) {
 			defer func() { w.guard = nil }()
 			for _, p := range s.pieces {
-				if p.el.feature == "" {
+				if p.Element.Feature == "" {
 					// A template piece draws one number per chest it
 					// places in this chunk, for the chest's loot seed
 					// (LegacyStructureTemplate::placeInWorld), before
@@ -1038,10 +971,10 @@ func (o *Overworld) dataJigsawFeatures(w *featureWorld, ox, oz int32, pop uint32
 					}
 					continue
 				}
-				if p.pos[0]>>4 != ox || p.pos[2]>>4 != oz {
+				if p.Pos[0]>>4 != ox || p.Pos[2]>>4 != oz {
 					continue
 				}
-				f, ok := o.features.get(p.el.feature)
+				f, ok := o.features.get(p.Element.Feature)
 				if !ok {
 					continue
 				}
@@ -1051,7 +984,7 @@ func (o *Overworld) dataJigsawFeatures(w *featureWorld, ox, oz int32, pop uint32
 				if w.guard == nil {
 					w.guard = structureCells(s)
 				}
-				f.place(w, p.pos[0], p.pos[1], p.pos[2], r)
+				f.place(w, p.Pos[0], p.Pos[1], p.Pos[2], r)
 			}
 		})
 	}
@@ -1059,17 +992,17 @@ func (o *Overworld) dataJigsawFeatures(w *featureWorld, ox, oz int32, pop uint32
 
 // chestsInChunk counts the chests template piece p places in chunk
 // (cx, cz).
-func chestsInChunk(p *jigsawPiece, cx, cz int32) int {
-	if p.tpl == nil {
+func chestsInChunk(p *structure.Piece, cx, cz int32) int {
+	if p.Template == nil {
 		return 0
 	}
 	n := 0
-	for _, b := range p.tpl.tpl.Blocks {
-		if name := p.tpl.tpl.Palette[b.State].Name; name != "minecraft:chest" && name != "minecraft:trapped_chest" {
+	for _, b := range p.Template.Template.Blocks {
+		if name := p.Template.Template.Palette[b.State].Name; name != "minecraft:chest" && name != "minecraft:trapped_chest" {
 			continue
 		}
-		rp := rotatePos(b.Pos, p.rotation)
-		if (rp[0]+p.pos[0])>>4 == cx && (rp[2]+p.pos[2])>>4 == cz {
+		rp := structure.RotatePos(b.Pos, p.Rotation)
+		if (rp[0]+p.Pos[0])>>4 == cx && (rp[2]+p.Pos[2])>>4 == cz {
 			n++
 		}
 	}
@@ -1080,15 +1013,15 @@ func chestsInChunk(p *jigsawPiece, cx, cz int32) int {
 func structureCells(s *djStructure) map[[3]int32]bool {
 	cells := map[[3]int32]bool{}
 	for _, p := range s.pieces {
-		if p.el.feature != "" || p.tpl == nil {
+		if p.Element.Feature != "" || p.Template == nil {
 			continue
 		}
-		for _, b := range p.tpl.tpl.Blocks {
-			if p.tpl.tpl.Palette[b.State].Name == "minecraft:structure_void" {
+		for _, b := range p.Template.Template.Blocks {
+			if p.Template.Template.Palette[b.State].Name == "minecraft:structure_void" {
 				continue
 			}
-			rp := rotatePos(b.Pos, p.rotation)
-			cells[[3]int32{rp[0] + p.pos[0], rp[1] + p.pos[1], rp[2] + p.pos[2]}] = true
+			rp := structure.RotatePos(b.Pos, p.Rotation)
+			cells[[3]int32{rp[0] + p.Pos[0], rp[1] + p.Pos[1], rp[2] + p.Pos[2]}] = true
 		}
 	}
 	return cells
@@ -1099,13 +1032,13 @@ func structureCells(s *djStructure) map[[3]int32]bool {
 // when there are none.
 func (o *Overworld) campCells(cx, cz int32) map[[3]int32]bool {
 	var cells map[[3]int32]bool
-	area := box{cx*16 - 16, MinY, cz*16 - 16, cx*16 + 31, MaxY - 1, cz*16 + 31}
+	area := structure.NewBox(cx*16-16, MinY, cz*16-16, cx*16+31, MaxY-1, cz*16+31)
 	for _, d := range o.dataJigsaws {
 		if d.kind != "abandoned_camp" {
 			continue
 		}
 		d.near(o, cx, cz, func(s *djStructure) {
-			if !s.bb.intersects(area) {
+			if !s.bb.Intersects(area) {
 				return
 			}
 			if cells == nil {
@@ -1135,12 +1068,12 @@ func (o *Overworld) JigsawPieces(id string, cx, cz int32) []PieceInfo {
 			}
 			out = make([]PieceInfo, 0, len(s.pieces))
 			for _, p := range s.pieces {
-				name := p.el.template
+				name := p.Element.Template
 				if name == "" {
-					name = p.el.feature
+					name = p.Element.Feature
 				}
-				out = append(out, PieceInfo{Template: name, Box: [6]int32{p.bb.x0, p.bb.y0, p.bb.z0, p.bb.x1, p.bb.y1, p.bb.z1},
-					Rotation: p.rotation, Depth: p.depth})
+				out = append(out, PieceInfo{Template: name, Box: [6]int32{p.BB.X0, p.BB.Y0, p.BB.Z0, p.BB.X1, p.BB.Y1, p.BB.Z1},
+					Rotation: p.Rotation, Depth: p.Depth})
 			}
 		})
 		if out != nil {

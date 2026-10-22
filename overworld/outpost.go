@@ -5,6 +5,7 @@ import (
 	"slices"
 
 	"github.com/helix-bedrock/worldgen/rand"
+	"github.com/helix-bedrock/worldgen/structure"
 )
 
 // Pillager outposts, written from BDS 1.26.52: PillagerOutpostFeature
@@ -118,19 +119,19 @@ func (o *Overworld) outpostAt(cx, cz int32) []outpostPiece {
 }
 
 // outpostBox is the area a piece covers.
-func (o *Overworld) outpostBox(p outpostPiece) (box, *jigsawTemplate) {
-	jt := o.template(p.path)
+func (o *Overworld) outpostBox(p outpostPiece) (structure.Box, *structure.JigsawTemplate) {
+	jt := o.st.Template(p.path)
 	if jt == nil {
-		return box{}, nil
+		return structure.Box{}, nil
 	}
-	e := rotatePos([3]int32{jt.tpl.Size[0] - 1, 0, jt.tpl.Size[2] - 1}, p.rot)
-	return box{min(p.x, p.x+e[0]), MinY, min(p.z, p.z+e[2]), max(p.x, p.x+e[0]), MaxY - 1, max(p.z, p.z+e[2])}, jt
+	e := structure.RotatePos([3]int32{jt.Template.Size[0] - 1, 0, jt.Template.Size[2] - 1}, p.rot)
+	return structure.NewBox(min(p.x, p.x+e[0]), MinY, min(p.z, p.z+e[2]), max(p.x, p.x+e[0]), MaxY-1, max(p.z, p.z+e[2])), jt
 }
 
 // outpostsReach calls f for each outpost with a piece in chunk (cx, cz).
 // Pieces reach at most 3 chunks from the start.
 func (o *Overworld) outpostsReach(cx, cz int32, f func(pieces []outpostPiece)) {
-	chunk := box{cx * 16, MinY, cz * 16, cx*16 + 15, MaxY - 1, cz*16 + 15}
+	chunk := structure.NewBox(cx*16, MinY, cz*16, cx*16+15, MaxY-1, cz*16+15)
 	for rx := floorDivRegion(cx-3, outpostSpacing); rx <= floorDivRegion(cx+3, outpostSpacing); rx++ {
 		for rz := floorDivRegion(cz-3, outpostSpacing); rz <= floorDivRegion(cz+3, outpostSpacing); rz++ {
 			sx, sz := o.outpostPick(rx, rz)
@@ -139,7 +140,7 @@ func (o *Overworld) outpostsReach(cx, cz int32, f func(pieces []outpostPiece)) {
 			}
 			pieces := o.outpostAt(sx, sz)
 			for _, p := range pieces {
-				if bb, jt := o.outpostBox(p); jt != nil && bb.intersects(chunk) {
+				if bb, jt := o.outpostBox(p); jt != nil && bb.Intersects(chunk) {
 					f(pieces)
 					break
 				}
@@ -157,8 +158,8 @@ func (o *Overworld) outpostReaches(cx, cz int32) bool {
 
 // outpostY is a piece's bottom y, ok false when a feature is not placed
 // (sub_4E84CE0).
-func (o *Overworld) outpostY(p outpostPiece, bb box, raw func(cx, cz int32) *PackedChunk) (int32, bool) {
-	hw, hd := (bb.x1-bb.x0+1)/2, (bb.z1-bb.z0+1)/2
+func (o *Overworld) outpostY(p outpostPiece, bb structure.Box, raw func(cx, cz int32) *PackedChunk) (int32, bool) {
+	hw, hd := (bb.X1-bb.X0+1)/2, (bb.Z1-bb.Z0+1)/2
 	at := func(x, y, z int32) uint32 {
 		c := raw(x>>4, z>>4)
 		if c == nil {
@@ -175,8 +176,8 @@ func (o *Overworld) outpostY(p outpostPiece, bb box, raw func(cx, cz int32) *Pac
 		return MinY
 	}
 	samples := [5][2]int32{
-		{bb.x0 + hw, bb.z0 + hd}, {bb.x0 + 2*hw, bb.z0 + hd}, {bb.x0 + hw, bb.z0 + 2*hd},
-		{bb.x0, bb.z0 + hd}, {bb.x0 + hw, bb.z0},
+		{bb.X0 + hw, bb.Z0 + hd}, {bb.X0 + 2*hw, bb.Z0 + hd}, {bb.X0 + hw, bb.Z0 + 2*hd},
+		{bb.X0, bb.Z0 + hd}, {bb.X0 + hw, bb.Z0},
 	}
 	var hs [5]int32
 	lo, hi := int32(MaxY), int32(MinY)
@@ -209,7 +210,7 @@ func (o *Overworld) placeOutposts(cx, cz int32, c *Chunk, raw func(cx, cz int32)
 	var b *scBuild
 	o.outpostsReach(cx, cz, func(pieces []outpostPiece) {
 		if b == nil {
-			b = &scBuild{o: o, c: c, cbox: box{cx * 16, MinY, cz * 16, cx*16 + 15, MaxY - 1, cz*16 + 15}}
+			b = &scBuild{o: o, c: c, cbox: structure.NewBox(cx*16, MinY, cz*16, cx*16+15, MaxY-1, cz*16+15)}
 			b.ids()
 			// The chunk's random rolls the allays and the chest seed.
 			b.r.Seed(populationSeed(o.seed, cx, cz))
@@ -225,20 +226,20 @@ func (o *Overworld) placeOutposts(cx, cz int32, c *Chunk, raw func(cx, cz int32)
 func (b *scBuild) outpostPiece(p outpostPiece, raw func(cx, cz int32) *PackedChunk) {
 	o := b.o
 	bb, jt := o.outpostBox(p)
-	if jt == nil || !bb.intersects(b.cbox) {
+	if jt == nil || !bb.Intersects(b.cbox) {
 		return
 	}
 	y0, ok := o.outpostY(p, bb, raw)
 	if !ok {
 		return
 	}
-	conv := o.templateStates(jt, p.rot)
+	conv := o.st.TemplateStates(jt, p.rot)
 	var ir rand.MT
-	ir.Seed(populationSeed(o.seed, b.cbox.x0>>4, b.cbox.z0>>4))
+	ir.Seed(populationSeed(o.seed, b.cbox.X0>>4, b.cbox.Z0>>4))
 	var markers []templateMarker
-	for _, tb := range jt.tpl.Blocks {
-		st := jt.tpl.Palette[tb.State]
-		rp := rotatePos(tb.Pos, p.rot)
+	for _, tb := range jt.Template.Blocks {
+		st := jt.Template.Palette[tb.State]
+		rp := structure.RotatePos(tb.Pos, p.rot)
 		pos := [3]int32{p.x + rp[0], y0 + rp[1], p.z + rp[2]}
 		switch st.Name {
 		case "minecraft:structure_block":
@@ -253,20 +254,20 @@ func (b *scBuild) outpostPiece(p outpostPiece, raw func(cx, cz int32) *PackedChu
 			continue
 		}
 		cs := conv[tb.State]
-		if !cs.ok || !b.cbox.contains(pos) || !b.setWorld(pos[0], pos[1], pos[2], cs.id) {
+		if !cs.OK || !b.cbox.Contains(pos) || !b.setWorld(pos[0], pos[1], pos[2], cs.ID) {
 			continue
 		}
 		b.dropEntity(pos)
-		if cs.water && o.holdsLiquid[o.blockName(cs.id)] {
+		if cs.Water && o.holdsLiquid[o.blockName(cs.ID)] {
 			i := (pos[1]-MinY)<<8 | (pos[2]&15)<<4 | pos[0]&15
 			b.c.Water[i>>6] |= 1 << (i & 63)
 		}
-		if d := o.blockEntityFor(cs.id, st.Name, pos[0], pos[1], pos[2]); d != nil {
-			b.c.BlockEntities = append(b.c.BlockEntities, BlockEntity{X: pos[0], Y: pos[1], Z: pos[2], Data: d})
+		if d := o.st.BlockEntityFor(cs.ID, st.Name, pos[0], pos[1], pos[2]); d != nil {
+			b.c.BlockEntities = append(b.c.BlockEntities, structure.BlockEntity{X: pos[0], Y: pos[1], Z: pos[2], Data: d})
 		}
 	}
 	for _, m := range markers {
-		if !b.cbox.contains(m.pos) {
+		if !b.cbox.Contains(m.pos) {
 			continue
 		}
 		switch m.name {
@@ -334,7 +335,7 @@ func (o *Overworld) NearestOutpost(x, z int32, maxRegions int32) (Scattered, boo
 			continue
 		}
 		y, _ := o.outpostY(pieces[0], bb, get)
-		return Scattered{Kind: "pillager_outpost", X: (bb.x0 + bb.x1) / 2, Y: y, Z: (bb.z0 + bb.z1) / 2}, true
+		return Scattered{Kind: "pillager_outpost", X: (bb.X0 + bb.X1) / 2, Y: y, Z: (bb.Z0 + bb.Z1) / 2}, true
 	}
 	return Scattered{}, false
 }

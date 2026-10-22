@@ -11,6 +11,7 @@ import (
 	"github.com/helix-bedrock/worldgen/noise"
 	"github.com/helix-bedrock/worldgen/overworld"
 	"github.com/helix-bedrock/worldgen/rand"
+	"github.com/helix-bedrock/worldgen/structure"
 )
 
 // Nether dimensions.
@@ -81,6 +82,14 @@ type Nether struct {
 	// portals); portals caches them by start chunk.
 	ow      *overworld.Overworld
 	portals sync.Map // [2]int32 start chunk -> *overworld.NetherPortal
+
+	// st prepares structure templates; bastionData holds the bastion
+	// pools, bastionBiomes the biomes a bastion may start in and bastions
+	// the assembled ones by start chunk.
+	st            *structure.Lib
+	bastionData   *structure.JigsawData
+	bastionBiomes map[uint32]bool
+	bastions      sync.Map // [2]int32 -> *bastion
 }
 
 // New builds the noises for a seed. reg must contain the vanilla blocks the
@@ -151,6 +160,12 @@ func New(seed int64, reg *blocks.Registry, biomeIDs map[string]uint32, ow *overw
 	if err := n.loadCarver(); err != nil {
 		return nil, err
 	}
+	if n.st, err = structure.NewLib(seed, reg); err != nil {
+		return nil, err
+	}
+	if err := n.loadBastions(biomeIDs); err != nil {
+		return nil, err
+	}
 	return n, nil
 }
 
@@ -164,6 +179,7 @@ func (n *Nether) Seed() int64 { return n.seed }
 func (n *Nether) GenerateChunk(chunkX, chunkZ int32, c *Chunk) {
 	n.baseChunk(chunkX, chunkZ, c)
 	n.placePortals(chunkX, chunkZ, c)
+	n.placeBastions(chunkX, chunkZ, c)
 	n.placeFortresses(chunkX, chunkZ, c)
 }
 

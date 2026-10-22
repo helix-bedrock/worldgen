@@ -2,6 +2,7 @@ package overworld
 
 import (
 	"github.com/helix-bedrock/worldgen/rand"
+	"github.com/helix-bedrock/worldgen/structure"
 )
 
 // Mineshafts, written from BDS 1.26.52: the placement test (sub_4E497D0),
@@ -31,21 +32,21 @@ const msNone = -1
 
 type msPiece struct {
 	kind   uint8
-	bb     box
+	bb     structure.Box
 	orient int32 // 0 south, 1 west, 2 north, 3 east; msNone for rooms and crossings
 	dir    int32 // a crossing's direction
 	depth  int32
 
-	rails, spider bool  // corridor
-	sections      int32 // corridor: 5-block sections
-	twoFloors     bool  // crossing
-	entrances     []box // room: the openings to its children
+	rails, spider bool            // corridor
+	sections      int32           // corridor: 5-block sections
+	twoFloors     bool            // crossing
+	entrances     []structure.Box // room: the openings to its children
 }
 
 // mineshaft is an assembled mineshaft and the box around all its pieces.
 type mineshaft struct {
 	pieces []*msPiece
-	bb     box
+	bb     structure.Box
 	mesa   bool
 }
 
@@ -104,13 +105,14 @@ func (o *Overworld) buildMineshaft(cx, cz int32, r *rand.MT) *mineshaft {
 	dy := r.IntN(6)
 	dx := r.IntN(6)
 	room := &msPiece{kind: msRoom, orient: msNone,
-		bb: box{cx*16 + 2, 50, cz*16 + 2, cx*16 + 9 + dx, 54 + dy, cz*16 + 9 + dz}}
+		bb: structure.NewBox(cx*16+2, 50, cz*16+2, cx*16+9+dx, 54+dy, cz*16+9+dz)}
 	ms.pieces = []*msPiece{room}
 	o.msChildren(ms, room, r)
 	ms.bb = room.bb
 	for _, p := range ms.pieces[1:] {
-		ms.bb = box{min(ms.bb.x0, p.bb.x0), min(ms.bb.y0, p.bb.y0), min(ms.bb.z0, p.bb.z0),
-			max(ms.bb.x1, p.bb.x1), max(ms.bb.y1, p.bb.y1), max(ms.bb.z1, p.bb.z1)}
+		ms.bb = structure.NewBox(min(ms.bb.X0, p.bb.X0), min(ms.bb.Y0, p.bb.Y0), min(ms.bb.Z0, p.bb.Z0),
+			max(ms.bb.X1, p.bb.X1), max(ms.bb.Y1, p.bb.Y1), max(ms.bb.Z1, p.bb.Z1))
+
 	}
 	var dyAll int32
 	if ms.mesa {
@@ -118,24 +120,24 @@ func (o *Overworld) buildMineshaft(cx, cz int32, r *rand.MT) *mineshaft {
 		// VERIFY: the height query is assumed to be the preliminary
 		// surface at the box centre's quart.
 		y := int32(SeaLevel)
-		midX := ms.bb.x0 + (ms.bb.x1-ms.bb.x0+1)/2
-		midZ := ms.bb.z0 + (ms.bb.z1-ms.bb.z0+1)/2
+		midX := ms.bb.X0 + (ms.bb.X1-ms.bb.X0+1)/2
+		midZ := ms.bb.Z0 + (ms.bb.Z1-ms.bb.Z0+1)/2
 		if h := prelimSurface(o.column(midX>>2, midZ>>2)); y < h {
 			y += r.IntN(h - y + 1)
 		}
-		dyAll = y - (ms.bb.y0 + (ms.bb.y1-ms.bb.y0+1)/2)
+		dyAll = y - (ms.bb.Y0 + (ms.bb.Y1-ms.bb.Y0+1)/2)
 	} else {
-		top := ms.bb.y1 - ms.bb.y0 + MinY + 2
+		top := ms.bb.Y1 - ms.bb.Y0 + MinY + 2
 		if lim := int32(SeaLevel - 10); lim > top {
 			top += r.IntN(lim - top)
 		}
-		dyAll = top - ms.bb.y1
+		dyAll = top - ms.bb.Y1
 	}
-	ms.bb = ms.bb.raise(dyAll)
+	ms.bb = ms.bb.Raise(dyAll)
 	for _, p := range ms.pieces {
-		p.bb = p.bb.raise(dyAll)
+		p.bb = p.bb.Raise(dyAll)
 		for i := range p.entrances {
-			p.entrances[i] = p.entrances[i].raise(dyAll)
+			p.entrances[i] = p.entrances[i].Raise(dyAll)
 		}
 	}
 	return ms
@@ -153,122 +155,122 @@ func (o *Overworld) msChildren(ms *mineshaft, p *msPiece, r *rand.MT) {
 		if r.Float() > chance {
 			return
 		}
-		ys := max(b.y1-b.y0+1, 6) - 4
-		if b.y1-b.y0+1 < 6 {
+		ys := max(b.Y1-b.Y0+1, 6) - 4
+		if b.Y1-b.Y0+1 < 6 {
 			ys = 1
 		}
-		xs, zs := b.x1-b.x0+1, b.z1-b.z0+1
-		side := func(span int32, at func(j, y int32) (*msPiece, box)) {
+		xs, zs := b.X1-b.X0+1, b.Z1-b.Z0+1
+		side := func(span int32, at func(j, y int32) (*msPiece, structure.Box)) {
 			for j := int32(0); j < span; j += 4 {
 				k := r.IntN(span)
 				if j+k+3 > span {
 					break
 				}
 				j += k
-				y := b.y0 + r.IntN(ys) + 1
+				y := b.Y0 + r.IntN(ys) + 1
 				if c, e := at(j, y); c != nil {
 					p.entrances = append(p.entrances, e)
 				}
 			}
 		}
-		side(xs, func(j, y int32) (*msPiece, box) {
-			c := o.msPiece(ms, r, b.x0+j, y, b.z0-1, 2, p.depth)
+		side(xs, func(j, y int32) (*msPiece, structure.Box) {
+			c := o.msPiece(ms, r, b.X0+j, y, b.Z0-1, 2, p.depth)
 			if c == nil {
-				return nil, box{}
+				return nil, structure.Box{}
 			}
-			return c, box{c.bb.x0, c.bb.y0, b.z0, c.bb.x1, c.bb.y1, b.z0 + 1}
+			return c, structure.NewBox(c.bb.X0, c.bb.Y0, b.Z0, c.bb.X1, c.bb.Y1, b.Z0+1)
 		})
-		side(xs, func(j, y int32) (*msPiece, box) {
-			c := o.msPiece(ms, r, b.x0+j, y, b.z1+1, 0, p.depth)
+		side(xs, func(j, y int32) (*msPiece, structure.Box) {
+			c := o.msPiece(ms, r, b.X0+j, y, b.Z1+1, 0, p.depth)
 			if c == nil {
-				return nil, box{}
+				return nil, structure.Box{}
 			}
-			return c, box{c.bb.x0, c.bb.y0, b.z1 - 1, c.bb.x1, c.bb.y1, b.z1}
+			return c, structure.NewBox(c.bb.X0, c.bb.Y0, b.Z1-1, c.bb.X1, c.bb.Y1, b.Z1)
 		})
-		side(zs, func(j, y int32) (*msPiece, box) {
-			c := o.msPiece(ms, r, b.x0-1, y, b.z0+j, 1, p.depth)
+		side(zs, func(j, y int32) (*msPiece, structure.Box) {
+			c := o.msPiece(ms, r, b.X0-1, y, b.Z0+j, 1, p.depth)
 			if c == nil {
-				return nil, box{}
+				return nil, structure.Box{}
 			}
-			return c, box{b.x0, c.bb.y0, c.bb.z0, b.x0 + 1, c.bb.y1, c.bb.z1}
+			return c, structure.NewBox(b.X0, c.bb.Y0, c.bb.Z0, b.X0+1, c.bb.Y1, c.bb.Z1)
 		})
-		side(zs, func(j, y int32) (*msPiece, box) {
-			c := o.msPiece(ms, r, b.x1+1, y, b.z0+j, 3, p.depth)
+		side(zs, func(j, y int32) (*msPiece, structure.Box) {
+			c := o.msPiece(ms, r, b.X1+1, y, b.Z0+j, 3, p.depth)
 			if c == nil {
-				return nil, box{}
+				return nil, structure.Box{}
 			}
-			return c, box{b.x1 - 1, c.bb.y0, c.bb.z0, b.x1, c.bb.y1, c.bb.z1}
+			return c, structure.NewBox(b.X1-1, c.bb.Y0, c.bb.Z0, b.X1, c.bb.Y1, c.bb.Z1)
 		})
 	case msCorridor:
 		d := p.depth
 		j := r.IntN(4)
-		y := b.y0 - 1 + r.IntN(3)
+		y := b.Y0 - 1 + r.IntN(3)
 		switch p.orient {
 		case 0:
 			switch {
 			case j <= 1:
-				o.msPiece(ms, r, b.x0, y, b.z1+1, 0, d)
+				o.msPiece(ms, r, b.X0, y, b.Z1+1, 0, d)
 			case j == 2:
-				o.msPiece(ms, r, b.x0-1, y, b.z1-3, 1, d)
+				o.msPiece(ms, r, b.X0-1, y, b.Z1-3, 1, d)
 			default:
-				o.msPiece(ms, r, b.x1+1, y, b.z1-3, 3, d)
+				o.msPiece(ms, r, b.X1+1, y, b.Z1-3, 3, d)
 			}
 		case 1:
 			switch {
 			case j <= 1:
-				o.msPiece(ms, r, b.x0-1, y, b.z0, 1, d)
+				o.msPiece(ms, r, b.X0-1, y, b.Z0, 1, d)
 			case j == 2:
-				o.msPiece(ms, r, b.x0, y, b.z0-1, 2, d)
+				o.msPiece(ms, r, b.X0, y, b.Z0-1, 2, d)
 			default:
-				o.msPiece(ms, r, b.x0, y, b.z1+1, 0, d)
+				o.msPiece(ms, r, b.X0, y, b.Z1+1, 0, d)
 			}
 		case 2:
 			switch {
 			case j <= 1:
-				o.msPiece(ms, r, b.x0, y, b.z0-1, 2, d)
+				o.msPiece(ms, r, b.X0, y, b.Z0-1, 2, d)
 			case j == 2:
-				o.msPiece(ms, r, b.x0-1, y, b.z0, 1, d)
+				o.msPiece(ms, r, b.X0-1, y, b.Z0, 1, d)
 			default:
-				o.msPiece(ms, r, b.x1+1, y, b.z0, 3, d)
+				o.msPiece(ms, r, b.X1+1, y, b.Z0, 3, d)
 			}
 		case 3:
 			switch {
 			case j <= 1:
-				o.msPiece(ms, r, b.x1+1, y, b.z0, 3, d)
+				o.msPiece(ms, r, b.X1+1, y, b.Z0, 3, d)
 			case j == 2:
-				o.msPiece(ms, r, b.x1-3, y, b.z0-1, 2, d)
+				o.msPiece(ms, r, b.X1-3, y, b.Z0-1, 2, d)
 			default:
-				o.msPiece(ms, r, b.x1-3, y, b.z1+1, 0, d)
+				o.msPiece(ms, r, b.X1-3, y, b.Z1+1, 0, d)
 			}
 		}
 		if d > 7 {
 			return
 		}
 		if p.orient&^2 != 0 {
-			for k := b.x0 + 6; k <= b.x1; k += 5 {
+			for k := b.X0 + 6; k <= b.X1; k += 5 {
 				switch r.IntN(5) {
 				case 1:
-					o.msPiece(ms, r, k-3, b.y0, b.z1+1, 0, d+1)
+					o.msPiece(ms, r, k-3, b.Y0, b.Z1+1, 0, d+1)
 				case 0:
-					o.msPiece(ms, r, k-3, b.y0, b.z0-1, 2, d+1)
+					o.msPiece(ms, r, k-3, b.Y0, b.Z0-1, 2, d+1)
 				}
 			}
 		} else {
-			for k := b.z0 + 6; k <= b.z1; k += 5 {
+			for k := b.Z0 + 6; k <= b.Z1; k += 5 {
 				switch r.IntN(5) {
 				case 1:
-					o.msPiece(ms, r, b.x1+1, b.y0, k-3, 3, d+1)
+					o.msPiece(ms, r, b.X1+1, b.Y0, k-3, 3, d+1)
 				case 0:
-					o.msPiece(ms, r, b.x0-1, b.y0, k-3, 1, d+1)
+					o.msPiece(ms, r, b.X0-1, b.Y0, k-3, 1, d+1)
 				}
 			}
 		}
 	case msCrossing:
 		d := p.depth
-		north := func() { o.msPiece(ms, r, b.x0+1, b.y0, b.z0-1, 2, d) }
-		south := func() { o.msPiece(ms, r, b.x0+1, b.y0, b.z1+1, 0, d) }
-		west := func() { o.msPiece(ms, r, b.x0-1, b.y0, b.z0+1, 1, d) }
-		east := func() { o.msPiece(ms, r, b.x1+1, b.y0, b.z0+1, 3, d) }
+		north := func() { o.msPiece(ms, r, b.X0+1, b.Y0, b.Z0-1, 2, d) }
+		south := func() { o.msPiece(ms, r, b.X0+1, b.Y0, b.Z1+1, 0, d) }
+		west := func() { o.msPiece(ms, r, b.X0-1, b.Y0, b.Z0+1, 1, d) }
+		east := func() { o.msPiece(ms, r, b.X1+1, b.Y0, b.Z0+1, 3, d) }
 		switch p.dir {
 		case 0:
 			south()
@@ -289,37 +291,37 @@ func (o *Overworld) msChildren(ms *mineshaft, p *msPiece, r *rand.MT) {
 		}
 		if p.twoFloors {
 			if nextBool(r) {
-				o.msPiece(ms, r, b.x0+1, b.y0+4, b.z0-1, 2, d)
+				o.msPiece(ms, r, b.X0+1, b.Y0+4, b.Z0-1, 2, d)
 			}
 			if nextBool(r) {
-				o.msPiece(ms, r, b.x0-1, b.y0+4, b.z0+1, 1, d)
+				o.msPiece(ms, r, b.X0-1, b.Y0+4, b.Z0+1, 1, d)
 			}
 			if nextBool(r) {
-				o.msPiece(ms, r, b.x1+1, b.y0+4, b.z0+1, 3, d)
+				o.msPiece(ms, r, b.X1+1, b.Y0+4, b.Z0+1, 3, d)
 			}
 			if nextBool(r) {
-				o.msPiece(ms, r, b.x0+1, b.y0+4, b.z1+1, 0, d)
+				o.msPiece(ms, r, b.X0+1, b.Y0+4, b.Z1+1, 0, d)
 			}
 		}
 	case msStairs:
 		d := p.depth
 		switch p.orient {
 		case 0:
-			o.msPiece(ms, r, b.x0, b.y0, b.z1+1, 0, d)
+			o.msPiece(ms, r, b.X0, b.Y0, b.Z1+1, 0, d)
 		case 1:
-			o.msPiece(ms, r, b.x0-1, b.y0, b.z0, 1, d)
+			o.msPiece(ms, r, b.X0-1, b.Y0, b.Z0, 1, d)
 		case 2:
-			o.msPiece(ms, r, b.x0, b.y0, b.z0-1, 2, d)
+			o.msPiece(ms, r, b.X0, b.Y0, b.Z0-1, 2, d)
 		case 3:
-			o.msPiece(ms, r, b.x1+1, b.y0, b.z0, 3, d)
+			o.msPiece(ms, r, b.X1+1, b.Y0, b.Z0, 3, d)
 		}
 	}
 }
 
 // msCollides reports whether bb overlaps a piece already placed.
-func msCollides(ms *mineshaft, bb box) bool {
+func msCollides(ms *mineshaft, bb structure.Box) bool {
 	for _, p := range ms.pieces {
-		if p.bb.intersects(bb) {
+		if p.bb.Intersects(bb) {
 			return true
 		}
 	}
@@ -333,46 +335,46 @@ func (o *Overworld) msPiece(ms *mineshaft, r *rand.MT, x, y, z, dir, depth int32
 		return nil
 	}
 	start := ms.pieces[0].bb
-	if abs32i(x-start.x0) > 80 || abs32i(z-start.z0) > 80 {
+	if abs32i(x-start.X0) > 80 || abs32i(z-start.Z0) > 80 {
 		return nil
 	}
 	var p *msPiece
 	switch n := r.IntN(100); {
 	case n >= 80:
 		t := r.IntN(4)
-		var bb box
+		var bb structure.Box
 		switch dir {
 		case 0:
-			bb = box{x - 1, y, z, x + 3, y, z + 4}
+			bb = structure.NewBox(x-1, y, z, x+3, y, z+4)
 		case 1:
-			bb = box{x - 4, y, z - 1, x, y, z + 3}
+			bb = structure.NewBox(x-4, y, z-1, x, y, z+3)
 		case 2:
-			bb = box{x - 1, y, z - 4, x + 3, y, z}
+			bb = structure.NewBox(x-1, y, z-4, x+3, y, z)
 		default:
-			bb = box{x, y, z - 1, x + 4, y, z + 3}
+			bb = structure.NewBox(x, y, z-1, x+4, y, z+3)
 		}
-		bb.y1 = y + 2
+		bb.Y1 = y + 2
 		if t == 0 {
-			bb.y1 = y + 6
+			bb.Y1 = y + 6
 		}
 		if msCollides(ms, bb) {
 			return nil
 		}
 		p = &msPiece{kind: msCrossing, bb: bb, orient: msNone, dir: dir, depth: depth + 1, twoFloors: t == 0}
 	case n < 70:
-		var bb box
+		var bb structure.Box
 		found := false
 		for k := r.IntN(3) + 2; k > 0; k-- {
 			l := 5 * k
 			switch dir {
 			case 0:
-				bb = box{x, y, z, x + 2, y + 2, z + l - 1}
+				bb = structure.NewBox(x, y, z, x+2, y+2, z+l-1)
 			case 1:
-				bb = box{x + 1 - l, y, z, x, y + 2, z + 2}
+				bb = structure.NewBox(x+1-l, y, z, x, y+2, z+2)
 			case 2:
-				bb = box{x, y, z + 1 - l, x + 2, y + 2, z}
+				bb = structure.NewBox(x, y, z+1-l, x+2, y+2, z)
 			default:
-				bb = box{x, y, z, x - 1 + l, y + 2, z + 2}
+				bb = structure.NewBox(x, y, z, x-1+l, y+2, z+2)
 			}
 			if !msCollides(ms, bb) {
 				found = true
@@ -386,21 +388,21 @@ func (o *Overworld) msPiece(ms *mineshaft, r *rand.MT, x, y, z, dir, depth int32
 		p.rails = r.IntN(3) == 0
 		p.spider = !p.rails && r.IntN(23) == 0
 		if dir&^2 == 0 {
-			p.sections = (bb.z1 - bb.z0 + 1) / 5
+			p.sections = (bb.Z1 - bb.Z0 + 1) / 5
 		} else {
-			p.sections = (bb.x1 - bb.x0 + 1) / 5
+			p.sections = (bb.X1 - bb.X0 + 1) / 5
 		}
 	default:
-		var bb box
+		var bb structure.Box
 		switch dir {
 		case 0:
-			bb = box{x, y - 5, z, x + 2, y + 2, z + 8}
+			bb = structure.NewBox(x, y-5, z, x+2, y+2, z+8)
 		case 1:
-			bb = box{x - 8, y - 5, z, x, y + 2, z + 2}
+			bb = structure.NewBox(x-8, y-5, z, x, y+2, z+2)
 		case 2:
-			bb = box{x, y - 5, z - 8, x + 2, y + 2, z}
+			bb = structure.NewBox(x, y-5, z-8, x+2, y+2, z)
 		default:
-			bb = box{x, y - 5, z, x + 8, y + 2, z + 2}
+			bb = structure.NewBox(x, y-5, z, x+8, y+2, z+2)
 		}
 		if msCollides(ms, bb) {
 			return nil
@@ -417,13 +419,13 @@ func (p *msPiece) worldPos(x, y, z int32) (int32, int32, int32) {
 	b := p.bb
 	switch p.orient {
 	case 0:
-		return b.x0 + x, b.y0 + y, b.z0 + z
+		return b.X0 + x, b.Y0 + y, b.Z0 + z
 	case 1:
-		return b.x1 - z, b.y0 + y, b.z0 + x
+		return b.X1 - z, b.Y0 + y, b.Z0 + x
 	case 2:
-		return b.x0 + x, b.y0 + y, b.z1 - z
+		return b.X0 + x, b.Y0 + y, b.Z1 - z
 	case 3:
-		return b.x0 + z, b.y0 + y, b.z0 + x
+		return b.X0 + z, b.Y0 + y, b.Z0 + x
 	}
 	return x, y, z
 }
@@ -433,7 +435,7 @@ type msBuild struct {
 	o       *Overworld
 	c       *Chunk
 	cx, cz  int32
-	cbox    box
+	cbox    structure.Box
 	raw     func(cx, cz int32) *PackedChunk
 	r       rand.MT
 	ms      *mineshaft
@@ -465,14 +467,14 @@ func (b *msBuild) get(x, y, z int32) uint32 {
 
 // boxGet is a piece's getBlock: air outside the chunk.
 func (b *msBuild) boxGet(x, y, z int32) uint32 {
-	if !b.cbox.contains([3]int32{x, y, z}) {
+	if !b.cbox.Contains([3]int32{x, y, z}) {
 		return b.o.ids.air
 	}
 	return b.c.Block(int(x&15), int(y), int(z&15))
 }
 
 func (b *msBuild) set(x, y, z int32, s uint32) {
-	if !b.cbox.contains([3]int32{x, y, z}) || b.o.floorBedrock(uint32(b.c.Blocks[(y-MinY)<<8|(z&15)<<4|x&15]), y) {
+	if !b.cbox.Contains([3]int32{x, y, z}) || b.o.floorBedrock(uint32(b.c.Blocks[(y-MinY)<<8|(z&15)<<4|x&15]), y) {
 		return
 	}
 	b.c.set(int(x&15), int(y), int(z&15), s)
@@ -519,7 +521,7 @@ func (b *msBuild) below(x, y, z int32) bool {
 // mineshaft's own wood, chain or bedrock.
 func (b *msBuild) place(p *msPiece, s uint32, x, y, z int32) {
 	wx, wy, wz := p.worldPos(x, y, z)
-	if !b.cbox.contains([3]int32{wx, wy, wz}) {
+	if !b.cbox.Contains([3]int32{wx, wy, wz}) {
 		return
 	}
 	switch b.c.Block(int(wx&15), int(wy), int(wz&15)) {
@@ -572,8 +574,8 @@ func (b *msBuild) maybeFill(p *msPiece, chance float32, x0, y0, z0, x1, y1, z1 i
 // edgesLiquid is the piece's skip test: liquid on the faces of its box
 // (grown by one, cut to the chunk), or the deep dark at its middle.
 func (b *msBuild) edgesLiquid(p *msPiece) bool {
-	x0, y0, z0 := max(p.bb.x0-1, b.cbox.x0), max(p.bb.y0-1, b.cbox.y0), max(p.bb.z0-1, b.cbox.z0)
-	x1, y1, z1 := min(p.bb.x1+1, b.cbox.x1), min(p.bb.y1+1, b.cbox.y1), min(p.bb.z1+1, b.cbox.z1)
+	x0, y0, z0 := max(p.bb.X0-1, b.cbox.X0), max(p.bb.Y0-1, b.cbox.Y0), max(p.bb.Z0-1, b.cbox.Z0)
+	x1, y1, z1 := min(p.bb.X1+1, b.cbox.X1), min(p.bb.Y1+1, b.cbox.Y1), min(p.bb.Z1+1, b.cbox.Z1)
 	mx, my, mz := (x0+x1)/2, (y0+y1)/2, (z0+z1)/2
 	if my >= MinY && my < MaxY && mx>>4 == b.cx && mz>>4 == b.cz &&
 		b.c.Biome(int(mx&15), int(my), int(mz&15)) == b.o.deepDark {
@@ -598,12 +600,12 @@ func (b *msBuild) edgesLiquid(p *msPiece) bool {
 // (cx, cz) into c (connectBlocks joins their fences). raw gives the terrain of
 // neighbouring chunks.
 func (o *Overworld) placeMineshafts(cx, cz int32, c *Chunk, raw func(cx, cz int32) *PackedChunk) {
-	cbox := box{cx * 16, MinY, cz * 16, cx*16 + 15, MaxY - 1, cz*16 + 15}
+	cbox := structure.NewBox(cx*16, MinY, cz*16, cx*16+15, MaxY-1, cz*16+15)
 	var b *msBuild
 	for sx := cx - msReach; sx <= cx+msReach; sx++ {
 		for sz := cz - msReach; sz <= cz+msReach; sz++ {
 			ms := o.mineshaftAt(sx, sz)
-			if ms == nil || !ms.bb.intersects(cbox) {
+			if ms == nil || !ms.bb.Intersects(cbox) {
 				continue
 			}
 			if b == nil {
@@ -618,7 +620,7 @@ func (o *Overworld) placeMineshafts(cx, cz int32, c *Chunk, raw func(cx, cz int3
 // (cx, cz), with the chunk's random.
 func (o *Overworld) newMsBuild(cx, cz int32, c *Chunk, raw func(cx, cz int32) *PackedChunk) *msBuild {
 	b := &msBuild{o: o, c: c, cx: cx, cz: cz, raw: raw,
-		cbox: box{cx * 16, MinY, cz * 16, cx*16 + 15, MaxY - 1, cz*16 + 15}}
+		cbox: structure.NewBox(cx*16, MinY, cz*16, cx*16+15, MaxY-1, cz*16+15)}
 	for i := range b.heights {
 		b.heights[i] = MinY - 1
 	}
@@ -629,12 +631,12 @@ func (o *Overworld) newMsBuild(cx, cz int32, c *Chunk, raw func(cx, cz int32) *P
 // mineshaftReaches reports whether a mineshaft has a piece in chunk
 // (cx, cz).
 func (o *Overworld) mineshaftReaches(cx, cz int32) bool {
-	cbox := box{cx * 16, MinY, cz * 16, cx*16 + 15, MaxY - 1, cz*16 + 15}
+	cbox := structure.NewBox(cx*16, MinY, cz*16, cx*16+15, MaxY-1, cz*16+15)
 	for sx := cx - msReach; sx <= cx+msReach; sx++ {
 		for sz := cz - msReach; sz <= cz+msReach; sz++ {
-			if ms := o.mineshaftAt(sx, sz); ms != nil && ms.bb.intersects(cbox) {
+			if ms := o.mineshaftAt(sx, sz); ms != nil && ms.bb.Intersects(cbox) {
 				for _, p := range ms.pieces {
-					if p.bb.intersects(cbox) {
+					if p.bb.Intersects(cbox) {
 						return true
 					}
 				}
@@ -660,7 +662,7 @@ func (b *msBuild) build(ms *mineshaft) {
 	b.web, b.torch, b.rail = id("minecraft:web"), id("minecraft:torch"), id("minecraft:rail")
 	b.chain, b.spawner = id("minecraft:iron_chain"), id("minecraft:mob_spawner")
 	for _, p := range ms.pieces {
-		if !p.bb.intersects(b.cbox) || b.edgesLiquid(p) {
+		if !p.bb.Intersects(b.cbox) || b.edgesLiquid(p) {
 			continue
 		}
 		switch p.kind {
@@ -679,26 +681,26 @@ func (b *msBuild) build(ms *mineshaft) {
 func (b *msBuild) buildRoom(p *msPiece) {
 	air := b.o.ids.air
 	bb := p.bb
-	b.fill(p, bb.x0, bb.y0+1, bb.z0, bb.x1, min(bb.y0+3, bb.y1), bb.z1, air, air)
+	b.fill(p, bb.X0, bb.Y0+1, bb.Z0, bb.X1, min(bb.Y0+3, bb.Y1), bb.Z1, air, air)
 	for _, e := range p.entrances {
-		b.fill(p, e.x0, e.y1-2, e.z0, e.x1, e.y1, e.z1, air, air)
+		b.fill(p, e.X0, e.Y1-2, e.Z0, e.X1, e.Y1, e.Z1, air, air)
 	}
 	// The upper half sphere of air above the floor space.
-	y0 := bb.y0 + 4
-	if bb.y1 < y0 || bb.x1 < bb.x0 || bb.z1 < bb.z0 {
+	y0 := bb.Y0 + 4
+	if bb.Y1 < y0 || bb.X1 < bb.X0 || bb.Z1 < bb.Z0 {
 		return
 	}
-	fy := float32(bb.y1 - y0 + 1)
-	hx := float32(bb.x1-bb.x0+1) * 0.5
-	mx := float32(bb.x0) + hx
-	hz := float32(bb.z1-bb.z0+1) * 0.5
-	mz := float32(bb.z0) + hz
-	for y := y0; y <= bb.y1; y++ {
+	fy := float32(bb.Y1 - y0 + 1)
+	hx := float32(bb.X1-bb.X0+1) * 0.5
+	mx := float32(bb.X0) + hx
+	hz := float32(bb.Z1-bb.Z0+1) * 0.5
+	mz := float32(bb.Z0) + hz
+	for y := y0; y <= bb.Y1; y++ {
 		dy := float32(y-y0) / fy
-		for x := bb.x0; x <= bb.x1; x++ {
+		for x := bb.X0; x <= bb.X1; x++ {
 			dx := (float32(x) - mx) / hx
 			s := dx*dx + dy*dy
-			for z := bb.z0; z <= bb.z1; z++ {
+			for z := bb.Z0; z <= bb.Z1; z++ {
 				dz := (float32(z) - mz) / hz
 				if dz*dz+s <= 1.05 {
 					b.place(p, air, x, y, z)
@@ -725,30 +727,30 @@ func (b *msBuild) buildCrossing(p *msPiece) {
 	air := b.o.ids.air
 	bb := p.bb
 	if p.twoFloors {
-		b.fill(p, bb.x0+1, bb.y0, bb.z0, bb.x1-1, bb.y0+2, bb.z1, air, air)
-		b.fill(p, bb.x0, bb.y0, bb.z0+1, bb.x1, bb.y0+2, bb.z1-1, air, air)
-		b.fill(p, bb.x0+1, bb.y1-2, bb.z0, bb.x1-1, bb.y1, bb.z1, air, air)
-		b.fill(p, bb.x0, bb.y1-2, bb.z0+1, bb.x1, bb.y1, bb.z1-1, air, air)
-		b.fill(p, bb.x0+1, bb.y0+3, bb.z0+1, bb.x1-1, bb.y0+3, bb.z1-1, air, air)
+		b.fill(p, bb.X0+1, bb.Y0, bb.Z0, bb.X1-1, bb.Y0+2, bb.Z1, air, air)
+		b.fill(p, bb.X0, bb.Y0, bb.Z0+1, bb.X1, bb.Y0+2, bb.Z1-1, air, air)
+		b.fill(p, bb.X0+1, bb.Y1-2, bb.Z0, bb.X1-1, bb.Y1, bb.Z1, air, air)
+		b.fill(p, bb.X0, bb.Y1-2, bb.Z0+1, bb.X1, bb.Y1, bb.Z1-1, air, air)
+		b.fill(p, bb.X0+1, bb.Y0+3, bb.Z0+1, bb.X1-1, bb.Y0+3, bb.Z1-1, air, air)
 	} else {
-		b.fill(p, bb.x0+1, bb.y0, bb.z0, bb.x1-1, bb.y1, bb.z1, air, air)
-		b.fill(p, bb.x0, bb.y0, bb.z0+1, bb.x1, bb.y1, bb.z1-1, air, air)
+		b.fill(p, bb.X0+1, bb.Y0, bb.Z0, bb.X1-1, bb.Y1, bb.Z1, air, air)
+		b.fill(p, bb.X0, bb.Y0, bb.Z0+1, bb.X1, bb.Y1, bb.Z1-1, air, air)
 	}
-	for _, c := range [4][2]int32{{bb.x0 + 1, bb.z0 + 1}, {bb.x0 + 1, bb.z1 - 1}, {bb.x1 - 1, bb.z0 + 1}, {bb.x1 - 1, bb.z1 - 1}} {
-		if b.boxGet(c[0], bb.y1+1, c[1]) != air {
-			b.fill(p, c[0], bb.y0, c[1], c[0], bb.y1, c[1], b.planks, air)
+	for _, c := range [4][2]int32{{bb.X0 + 1, bb.Z0 + 1}, {bb.X0 + 1, bb.Z1 - 1}, {bb.X1 - 1, bb.Z0 + 1}, {bb.X1 - 1, bb.Z1 - 1}} {
+		if b.boxGet(c[0], bb.Y1+1, c[1]) != air {
+			b.fill(p, c[0], bb.Y0, c[1], c[0], bb.Y1, c[1], b.planks, air)
 		}
 	}
 	// Planks over air (or chain) under the floor.
 	// VERIFY: BDS writes these through the world, not only inside the
 	// chunk being built; here they stay inside it.
-	for x := bb.x0; x <= bb.x1; x++ {
-		for z := bb.z0; z <= bb.z1; z++ {
-			if !b.cbox.contains([3]int32{x, bb.y0, z}) || !b.below(x, bb.y0, z) {
+	for x := bb.X0; x <= bb.X1; x++ {
+		for z := bb.Z0; z <= bb.Z1; z++ {
+			if !b.cbox.Contains([3]int32{x, bb.Y0, z}) || !b.below(x, bb.Y0, z) {
 				continue
 			}
-			if s := b.get(x, bb.y0-1, z); s == air || s == b.chain {
-				b.set(x, bb.y0-1, z, b.planks)
+			if s := b.get(x, bb.Y0-1, z); s == air || s == b.chain {
+				b.set(x, bb.Y0-1, z, b.planks)
 			}
 		}
 	}
@@ -787,14 +789,14 @@ func (b *msBuild) buildCorridor(p *msPiece) {
 		// each chunk here starts without one.
 		s := at - 1 + b.r.IntN(3)
 		x, y, z := p.worldPos(1, 0, s)
-		if !b.cbox.contains([3]int32{x, y, z}) || !b.below(x, y, z) {
+		if !b.cbox.Contains([3]int32{x, y, z}) || !b.below(x, y, z) {
 			continue
 		}
 		spiderPlaced = true
 		b.set(x, y, z, b.spawner)
-		if d := o.blockEntityFor(b.spawner, "", x, y, z); d != nil {
+		if d := o.st.BlockEntityFor(b.spawner, "", x, y, z); d != nil {
 			d["EntityIdentifier"] = "minecraft:cave_spider"
-			b.c.BlockEntities = append(b.c.BlockEntities, BlockEntity{X: x, Y: y, Z: z, Data: d})
+			b.c.BlockEntities = append(b.c.BlockEntities, structure.BlockEntity{X: x, Y: y, Z: z, Data: d})
 		}
 	}
 	// Planks over air (or chain) under the floor.
@@ -803,7 +805,7 @@ func (b *msBuild) buildCorridor(p *msPiece) {
 	for x := int32(0); x <= 2; x++ {
 		for z := int32(0); z < length; z++ {
 			wx, wy, wz := p.worldPos(x, 0, z)
-			if !b.cbox.contains([3]int32{wx, wy, wz}) || !b.below(wx, wy, wz) {
+			if !b.cbox.Contains([3]int32{wx, wy, wz}) || !b.below(wx, wy, wz) {
 				continue
 			}
 			if s := b.get(wx, wy-1, wz); s == air || s == b.chain {
@@ -1007,8 +1009,8 @@ func (o *Overworld) NearestMineshaft(x, z, maxChunks int32) (Mineshaft, bool) {
 	}
 	room := ms.pieces[0].bb
 	return Mineshaft{
-		X: (room.x0 + room.x1) / 2, Y: room.y0 + 1, Z: (room.z0 + room.z1) / 2,
-		Min: [3]int32{ms.bb.x0, ms.bb.y0, ms.bb.z0}, Max: [3]int32{ms.bb.x1, ms.bb.y1, ms.bb.z1},
+		X: (room.X0 + room.X1) / 2, Y: room.Y0 + 1, Z: (room.Z0 + room.Z1) / 2,
+		Min: [3]int32{ms.bb.X0, ms.bb.Y0, ms.bb.Z0}, Max: [3]int32{ms.bb.X1, ms.bb.Y1, ms.bb.Z1},
 		Badlands: ms.mesa,
 	}, true
 }

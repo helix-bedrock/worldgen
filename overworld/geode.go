@@ -6,6 +6,7 @@ import (
 
 	"github.com/helix-bedrock/worldgen/noise"
 	"github.com/helix-bedrock/worldgen/rand"
+	"github.com/helix-bedrock/worldgen/structure"
 )
 
 // geodeFeature is GeodeFeature (place: sub_51C22E0, per-column lambda
@@ -154,8 +155,8 @@ type geodeOp struct {
 func (o *Overworld) insideStructure(x, y, z int32) bool {
 	p := [3]int32{x, y, z}
 	in := false
-	o.forCityPieces(x>>4, z>>4, func(c *jigsawPiece) bool {
-		if c.bb.contains(p) {
+	o.forCityPieces(x>>4, z>>4, func(c *structure.Piece) bool {
+		if c.BB.Contains(p) {
 			in = true
 			return false
 		}
@@ -168,11 +169,11 @@ func (o *Overworld) insideStructure(x, y, z int32) bool {
 	for sx := cx - msReach; sx <= cx+msReach; sx++ {
 		for sz := cz - msReach; sz <= cz+msReach; sz++ {
 			ms := o.mineshaftAt(sx, sz)
-			if ms == nil || !ms.bb.contains(p) {
+			if ms == nil || !ms.bb.Contains(p) {
 				continue
 			}
 			for _, q := range ms.pieces {
-				if q.bb.contains(p) {
+				if q.bb.Contains(p) {
 					return true
 				}
 			}

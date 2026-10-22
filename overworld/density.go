@@ -3,6 +3,7 @@ package overworld
 import (
 	"github.com/helix-bedrock/worldgen/noise"
 	"github.com/helix-bedrock/worldgen/rand"
+	"github.com/helix-bedrock/worldgen/structure"
 )
 
 // The terrain fill, copied from BDS (OverworldGeneratorMultinoise slot 64 and
@@ -170,7 +171,7 @@ func (o *Overworld) fillBlocks(chunkX, chunkZ int32, g *grids, aq *aquifer, c *C
 
 // fillBlocksAdj is fillBlocks with the given buried structure boxes and
 // village beards.
-func (o *Overworld) fillBlocksAdj(chunkX, chunkZ int32, g *grids, aq *aquifer, c *Chunk, bury []box, beards []beardBox) {
+func (o *Overworld) fillBlocksAdj(chunkX, chunkZ int32, g *grids, aq *aquifer, c *Chunk, bury []structure.Box, beards []beardBox) {
 	adj := o.cityAdjustments(chunkX, chunkZ)
 	for i := fillHeight << 8; i < len(c.Blocks); i++ {
 		c.Blocks[i] = uint16(o.ids.air)
@@ -193,7 +194,7 @@ func (o *Overworld) fillBlocksAdj(chunkX, chunkZ int32, g *grids, aq *aquifer, c
 	}
 }
 
-func (o *Overworld) fillBlock(g *grids, aq *aquifer, adj []beardShaver, beards []beardBox, bury []box, i, j, k, dx, dy, dz int, x, y, z int32) uint32 {
+func (o *Overworld) fillBlock(g *grids, aq *aquifer, adj []beardShaver, beards []beardBox, bury []structure.Box, i, j, k, dx, dy, dz int, x, y, z int32) uint32 {
 	d := squeeze(interp(&g.density, i, j, k, dx, dy, dz))
 	if y >= MinY+4 && d > 0 && interp(&g.aux[auxNoodle], i, j, k, dx, dy, dz) >= 0 {
 		t := (interp(&g.aux[auxNoodleThickness], i, j, k, dx, dy, dz) + 1) * 0.5

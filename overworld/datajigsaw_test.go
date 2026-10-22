@@ -31,8 +31,8 @@ func TestListDataJigsaws(t *testing.T) {
 					continue
 				}
 				for _, p := range s.pieces {
-					if o.elementTemplate(p.el) == nil {
-						t.Errorf("%s: missing template %q", d.kind, p.el.template)
+					if o.elementTemplate(p.Element) == nil {
+						t.Errorf("%s: missing template %q", d.kind, p.Element.Template)
 					}
 				}
 				fmt.Printf("%s start=%v pieces=%d box=%v\n", d.kind, s.start, len(s.pieces), s.bb)
@@ -70,11 +70,11 @@ func TestDataJigsawBlocks(t *testing.T) {
 		}
 		counts := map[string]int{}
 		loot := 0
-		for cx := st.bb.x0 >> 4; cx <= st.bb.x1>>4; cx++ {
-			for cz := st.bb.z0 >> 4; cz <= st.bb.z1>>4; cz++ {
+		for cx := st.bb.X0 >> 4; cx <= st.bb.X1>>4; cx++ {
+			for cz := st.bb.Z0 >> 4; cz <= st.bb.Z1>>4; cz++ {
 				var c Chunk
 				tc.Generate(cx, cz, &c)
-				for y := st.bb.y0; y <= st.bb.y1; y++ {
+				for y := st.bb.Y0; y <= st.bb.Y1; y++ {
 					for x := 0; x < 16; x++ {
 						for z := 0; z < 16; z++ {
 							switch n := o.blockName(c.Block(x, int(y), z)); n {

@@ -3,9 +3,9 @@ package overworld
 import (
 	"cmp"
 	"slices"
-	"strconv"
 
 	"github.com/helix-bedrock/worldgen/rand"
+	"github.com/helix-bedrock/worldgen/structure"
 )
 
 // Ruined portals in the overworld, written from BDS 1.26.52:
@@ -109,7 +109,7 @@ type ruinedPortal struct {
 	rot    int
 	mirror bool
 	under  bool
-	bb     box
+	bb     structure.Box
 	writes map[[2]int32][]portalWrite
 }
 
@@ -176,7 +176,7 @@ func (o *Overworld) placePortals(cx, cz int32, c *Chunk, raw func(cx, cz int32) 
 			return
 		}
 		if b == nil {
-			b = &scBuild{o: o, c: c, cbox: box{cx * 16, MinY, cz * 16, cx*16 + 15, MaxY - 1, cz*16 + 15}}
+			b = &scBuild{o: o, c: c, cbox: structure.NewBox(cx*16, MinY, cz*16, cx*16+15, MaxY-1, cz*16+15)}
 		}
 		for _, w := range ws {
 			if !b.setWorld(w.x, w.y, w.z, w.id) {
@@ -188,7 +188,7 @@ func (o *Overworld) placePortals(cx, cz int32, c *Chunk, raw func(cx, cz int32) 
 				c.Water[i>>6] |= 1 << (i & 63)
 			}
 			if w.be != nil {
-				c.BlockEntities = append(c.BlockEntities, BlockEntity{X: w.x, Y: w.y, Z: w.z, Data: w.be})
+				c.BlockEntities = append(c.BlockEntities, structure.BlockEntity{X: w.x, Y: w.y, Z: w.z, Data: w.be})
 			}
 		}
 	})
@@ -320,53 +320,53 @@ func (o *Overworld) buildPortal(cx, cz int32, s *portalSim) *ruinedPortal {
 	} else {
 		path = portalGiant[r.IntN(3)]
 	}
-	jt := o.template("ruined_portal/" + path)
+	jt := o.st.Template("ruined_portal/" + path)
 	if jt == nil {
 		return nil
 	}
 
 	// The box spans the template's size, not size-1, from the origin.
-	sz := jt.tpl.Size[2]
+	sz := jt.Template.Size[2]
 	if mirror {
 		sz = -sz
 	}
-	e := rotatePos([3]int32{jt.tpl.Size[0], 0, sz}, rot)
+	e := structure.RotatePos([3]int32{jt.Template.Size[0], 0, sz}, rot)
 	y := h - 1
-	bb := box{min(ox, ox+e[0]), y, min(oz, oz+e[2]), max(ox, ox+e[0]), y + jt.tpl.Size[1], max(oz, oz+e[2])}
+	bb := structure.NewBox(min(ox, ox+e[0]), y, min(oz, oz+e[2]), max(ox, ox+e[0]), y+jt.Template.Size[1], max(oz, oz+e[2]))
 	mid := func(a0, a1 int32) int32 { return a0 + (a1-a0+1)/2 }
-	surface := s.height(mid(bb.x0, bb.x1), mid(bb.z0, bb.z1), !ocean)
+	surface := s.height(mid(bb.X0, bb.X1), mid(bb.Z0, bb.Z1), !ocean)
 	y = surface - 1
 	switch {
 	case s.nether:
 		y = s.minY + 15 + r.IntN(85)
 	case !under:
 		if desert {
-			y = surface - (bb.y1 - bb.y0) + r.IntN(6)
+			y = surface - (bb.Y1 - bb.Y0) + r.IntN(6)
 		}
 	default:
-		b := o.BiomeAt(mid(bb.x0, bb.x1), mid(bb.y0, bb.y1), mid(bb.z0, bb.z1))
+		b := o.BiomeAt(mid(bb.X0, bb.X1), mid(bb.Y0, bb.Y1), mid(bb.Z0, bb.Z1))
 		low := s.minY + 15
 		if o.biomeHas(b, "extreme_hills") || o.biomeHas(b, "mountain") {
 			low = SeaLevel + 7
 		}
-		y += bb.y0 - bb.y1 - 1
+		y += bb.Y0 - bb.Y1 - 1
 		if y > low {
 			y = low + r.IntN(y-low+1)
 		}
 	}
-	bb = bb.raise(y - bb.y0)
+	bb = bb.Raise(y - bb.Y0)
 
 	// Lower the box until three of its bottom corners stand on something.
 	standing := func(x, z int32) bool {
-		b := s.get(x, bb.y0-1, z)
+		b := s.get(x, bb.Y0-1, z)
 		if o.hasBlockTag(b, "leaves") {
 			return false
 		}
 		return (!ocean && s.isWater(b)) || o.solidMaterial(b)
 	}
-	for bb.y0 > s.minY+15 {
+	for bb.Y0 > s.minY+15 {
 		n := 0
-		for _, c := range [4][2]int32{{bb.x0, bb.z0}, {bb.x0, bb.z1}, {bb.x1, bb.z0}, {bb.x1, bb.z1}} {
+		for _, c := range [4][2]int32{{bb.X0, bb.Z0}, {bb.X0, bb.Z1}, {bb.X1, bb.Z0}, {bb.X1, bb.Z1}} {
 			if standing(c[0], c[1]) {
 				n++
 			}
@@ -374,7 +374,7 @@ func (o *Overworld) buildPortal(cx, cz int32, s *portalSim) *ruinedPortal {
 		if n >= 3 {
 			break
 		}
-		bb = bb.raise(-1)
+		bb = bb.Raise(-1)
 	}
 
 	ids := o.portalIDs()
@@ -392,8 +392,8 @@ func (o *Overworld) buildPortal(cx, cz int32, s *portalSim) *ruinedPortal {
 			netherrack(x, y-i, z)
 		}
 	}
-	spread := r.IntN(max(8-((bb.x1-bb.x0)+(bb.z1-bb.z0)+2)/4, 1))
-	mx, mz := mid(bb.x0, bb.x1), mid(bb.z0, bb.z1)
+	spread := r.IntN(max(8-((bb.X1-bb.X0)+(bb.Z1-bb.Z0)+2)/4, 1))
+	mx, mz := mid(bb.X0, bb.X1), mid(bb.Z0, bb.Z1)
 	for x := mx - 14; x <= mx+14; x++ {
 		for dz := int32(-14); dz <= 14; dz++ {
 			d := spread + iabs(mx-x) + iabs(dz)
@@ -403,9 +403,9 @@ func (o *Overworld) buildPortal(cx, cz int32, s *portalSim) *ruinedPortal {
 			z := mz + dz
 			hy := s.height(x, z, !ocean) - 1
 			if buried {
-				hy = min(hy, bb.y0)
+				hy = min(hy, bb.Y0)
 			}
-			if iabs(bb.y0-hy) <= 3 {
+			if iabs(bb.Y0-hy) <= 3 {
 				netherrack(x, hy, z)
 				drip(x, hy-1, z)
 			}
@@ -414,27 +414,27 @@ func (o *Overworld) buildPortal(cx, cz int32, s *portalSim) *ruinedPortal {
 
 	keepAir := under
 	switch {
-	case s.nether && bb.y0 < s.sea:
+	case s.nether && bb.Y0 < s.sea:
 		keepAir = false
 	case !under && !desert:
 		keepAir = r.Float() < 0.5
 	}
 	wet := false
 	for _, c := range [8][3]int32{
-		{bb.x0, bb.y1, bb.z0}, {bb.x0, bb.y1, bb.z1}, {bb.x1, bb.y1, bb.z0}, {bb.x1, bb.y1, bb.z1},
-		{bb.x0, bb.y0, bb.z0}, {bb.x0, bb.y0, bb.z1}, {bb.x1, bb.y0, bb.z0}, {bb.x1, bb.y0, bb.z1},
+		{bb.X0, bb.Y1, bb.Z0}, {bb.X0, bb.Y1, bb.Z1}, {bb.X1, bb.Y1, bb.Z0}, {bb.X1, bb.Y1, bb.Z1},
+		{bb.X0, bb.Y0, bb.Z0}, {bb.X0, bb.Y0, bb.Z1}, {bb.X1, bb.Y0, bb.Z0}, {bb.X1, bb.Y0, bb.Z1},
 	} {
 		if s.get(c[0], c[1], c[2]) == o.ids.water {
 			wet = true
 			break
 		}
 	}
-	o.portalTemplate(s, &r, jt, ox, bb.y0, oz, rot, mirror, keepAir, wet)
+	o.portalTemplate(s, &r, jt, ox, bb.Y0, oz, rot, mirror, keepAir, wet)
 
-	for x := bb.x0 + 1; x < bb.x1; x++ {
-		for z := bb.z0 + 1; z < bb.z1; z++ {
-			if s.get(x, bb.y0, z) == ids.netherrack {
-				drip(x, bb.y0-1, z)
+	for x := bb.X0 + 1; x < bb.X1; x++ {
+		for z := bb.Z0 + 1; z < bb.Z1; z++ {
+			if s.get(x, bb.Y0, z) == ids.netherrack {
+				drip(x, bb.Y0-1, z)
 			}
 		}
 	}
@@ -468,35 +468,35 @@ func (o *Overworld) buildPortal(cx, cz int32, s *portalSim) *ruinedPortal {
 // turned. Air is skipped unless keepAir; wet waterlogs below sea level.
 // Like every legacy template placement, a chest without a loot seed draws
 // one from r.
-func (o *Overworld) portalTemplate(s *portalSim, r *rand.MT, jt *jigsawTemplate, ox, oy, oz int32, rot int, mirror, keepAir, wet bool) {
-	m := mirrorNone
+func (o *Overworld) portalTemplate(s *portalSim, r *rand.MT, jt *structure.JigsawTemplate, ox, oy, oz int32, rot int, mirror, keepAir, wet bool) {
+	m := structure.MirrorNone
 	if mirror {
-		m = mirrorZ
+		m = structure.MirrorZ
 	}
-	conv := o.templateStatesMirror(jt, rot, m)
-	for _, tb := range jt.tpl.Blocks {
-		st := jt.tpl.Palette[tb.State]
+	conv := o.st.TemplateStatesMirror(jt, rot, m)
+	for _, tb := range jt.Template.Blocks {
+		st := jt.Template.Palette[tb.State]
 		switch st.Name {
 		case "minecraft:structure_block", "minecraft:jigsaw", "minecraft:structure_void":
 			continue
 		}
 		cs := conv[tb.State]
-		if !cs.ok || (!keepAir && cs.id == o.ids.air) {
+		if !cs.OK || (!keepAir && cs.ID == o.ids.air) {
 			continue
 		}
 		p := tb.Pos
 		if mirror {
 			p[2] = -p[2]
 		}
-		p = rotatePos(p, rot)
+		p = structure.RotatePos(p, rot)
 		x, y, z := ox+p[0], oy+p[1], oz+p[2]
-		id, name := cs.id, o.blockName(cs.id)
+		id, name := cs.ID, o.blockName(cs.ID)
 		below := wet && y < s.sea
 		if id == o.ids.air && below {
 			id, name = o.ids.water, "minecraft:water"
 		}
-		water := o.holdsLiquid[name] && (below || cs.water)
-		be := o.blockEntityFor(id, st.Name, x, y, z)
+		water := o.holdsLiquid[name] && (below || cs.Water)
+		be := o.st.BlockEntityFor(id, st.Name, x, y, z)
 		if be != nil && be["id"] == "Chest" {
 			be["LootTableSeed"] = int32(r.Uint32() >> 1)
 		}
@@ -529,7 +529,7 @@ func (o *Overworld) portalIDs() portalIDs {
 }
 
 // agePortal is the aging pass over the box: x, then y, then z.
-func (o *Overworld) agePortal(s *portalSim, r *rand.MT, bb box, ids portalIDs, moss float32, ocean, cold bool) {
+func (o *Overworld) agePortal(s *portalSim, r *rand.MT, bb structure.Box, ids portalIDs, moss float32, ocean, cold bool) {
 	// stairs draws a facing and a half (sub_4E8A9F0).
 	stairs := func(name string) uint32 {
 		d := r.IntN(4)
@@ -544,9 +544,9 @@ func (o *Overworld) agePortal(s *portalSim, r *rand.MT, bb box, ids portalIDs, m
 		}
 		return mossy[i]
 	}
-	for x := bb.x0; x <= bb.x1; x++ {
-		for y := bb.y0; y <= bb.y1; y++ {
-			for z := bb.z0; z <= bb.z1; z++ {
+	for x := bb.X0; x <= bb.X1; x++ {
+		for y := bb.Y0; y <= bb.Y1; y++ {
+			for z := bb.Z0; z <= bb.Z1; z++ {
 				b := s.get(x, y, z)
 				name := o.blockName(b)
 				set := func(id uint32) { s.put(x, y, z, id, false, nil) }
@@ -677,58 +677,14 @@ func (o *Overworld) NearestRuinedPortal(x, z int32, maxRegions int32) (Scattered
 		if p == nil {
 			continue
 		}
-		s := Scattered{Kind: "ruined_portal", X: (p.bb.x0 + p.bb.x1) / 2, Y: p.bb.y1 + 1, Z: (p.bb.z0 + p.bb.z1) / 2}
+		s := Scattered{Kind: "ruined_portal", X: (p.bb.X0 + p.bb.X1) / 2, Y: p.bb.Y1 + 1, Z: (p.bb.Z0 + p.bb.Z1) / 2}
 		if p.under {
 			// A buried portal keeps its air: its middle is open.
-			s.Kind, s.Y = "buried ruined_portal", p.bb.y0+1
+			s.Kind, s.Y = "buried ruined_portal", p.bb.Y0+1
 		}
 		return s, true
 	}
 	return Scattered{}, false
-}
-
-// mirrorPropsZ mirrors a Java block state along z (Java's LEFT_RIGHT).
-func mirrorPropsZ(p map[string]string) map[string]string {
-	return mirrorProps(p, "north", "south", 8)
-}
-
-// mirrorPropsX mirrors a Java block state along x (Java's FRONT_BACK).
-func mirrorPropsX(p map[string]string) map[string]string {
-	return mirrorProps(p, "east", "west", 0)
-}
-
-// mirrorProps swaps the facings and sides a and b, flips door hinges and
-// mirrors a 16-step rotation (0 faces south) as Java's Mirror.mirror does:
-// (half - r) for LEFT_RIGHT, (16 - r) for FRONT_BACK.
-func mirrorProps(p map[string]string, a, b string, half int) map[string]string {
-	if len(p) == 0 {
-		return p
-	}
-	out := make(map[string]string, len(p))
-	for k, v := range p {
-		out[k] = v
-	}
-	switch p["facing"] {
-	case a:
-		out["facing"] = b
-	case b:
-		out["facing"] = a
-	}
-	if v, ok := p[a]; ok {
-		out[a], out[b] = p[b], v
-	}
-	switch p["hinge"] {
-	case "left":
-		out["hinge"] = "right"
-	case "right":
-		out["hinge"] = "left"
-	}
-	if v, ok := p["rotation"]; ok {
-		if n, err := strconv.Atoi(v); err == nil {
-			out["rotation"] = strconv.Itoa((half - n + 16) & 15)
-		}
-	}
-	return out
 }
 
 // NetherPortal is a built Nether ruined portal.
@@ -758,7 +714,7 @@ func (o *Overworld) NetherRuinedPortal(cx, cz, height, sea int32, block func(x, 
 	if p == nil {
 		return nil
 	}
-	np := &NetherPortal{X0: p.bb.x0, Y0: p.bb.y0, Z0: p.bb.z0, X1: p.bb.x1, Y1: p.bb.y1, Z1: p.bb.z1,
+	np := &NetherPortal{X0: p.bb.X0, Y0: p.bb.Y0, Z0: p.bb.Z0, X1: p.bb.X1, Y1: p.bb.Y1, Z1: p.bb.Z1,
 		Blocks: make(map[[2]int32][]StructureBlock, len(p.writes))}
 	for k, ws := range p.writes {
 		bs := make([]StructureBlock, len(ws))

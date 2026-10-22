@@ -31,7 +31,7 @@ func TestListMansions(t *testing.T) {
 				continue
 			}
 			for _, p := range m.pieces {
-				if o.template("mansion/"+p.name) == nil {
+				if o.st.Template("mansion/"+p.name) == nil {
 					t.Errorf("mansion at chunk %d %d: missing template %q", cx, cz, p.name)
 				}
 			}
@@ -64,11 +64,11 @@ func TestMansionBlocks(t *testing.T) {
 	m := o.mansionAt(s.X>>4, s.Z>>4, tc.Raw)
 	counts := map[string]int{}
 	chests := 0
-	for cx := m.bb.x0 >> 4; cx <= m.bb.x1>>4; cx++ {
-		for cz := m.bb.z0 >> 4; cz <= m.bb.z1>>4; cz++ {
+	for cx := m.bb.X0 >> 4; cx <= m.bb.X1>>4; cx++ {
+		for cz := m.bb.Z0 >> 4; cz <= m.bb.Z1>>4; cz++ {
 			var c Chunk
 			tc.Generate(cx, cz, &c)
-			for y := m.bb.y0 - 4; y <= m.bb.y1; y++ {
+			for y := m.bb.Y0 - 4; y <= m.bb.Y1; y++ {
 				for x := 0; x < 16; x++ {
 					for z := 0; z < 16; z++ {
 						n := o.blockName(c.Block(x, int(y), z))

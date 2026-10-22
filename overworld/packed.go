@@ -1,6 +1,10 @@
 package overworld
 
-import "maps"
+import (
+	"maps"
+
+	"github.com/helix-bedrock/worldgen/structure"
+)
 
 // PackedChunk is an undecorated chunk stored compactly for TerrainCache and
 // Decorate's neighbour reads. A sub-chunk (16x16x16) of one block, such as
@@ -17,7 +21,7 @@ type PackedChunk struct {
 	// water and blockEntities are those of structures placed in the
 	// terrain; nil for plain terrain.
 	water         []uint64
-	blockEntities []BlockEntity
+	blockEntities []structure.BlockEntity
 }
 
 type packedSub struct {
@@ -65,7 +69,7 @@ func Pack(c *Chunk) *PackedChunk {
 		}
 	}
 	if len(c.BlockEntities) > 0 {
-		p.blockEntities = append([]BlockEntity(nil), c.BlockEntities...)
+		p.blockEntities = append([]structure.BlockEntity(nil), c.BlockEntities...)
 	}
 	packSubs(&p.subs, c.Blocks[:])
 	packSubs(&p.biomes, c.Biomes[:])

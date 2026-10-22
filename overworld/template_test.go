@@ -1,10 +1,12 @@
 package overworld
 
 import (
-	"github.com/helix-bedrock/worldgen"
 	"io/fs"
 	"strings"
 	"testing"
+
+	"github.com/helix-bedrock/worldgen"
+	"github.com/helix-bedrock/worldgen/structure"
 )
 
 // TestLoadTemplates loads every Java structure template shipped in the
@@ -20,7 +22,7 @@ func TestLoadTemplates(t *testing.T) {
 			return err
 		}
 		defer func() { _ = f.Close() }()
-		tpl, err := LoadTemplate(f)
+		tpl, err := structure.LoadTemplate(f)
 		if err != nil {
 			t.Errorf("%s: %v", p, err)
 			return nil

@@ -5,8 +5,8 @@ import (
 	"fmt"
 
 	"github.com/helix-bedrock/worldgen"
-	"github.com/helix-bedrock/worldgen/overworld"
 	"github.com/helix-bedrock/worldgen/rand"
+	"github.com/helix-bedrock/worldgen/structure"
 )
 
 // netherFossilCount is the number of templates, nether_fossils/fossil_1 to
@@ -43,7 +43,7 @@ func (n *Nether) loadFossils() error {
 		if err != nil {
 			return fmt.Errorf("worldgen: read %s: %w", path, err)
 		}
-		tpl, err := overworld.LoadTemplate(bytes.NewReader(raw))
+		tpl, err := structure.LoadTemplate(bytes.NewReader(raw))
 		if err != nil {
 			return fmt.Errorf("worldgen: %s: %w", path, err)
 		}

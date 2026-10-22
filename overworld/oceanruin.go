@@ -4,10 +4,12 @@ import (
 	"cmp"
 	"encoding/json"
 	"fmt"
-	"github.com/helix-bedrock/worldgen"
 	"slices"
 
+	"github.com/helix-bedrock/worldgen"
+
 	"github.com/helix-bedrock/worldgen/rand"
+	"github.com/helix-bedrock/worldgen/structure"
 )
 
 // Ocean ruins, written from BDS 1.26.52: OceanRuinFeature (constructor
@@ -115,24 +117,6 @@ type ruinPiece struct {
 	big, warm bool
 }
 
-// loadLiquidHolders reads the blocks that can hold a liquid source
-// (canContainLiquidSource, exported from BDS 1.26.52 block states).
-func loadLiquidHolders() (map[string]bool, error) {
-	raw, err := worldgen.Data.ReadFile("data/bds/liquid_holders.json")
-	if err != nil {
-		return nil, fmt.Errorf("worldgen: read liquid holders: %w", err)
-	}
-	var names []string
-	if err := json.Unmarshal(raw, &names); err != nil {
-		return nil, fmt.Errorf("worldgen: parse liquid holders: %w", err)
-	}
-	m := make(map[string]bool, len(names))
-	for _, n := range names {
-		m[n] = true
-	}
-	return m, nil
-}
-
 // initOceanStructures fills the per-biome ocean structure tables.
 func (o *Overworld) initOceanStructures(biomeIDs map[string]uint32, n uint32) error {
 	o.ruinBiome = make([]ruinBiome, n)
@@ -155,7 +139,7 @@ func (o *Overworld) initOceanStructures(biomeIDs map[string]uint32, n uint32) er
 	o.treasureBiome = set(treasureBiomes)
 	o.outpostBiome = set(outpostBiomes)
 	o.mansionBiome = set(mansionBiomes)
-	h, err := loadLiquidHolders()
+	h, err := structure.LoadLiquidHolders()
 	if err != nil {
 		return err
 	}
@@ -346,19 +330,19 @@ func (o *Overworld) ruinStart(sx, sz int32) []ruinPiece {
 }
 
 // ruinBox is the area a piece covers.
-func (o *Overworld) ruinBox(p ruinPiece) (box, *jigsawTemplate) {
-	jt := o.template(p.path)
+func (o *Overworld) ruinBox(p ruinPiece) (structure.Box, *structure.JigsawTemplate) {
+	jt := o.st.Template(p.path)
 	if jt == nil {
-		return box{}, nil
+		return structure.Box{}, nil
 	}
-	e := rotatePos([3]int32{jt.tpl.Size[0] - 1, 0, jt.tpl.Size[2] - 1}, p.rot)
-	return box{min(p.x, p.x+e[0]), MinY, min(p.z, p.z+e[2]), max(p.x, p.x+e[0]), MaxY - 1, max(p.z, p.z+e[2])}, jt
+	e := structure.RotatePos([3]int32{jt.Template.Size[0] - 1, 0, jt.Template.Size[2] - 1}, p.rot)
+	return structure.NewBox(min(p.x, p.x+e[0]), MinY, min(p.z, p.z+e[2]), max(p.x, p.x+e[0]), MaxY-1, max(p.z, p.z+e[2])), jt
 }
 
 // ruinsReach calls f for each ruin start with a piece in chunk (cx, cz),
 // with its pieces. Pieces reach at most 3 chunks from the start.
 func (o *Overworld) ruinsReach(cx, cz int32, f func(sx, sz int32, pieces []ruinPiece)) {
-	chunk := box{cx * 16, MinY, cz * 16, cx*16 + 15, MaxY - 1, cz*16 + 15}
+	chunk := structure.NewBox(cx*16, MinY, cz*16, cx*16+15, MaxY-1, cz*16+15)
 	for rx := floorDivRegion(cx-3, ruinSpacing); rx <= floorDivRegion(cx+3, ruinSpacing); rx++ {
 		for rz := floorDivRegion(cz-3, ruinSpacing); rz <= floorDivRegion(cz+3, ruinSpacing); rz++ {
 			sx, sz := o.ruinPick(rx, rz)
@@ -367,7 +351,7 @@ func (o *Overworld) ruinsReach(cx, cz int32, f func(sx, sz int32, pieces []ruinP
 			}
 			pieces := o.ruinStart(sx, sz)
 			for _, p := range pieces {
-				if b, jt := o.ruinBox(p); jt != nil && b.intersects(chunk) {
+				if b, jt := o.ruinBox(p); jt != nil && b.Intersects(chunk) {
 					f(sx, sz, pieces)
 					break
 				}
@@ -389,7 +373,7 @@ func (o *Overworld) placeRuins(cx, cz int32, c *Chunk, raw func(cx, cz int32) *P
 	var b *scBuild
 	o.ruinsReach(cx, cz, func(_, _ int32, pieces []ruinPiece) {
 		if b == nil {
-			b = &scBuild{o: o, c: c, cbox: box{cx * 16, MinY, cz * 16, cx*16 + 15, MaxY - 1, cz*16 + 15}}
+			b = &scBuild{o: o, c: c, cbox: structure.NewBox(cx*16, MinY, cz*16, cx*16+15, MaxY-1, cz*16+15)}
 			b.ids()
 			// The chunk's random gives the chests their loot seeds.
 			b.r.Seed(populationSeed(o.seed, cx, cz))
@@ -403,7 +387,7 @@ func (o *Overworld) placeRuins(cx, cz int32, c *Chunk, raw func(cx, cz int32) *P
 // ruinY is a piece's bottom y (sub_4E80060): the height map at its corner,
 // moved down to the lowest floor under the piece when that floor is more
 // than 3 below and most columns are that deep, then one lower.
-func (o *Overworld) ruinY(p ruinPiece, area box, raw func(cx, cz int32) *PackedChunk) int32 {
+func (o *Overworld) ruinY(p ruinPiece, area structure.Box, raw func(cx, cz int32) *PackedChunk) int32 {
 	at := func(x, y, z int32) uint32 {
 		c := raw(x>>4, z>>4)
 		if c == nil {
@@ -419,8 +403,8 @@ func (o *Overworld) ruinY(p ruinPiece, area box, raw func(cx, cz int32) *PackedC
 		}
 	}
 	lowest, deep := int32(512), int32(0)
-	for x := area.x0; x <= area.x1; x++ {
-		for z := area.z0; z <= area.z1; z++ {
+	for x := area.X0; x <= area.X1; x++ {
+		for z := area.Z0; z <= area.Z1; z++ {
 			y := h - 1
 			for y > MinY+1 {
 				s := at(x, y, z)
@@ -435,7 +419,7 @@ func (o *Overworld) ruinY(p ruinPiece, area box, raw func(cx, cz int32) *PackedC
 			}
 		}
 	}
-	if lowest-h < -3 && deep > area.x1-area.x0-2 {
+	if lowest-h < -3 && deep > area.X1-area.X0-2 {
 		h = lowest + 1
 	}
 	return h - 1
@@ -446,19 +430,19 @@ func (o *Overworld) ruinY(p ruinPiece, area box, raw func(cx, cz int32) *PackedC
 func (b *scBuild) ruinPiece(p ruinPiece, raw func(cx, cz int32) *PackedChunk) {
 	o := b.o
 	area, jt := o.ruinBox(p)
-	if jt == nil || !area.intersects(b.cbox) {
+	if jt == nil || !area.Intersects(b.cbox) {
 		return
 	}
 	y0 := o.ruinY(p, area, raw)
-	conv := o.templateStates(jt, p.rot)
+	conv := o.st.TemplateStates(jt, p.rot)
 	// Integrity draws one float per placed template block, inside the chunk
 	// or not, from a random seeded with the chunk's population seed.
 	var ir rand.MT
-	ir.Seed(populationSeed(o.seed, b.cbox.x0>>4, b.cbox.z0>>4))
+	ir.Seed(populationSeed(o.seed, b.cbox.X0>>4, b.cbox.Z0>>4))
 	var markers []templateMarker
-	for _, tb := range jt.tpl.Blocks {
-		st := jt.tpl.Palette[tb.State]
-		rp := rotatePos(tb.Pos, p.rot)
+	for _, tb := range jt.Template.Blocks {
+		st := jt.Template.Palette[tb.State]
+		rp := structure.RotatePos(tb.Pos, p.rot)
 		pos := [3]int32{p.x + rp[0], y0 + rp[1], p.z + rp[2]}
 		switch st.Name {
 		case "minecraft:structure_block":
@@ -474,10 +458,10 @@ func (b *scBuild) ruinPiece(p ruinPiece, raw func(cx, cz int32) *PackedChunk) {
 			continue
 		}
 		cs := conv[tb.State]
-		if !cs.ok || !b.cbox.contains(pos) {
+		if !cs.OK || !b.cbox.Contains(pos) {
 			continue
 		}
-		id, name := cs.id, o.blockName(cs.id)
+		id, name := cs.ID, o.blockName(cs.ID)
 		below := pos[1] < SeaLevel
 		if id == o.ids.air && below {
 			id, name = o.ids.water, "minecraft:water"
@@ -486,12 +470,12 @@ func (b *scBuild) ruinPiece(p ruinPiece, raw func(cx, cz int32) *PackedChunk) {
 			continue
 		}
 		b.dropEntity(pos)
-		if o.holdsLiquid[name] && (below || cs.water) {
+		if o.holdsLiquid[name] && (below || cs.Water) {
 			i := (pos[1]-MinY)<<8 | (pos[2]&15)<<4 | pos[0]&15
 			b.c.Water[i>>6] |= 1 << (i & 63)
 		}
-		if d := o.blockEntityFor(id, st.Name, pos[0], pos[1], pos[2]); d != nil {
-			b.c.BlockEntities = append(b.c.BlockEntities, BlockEntity{X: pos[0], Y: pos[1], Z: pos[2], Data: d})
+		if d := o.st.BlockEntityFor(id, st.Name, pos[0], pos[1], pos[2]); d != nil {
+			b.c.BlockEntities = append(b.c.BlockEntities, structure.BlockEntity{X: pos[0], Y: pos[1], Z: pos[2], Data: d})
 		}
 	}
 	for _, m := range markers {
@@ -504,7 +488,7 @@ func (b *scBuild) ruinPiece(p ruinPiece, raw func(cx, cz int32) *PackedChunk) {
 // level, and gets the big or small ruin loot.
 func (b *scBuild) ruinChest(p ruinPiece, pos [3]int32) {
 	o := b.o
-	if !b.cbox.contains(pos) {
+	if !b.cbox.Contains(pos) {
 		return
 	}
 	fill := "minecraft:water"
@@ -536,10 +520,10 @@ func (b *scBuild) ruinChest(p ruinPiece, pos [3]int32) {
 	if p.big {
 		table = "loot_tables/chests/underwater_ruin_big.json"
 	}
-	if d := o.blockEntityFor(chest, "", pos[0], cy, pos[2]); d != nil {
+	if d := o.st.BlockEntityFor(chest, "", pos[0], cy, pos[2]); d != nil {
 		d["LootTable"] = table
 		d["LootTableSeed"] = int32(b.r.Uint32() >> 1)
-		b.c.BlockEntities = append(b.c.BlockEntities, BlockEntity{X: pos[0], Y: cy, Z: pos[2], Data: d, LootTable: table})
+		b.c.BlockEntities = append(b.c.BlockEntities, structure.BlockEntity{X: pos[0], Y: cy, Z: pos[2], Data: d, LootTable: table})
 	}
 }
 
@@ -596,7 +580,7 @@ func (o *Overworld) NearestOceanRuin(x, z int32, maxRegions int32) (Scattered, b
 // dropEntity removes the block entity at a position, as replacing its
 // block does in BDS (a later layer's chest replaces an earlier one's).
 func (b *scBuild) dropEntity(p [3]int32) {
-	b.c.BlockEntities = slices.DeleteFunc(b.c.BlockEntities, func(be BlockEntity) bool {
+	b.c.BlockEntities = slices.DeleteFunc(b.c.BlockEntities, func(be structure.BlockEntity) bool {
 		return be.X == p[0] && be.Y == p[1] && be.Z == p[2]
 	})
 }

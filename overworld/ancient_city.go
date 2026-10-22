@@ -1,6 +1,9 @@
 package overworld
 
-import "github.com/helix-bedrock/worldgen/rand"
+import (
+	"github.com/helix-bedrock/worldgen/rand"
+	"github.com/helix-bedrock/worldgen/structure"
+)
 
 // Ancient cities, after BDS 1.26.52:
 //   placement  sub_4E3E390  regions of 24 chunks with picks 8 apart (two
@@ -33,8 +36,8 @@ const (
 
 // city is an assembled ancient city.
 type city struct {
-	pieces []*jigsawPiece
-	bb     box
+	pieces []*structure.Piece
+	bb     structure.Box
 }
 
 // cityPick is the chunk a region's city would start in, and the random
@@ -80,224 +83,50 @@ func (o *Overworld) cityAt(rx, rz int32) *city {
 	return c
 }
 
-// cityShape is the free space of one nesting level: a piece must lie inside
-// one of in and touch none of out.
-type cityShape struct {
-	in, out []box
-}
-
-func (s *cityShape) fits(bb box) bool {
-	inside := false
-	for _, b := range s.in {
-		if bb.inside(b) {
-			inside = true
-			break
-		}
-	}
-	if !inside {
-		return false
-	}
-	for _, b := range s.out {
-		if bb.intersects(b) {
-			return false
-		}
-	}
-	return true
-}
-
-// cityQueued is a placed piece waiting to have its jigsaws expanded, with
-// the nesting level it was placed in.
-type cityQueued struct {
-	p     *jigsawPiece
-	shape int
-}
-
-type cityAssembly struct {
-	o       *Overworld
-	r       *rand.MT
-	shapes  []cityShape
-	pieces  []*jigsawPiece
-	queue   []cityQueued
-	feature *jigsawTemplate
-}
-
 // assembleCity builds the city starting in chunk (cx, cz).
 func (o *Overworld) assembleCity(cx, cz int32, r *rand.MT) *city {
 	rot := int(r.IntN(4))
-	pool := o.city.pools["minecraft:ancient_city/city_center"]
-	if pool == nil || len(pool.entries) == 0 {
+	pool := o.city.Pools["minecraft:ancient_city/city_center"]
+	if pool == nil || len(pool.Entries) == 0 {
 		return nil
 	}
-	el := pool.entries[r.IntN(int32(len(pool.entries)))].el
-	tpl := o.template(el.template)
+	el := pool.Entries[r.IntN(int32(len(pool.Entries)))].Element
+	tpl := o.st.Template(el.Template)
 	if tpl == nil {
 		return nil
 	}
 	at := [3]int32{cx * 16, 0, cz * 16}
-	p := &jigsawPiece{el: el, tpl: tpl, pos: at, rotation: rot}
-	js := p.placedJigsaws()
-	shuffle(js, r)
+	p := &structure.Piece{Element: el, Template: tpl, Pos: at, Rotation: rot}
+	js := p.PlacedJigsaws()
+	structure.Shuffle(js, r)
 	// BDS logs and uses no offset when the anchor is missing.
 	var off [3]int32
 	for _, j := range js {
-		if j.name == "minecraft:city_anchor" {
-			off = [3]int32{j.pos[0] - at[0], j.pos[1] - at[1], j.pos[2] - at[2]}
+		if j.Name == "minecraft:city_anchor" {
+			off = [3]int32{j.Pos[0] - at[0], j.Pos[1] - at[1], j.Pos[2] - at[2]}
 			break
 		}
 	}
-	p.pos = [3]int32{at[0] - off[0], 0, at[2] - off[2]}
-	p.bb = tplBox(tpl.tpl, p.pos, rot)
+	p.Pos = [3]int32{at[0] - off[0], 0, at[2] - off[2]}
+	p.BB = structure.TemplateBox(tpl.Template, p.Pos, rot)
 	// The free space is centred on the start piece before it is lowered.
-	mx := p.bb.x0 + (p.bb.x1-p.bb.x0+1)/2
-	my := p.bb.y0 + (p.bb.y1-p.bb.y0+1)/2
-	mz := p.bb.z0 + (p.bb.z1-p.bb.z0+1)/2
-	bounds := box{mx - cityMaxDist, my - cityMaxDist, mz - cityMaxDist, mx + cityMaxDist, my + cityMaxDist, mz + cityMaxDist}
-	dy := cityAnchorY - (p.bb.y0 + off[1])
-	p.pos[1] += dy
-	p.bb = p.bb.raise(dy)
-	p.ground = 1
+	mx := p.BB.X0 + (p.BB.X1-p.BB.X0+1)/2
+	my := p.BB.Y0 + (p.BB.Y1-p.BB.Y0+1)/2
+	mz := p.BB.Z0 + (p.BB.Z1-p.BB.Z0+1)/2
+	bounds := structure.NewBox(mx-cityMaxDist, my-cityMaxDist, mz-cityMaxDist, mx+cityMaxDist, my+cityMaxDist, mz+cityMaxDist)
+	dy := cityAnchorY - (p.BB.Y0 + off[1])
+	p.Pos[1] += dy
+	p.BB = p.BB.Raise(dy)
+	p.Ground = 1
 
-	a := &cityAssembly{o: o, r: r, pieces: []*jigsawPiece{p},
-		shapes: []cityShape{{in: []box{bounds}, out: []box{p.bb}}},
-		queue:  []cityQueued{{p, 0}},
-		feature: &jigsawTemplate{tpl: &Template{Size: [3]int32{1, 1, 1}},
-			jigsaws: []jigsawBlock{{facing: "down", name: "minecraft:bottom", target: "minecraft:empty", pool: "minecraft:empty"}}},
+	a := &structure.Assembly{Lib: o.st, Data: o.city, MaxDepth: cityMaxDepth, R: r, Pieces: []*structure.Piece{p},
+		Shapes: []structure.Shape{{In: []structure.Box{bounds}, Out: []structure.Box{p.BB}}},
+		Queue:  []structure.Queued{{Piece: p}},
+		Feature: &structure.JigsawTemplate{Template: &structure.Template{Size: [3]int32{1, 1, 1}},
+			Jigsaws: []structure.JigsawBlock{{Facing: "down", Name: "minecraft:bottom", Target: "minecraft:empty", Pool: "minecraft:empty"}}},
 	}
-	for i := 0; i < len(a.queue); i++ {
-		a.expand(a.queue[i])
-	}
-	c := &city{pieces: a.pieces, bb: p.bb}
-	for _, q := range a.pieces[1:] {
-		c.bb = box{min(c.bb.x0, q.bb.x0), min(c.bb.y0, q.bb.y0), min(c.bb.z0, q.bb.z0),
-			max(c.bb.x1, q.bb.x1), max(c.bb.y1, q.bb.y1), max(c.bb.z1, q.bb.z1)}
-	}
-	return c
-}
-
-// expand tries every jigsaw of a queued piece.
-func (a *cityAssembly) expand(q cityQueued) {
-	if q.p.depth > cityMaxDepth {
-		return
-	}
-	js := q.p.placedJigsaws()
-	shuffle(js, a.r)
-	// BDS then sorts by selection priority; city jigsaws have none.
-	for _, j := range js {
-		pool := a.o.city.pools[j.pool]
-		if pool == nil || len(pool.entries) == 0 {
-			continue
-		}
-		fallback := a.o.city.pools[pool.fallback]
-		if fallback != nil && len(fallback.entries) == 0 {
-			fallback = nil
-		}
-		if q.p.depth != cityMaxDepth && a.fit(q, j, pool) {
-			continue
-		}
-		if fallback != nil {
-			a.fit(q, j, fallback)
-		}
-	}
-}
-
-// template is an element's prepared template; feature elements are a
-// single block with one jigsaw facing down.
-func (a *cityAssembly) template(el *jigsawElement) *jigsawTemplate {
-	if el.feature != "" {
-		return a.feature
-	}
-	return a.o.template(el.template)
-}
-
-// fit attaches the first element of pool that fits to jigsaw j of the
-// queued piece, and reports whether one did.
-func (a *cityAssembly) fit(q cityQueued, j jigsawBlock, pool *jigsawPool) bool {
-	cands := pool.weightedShuffle(a.r)
-	dir := jigsawDir(j.facing)
-	target := [3]int32{j.pos[0] + dir[0], j.pos[1] + dir[1], j.pos[2] + dir[2]}
-	inside := q.p.bb.contains(target)
-	want := opposite(j.facing)
-	for _, el := range cands {
-		tpl := a.template(el)
-		if tpl == nil {
-			// BDS stops at an empty element.
-			return true
-		}
-		rots := []int{0, 1, 2, 3}
-		shuffle(rots, a.r)
-		for _, rot := range rots {
-			cand := &jigsawPiece{el: el, tpl: tpl, rotation: rot}
-			cjs := cand.placedJigsaws()
-			shuffle(cjs, a.r)
-			for _, cj := range cjs {
-				// City joints are all rollable: only the fronts must face.
-				if cj.facing != want || cj.name != j.target {
-					continue
-				}
-				// A piece joined inside its parent goes into the next
-				// nesting level, whose space grows by the parent's box.
-				si := q.shape
-				if inside {
-					si++
-					if si < len(a.shapes) {
-						a.shapes[si].in = append(a.shapes[si].in, q.p.bb)
-					} else {
-						a.shapes = append(a.shapes, cityShape{in: []box{q.p.bb}})
-					}
-				}
-				pos := [3]int32{target[0] - cj.pos[0], target[1] - cj.pos[1], target[2] - cj.pos[2]}
-				bb := tplBox(tpl.tpl, pos, rot)
-				if !a.shapes[si].fits(bb) {
-					continue
-				}
-				a.shapes[si].out = append(a.shapes[si].out, bb)
-				cand.pos, cand.bb, cand.depth = pos, bb, q.p.depth+1
-				// The joining jigsaw's height in the piece is its ground.
-				cand.ground = cj.pos[1]
-				a.pieces = append(a.pieces, cand)
-				a.queue = append(a.queue, cityQueued{cand, si})
-				return true
-			}
-		}
-	}
-	return false
-}
-
-// applyRules runs a template's block rules on one block about to be placed
-// at (x, y, z) over world: the first rule whose block matches, whose chance
-// passes and whose spot is not protected decides the block. The random is
-// fresh per block and drawn only for matching rules.
-func (o *Overworld) applyRules(rules []blockRule, cs convertedState, x, y, z int32, world uint32) convertedState {
-	st, ok := o.reg.State(cs.id)
-	if !ok {
-		return cs
-	}
-	var r rand.Java
-	seeded := false
-	for _, ru := range rules {
-		if ru.set == nil && ru.block != st.Name || ru.set != nil && !ru.set[st.Name] {
-			continue
-		}
-		pass := ru.chance >= 1
-		if !pass && (ru.set != nil || ru.chance > 0) {
-			if !seeded {
-				r.Seed(rand.RuleSeed(x, y, z))
-				seeded = true
-			}
-			f := r.Float()
-			// A single block passes on chance > f, a set on chance >= f.
-			pass = ru.chance > f || ru.set != nil && ru.chance == f
-		}
-		if !pass {
-			continue
-		}
-		// VERIFY: the location test's own chance is taken as 1.
-		if ws, ok := o.reg.State(world); ok && (ru.notIn[ws.Name] || ru.at != "" && ws.Name != ru.at) {
-			continue
-		}
-		return convertedState{ru.output, false, true}
-	}
-	return cs
+	a.Run()
+	return &city{pieces: a.Pieces, bb: structure.PiecesBox(a.Pieces)}
 }
 
 // placeCities writes the pieces of ancient cities that reach chunk
@@ -305,9 +134,9 @@ func (o *Overworld) applyRules(rules []blockRule, cs convertedState, x, y, z int
 // Feature elements are placed during decoration (cityFeatures).
 // TODO: the beard_box terrain adaptation around the pieces.
 func (o *Overworld) placeCities(cx, cz int32, c *Chunk) {
-	chunkBox := box{cx * 16, MinY, cz * 16, cx*16 + 15, MaxY - 1, cz*16 + 15}
-	o.forCityPieces(cx, cz, func(p *jigsawPiece) bool {
-		if p.el.feature == "" {
+	chunkBox := structure.NewBox(cx*16, MinY, cz*16, cx*16+15, MaxY-1, cz*16+15)
+	o.forCityPieces(cx, cz, func(p *structure.Piece) bool {
+		if p.Element.Feature == "" {
 			o.placePiece(p, c, chunkBox, nil)
 		}
 		return true
@@ -323,18 +152,18 @@ func (o *Overworld) placeCities(cx, cz int32, c *Chunk) {
 // in the decoration order was not read.
 func (o *Overworld) cityFeatures(w *featureWorld, ox, oz int32, pop uint32) {
 	var r *rand.MT
-	o.forCityPieces(ox, oz, func(p *jigsawPiece) bool {
-		if p.el.feature == "" || p.pos[0]>>4 != ox || p.pos[2]>>4 != oz {
+	o.forCityPieces(ox, oz, func(p *structure.Piece) bool {
+		if p.Element.Feature == "" || p.Pos[0]>>4 != ox || p.Pos[2]>>4 != oz {
 			return true
 		}
-		f, ok := o.features.get(p.el.feature)
+		f, ok := o.features.get(p.Element.Feature)
 		if !ok {
 			return true
 		}
 		if r == nil {
 			r = rand.NewMT(pop)
 		}
-		f.place(w, p.pos[0], p.pos[1], p.pos[2], r)
+		f.place(w, p.Pos[0], p.Pos[1], p.Pos[2], r)
 		return true
 	})
 }
@@ -343,7 +172,7 @@ func (o *Overworld) cityFeatures(w *featureWorld, ox, oz int32, pop uint32) {
 // (cx, cz).
 func (o *Overworld) citiesReach(cx, cz int32) bool {
 	found := false
-	o.forCityPieces(cx, cz, func(*jigsawPiece) bool {
+	o.forCityPieces(cx, cz, func(*structure.Piece) bool {
 		found = true
 		return false
 	})
@@ -352,21 +181,21 @@ func (o *Overworld) citiesReach(cx, cz int32) bool {
 
 // forCityPieces calls f for every city piece in chunk (cx, cz), in
 // placement order, until f returns false.
-func (o *Overworld) forCityPieces(cx, cz int32, f func(*jigsawPiece) bool) {
+func (o *Overworld) forCityPieces(cx, cz int32, f func(*structure.Piece) bool) {
 	if o.city == nil {
 		return
 	}
-	chunkBox := box{cx * 16, MinY, cz * 16, cx*16 + 15, MaxY - 1, cz*16 + 15}
+	chunkBox := structure.NewBox(cx*16, MinY, cz*16, cx*16+15, MaxY-1, cz*16+15)
 	r0x, r1x := floorDivRegion(cx-cityReach, citySpacing), floorDivRegion(cx+cityReach, citySpacing)
 	r0z, r1z := floorDivRegion(cz-cityReach, citySpacing), floorDivRegion(cz+cityReach, citySpacing)
 	for rx := r0x; rx <= r1x; rx++ {
 		for rz := r0z; rz <= r1z; rz++ {
 			c := o.cityAt(rx, rz)
-			if c == nil || !c.bb.intersects(chunkBox) {
+			if c == nil || !c.bb.Intersects(chunkBox) {
 				continue
 			}
 			for _, p := range c.pieces {
-				if p.bb.intersects(chunkBox) && !f(p) {
+				if p.BB.Intersects(chunkBox) && !f(p) {
 					return
 				}
 			}
@@ -420,5 +249,5 @@ func (o *Overworld) NearestAncientCity(x, z, maxRings int32) (AncientCity, bool)
 	var r2 rand.MT
 	cx, cz := o.cityPick(found[0], found[1], &r2)
 	return AncientCity{X: cx * 16, Y: cityAnchorY + 1, Z: cz * 16,
-		Min: [3]int32{c.bb.x0, c.bb.y0, c.bb.z0}, Max: [3]int32{c.bb.x1, c.bb.y1, c.bb.z1}}, true
+		Min: [3]int32{c.bb.X0, c.bb.Y0, c.bb.Z0}, Max: [3]int32{c.bb.X1, c.bb.Y1, c.bb.Z1}}, true
 }

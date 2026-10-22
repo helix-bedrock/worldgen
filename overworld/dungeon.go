@@ -4,6 +4,7 @@ import (
 	"slices"
 
 	"github.com/helix-bedrock/worldgen/rand"
+	"github.com/helix-bedrock/worldgen/structure"
 )
 
 // The code-placed start of BDS's decoration (postProcess sub_517CD10): with
@@ -281,9 +282,9 @@ func (o *Overworld) monsterRoom(w *featureWorld, x, y, z int32, r *rand.MT) {
 	if sp, ok := o.reg.Default("minecraft:mob_spawner"); ok {
 		w.set(x, y, z, sp)
 		mob := dungeonMobs[r.IntN(4)]
-		if d := o.blockEntityFor(sp, "", x, y, z); d != nil {
+		if d := o.st.BlockEntityFor(sp, "", x, y, z); d != nil {
 			d["EntityIdentifier"] = mob
-			w.setEntity(BlockEntity{X: x, Y: y, Z: z, Data: d})
+			w.setEntity(structure.BlockEntity{X: x, Y: y, Z: z, Data: d})
 		}
 	}
 }
@@ -326,10 +327,17 @@ func (o *Overworld) dungeonChest(w *featureWorld, x, y, z, dx, dz int32, r *rand
 	}
 	w.set(x, y, z, id)
 	seed := int32(r.Uint32() >> 1)
-	if d := o.blockEntityFor(id, "", x, y, z); d != nil {
-		be := BlockEntity{X: x, Y: y, Z: z, Data: d, LootTable: "loot_tables/chests/simple_dungeon.json"}
+	if d := o.st.BlockEntityFor(id, "", x, y, z); d != nil {
+		be := structure.BlockEntity{X: x, Y: y, Z: z, Data: d, LootTable: "loot_tables/chests/simple_dungeon.json"}
 		d["LootTable"] = be.LootTable
 		d["LootTableSeed"] = seed
 		w.setEntity(be)
 	}
+}
+
+func b2i(b bool) int32 {
+	if b {
+		return 1
+	}
+	return 0
 }

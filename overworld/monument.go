@@ -5,6 +5,7 @@ import (
 	"slices"
 
 	"github.com/helix-bedrock/worldgen/rand"
+	"github.com/helix-bedrock/worldgen/structure"
 )
 
 // Ocean monuments, written from BDS 1.26.52: the start (sub_4E5EAA0,
@@ -95,7 +96,7 @@ func (r *monRoom) findSource(scan int) bool {
 // monPiece is a piece of a laid-out monument.
 type monPiece struct {
 	kind   int
-	bb     box
+	bb     structure.Box
 	room   *monRoom
 	design int32
 }
@@ -137,7 +138,7 @@ func (o *Overworld) layMonument(cx, cz int32) *monument {
 	r.Seed(seed)
 	m := &monument{orient: r.IntN(4) + 2}
 	x, z := cx*16-21, cz*16-21
-	building := monPiece{kind: monBuilding, bb: box{x, SeaLevel - 24, z, x + 57, SeaLevel - 2, z + 57}}
+	building := monPiece{kind: monBuilding, bb: structure.NewBox(x, SeaLevel-24, z, x+57, SeaLevel-2, z+57)}
 
 	// The room grid: two 5x4 floors and a 3x2 top floor.
 	var rooms [75]*monRoom
@@ -292,13 +293,13 @@ func (o *Overworld) layMonument(cx, cz int32) *monument {
 	dx, dz := b.wx(9, 22), b.wz(9, 22)
 	for i := range children {
 		c := &children[i].bb
-		c.x0, c.x1 = c.x0+dx, c.x1+dx
-		c.y0, c.y1 = c.y0+building.bb.y0, c.y1+building.bb.y0
-		c.z0, c.z1 = c.z0+dz, c.z1+dz
+		c.X0, c.X1 = c.X0+dx, c.X1+dx
+		c.Y0, c.Y1 = c.Y0+building.bb.Y0, c.Y1+building.bb.Y0
+		c.Z0, c.Z1 = c.Z0+dz, c.Z1+dz
 	}
-	corners := func(ax, ay, az, bx, by, bz int32) box {
+	corners := func(ax, ay, az, bx, by, bz int32) structure.Box {
 		x0, z0, x1, z1 := b.wx(ax, az), b.wz(ax, az), b.wx(bx, bz), b.wz(bx, bz)
-		return box{min(x0, x1), b.wy(ay), min(z0, z1), max(x0, x1), b.wy(by), max(z0, z1)}
+		return structure.NewBox(min(x0, x1), b.wy(ay), min(z0, z1), max(x0, x1), b.wy(by), max(z0, z1))
 	}
 	design := int32(r.Uint32()>>1) & 1
 	children = append(children,
@@ -311,7 +312,7 @@ func (o *Overworld) layMonument(cx, cz int32) *monument {
 
 // roomBox is a room piece's box from its grid index (sub_4E5F3D0), before
 // the building moves it.
-func (m *monument) roomBox(rm *monRoom, sx, sy, sz int32) box {
+func (m *monument) roomBox(rm *monRoom, sx, sy, sz int32) structure.Box {
 	i := int32(rm.index)
 	gx, gz, gy := i%5, i/5%5, i/25
 	w, d := sx, sz
@@ -329,20 +330,20 @@ func (m *monument) roomBox(rm *monRoom, sx, sy, sz int32) box {
 	default:
 		x, z = 8*gz, 8*gx
 	}
-	return box{x, 4 * gy, z, x + 8*w - 1, 4*gy + 4*sy - 1, z + 8*d - 1}
+	return structure.NewBox(x, 4*gy, z, x+8*w-1, 4*gy+4*sy-1, z+8*d-1)
 }
 
 // monumentsReach calls f for each monument with its building in chunk
 // (cx, cz). A building spans chunks sx-2..sx+2 of its start.
 func (o *Overworld) monumentsReach(cx, cz int32, f func(m *monument)) {
-	chunk := box{cx * 16, MinY, cz * 16, cx*16 + 15, MaxY - 1, cz*16 + 15}
+	chunk := structure.NewBox(cx*16, MinY, cz*16, cx*16+15, MaxY-1, cz*16+15)
 	for rx := floorDivRegion(cx-2, monumentSpacing); rx <= floorDivRegion(cx+2, monumentSpacing); rx++ {
 		for rz := floorDivRegion(cz-2, monumentSpacing); rz <= floorDivRegion(cz+2, monumentSpacing); rz++ {
 			sx, sz := o.monumentPick(rx, rz)
 			if sx < cx-2 || sx > cx+2 || sz < cz-2 || sz > cz+2 {
 				continue
 			}
-			if m := o.monumentAt(sx, sz); m != nil && m.pieces[0].bb.intersects(chunk) {
+			if m := o.monumentAt(sx, sz); m != nil && m.pieces[0].bb.Intersects(chunk) {
 				f(m)
 			}
 		}
@@ -359,7 +360,7 @@ func (o *Overworld) monumentReaches(cx, cz int32) bool {
 // placeMonuments writes the monuments that reach chunk (cx, cz) into c.
 func (o *Overworld) placeMonuments(cx, cz int32, c *Chunk) {
 	o.monumentsReach(cx, cz, func(m *monument) {
-		b := &monBuild{scBuild: scBuild{o: o, c: c, cbox: box{cx * 16, MinY, cz * 16, cx*16 + 15, MaxY - 1, cz*16 + 15}},
+		b := &monBuild{scBuild: scBuild{o: o, c: c, cbox: structure.NewBox(cx*16, MinY, cz*16, cx*16+15, MaxY-1, cz*16+15)},
 			orient: m.orient}
 		b.ids()
 		b.gray, _ = o.reg.Default("minecraft:prismarine")
@@ -371,7 +372,7 @@ func (o *Overworld) placeMonuments(cx, cz int32, c *Chunk) {
 		b.bb = m.pieces[0].bb
 		b.building()
 		for _, p := range m.pieces[1:] {
-			if !p.bb.intersects(b.cbox) {
+			if !p.bb.Intersects(b.cbox) {
 				continue
 			}
 			b.bb = p.bb
@@ -408,7 +409,7 @@ func (o *Overworld) placeMonuments(cx, cz int32, c *Chunk) {
 // and sub_4E5F650).
 type monBuild struct {
 	scBuild
-	bb                       box
+	bb                       structure.Box
 	orient                   int32
 	gray, light, black, lamp uint32
 }
@@ -416,11 +417,11 @@ type monBuild struct {
 func (b *monBuild) wx(x, z int32) int32 {
 	switch b.orient {
 	case 2, 3:
-		return b.bb.x0 + x
+		return b.bb.X0 + x
 	case 4:
-		return b.bb.x1 - z
+		return b.bb.X1 - z
 	case 5:
-		return b.bb.x0 + z
+		return b.bb.X0 + z
 	}
 	return x
 }
@@ -428,21 +429,21 @@ func (b *monBuild) wx(x, z int32) int32 {
 func (b *monBuild) wz(x, z int32) int32 {
 	switch b.orient {
 	case 4, 5:
-		return b.bb.z0 + x
+		return b.bb.Z0 + x
 	case 3:
-		return b.bb.z0 + z
+		return b.bb.Z0 + z
 	case 2:
-		return b.bb.z1 - z
+		return b.bb.Z1 - z
 	}
 	return z
 }
 
-func (b *monBuild) wy(y int32) int32 { return b.bb.y0 + y }
+func (b *monBuild) wy(y int32) int32 { return b.bb.Y0 + y }
 
 // at is the block at a piece position, air outside the chunk.
 func (b *monBuild) at(x, y, z int32) uint32 {
 	p := [3]int32{b.wx(x, z), b.wy(y), b.wz(x, z)}
-	if !b.cbox.contains(p) {
+	if !b.cbox.Contains(p) {
 		return b.air
 	}
 	return b.c.Block(int(p[0]&15), int(p[1]), int(p[2]&15))
@@ -502,7 +503,7 @@ func (b *monBuild) ifw(s uint32, x0, y, z0, x1, z1 int32) {
 // chunk (chunkIntersects).
 func (b *monBuild) hits(x0, z0, x1, z1 int32) bool {
 	ax, az, bx, bz := b.wx(x0, z0), b.wz(x0, z0), b.wx(x1, z1), b.wz(x1, z1)
-	return b.cbox.x1 >= min(ax, bx) && b.cbox.x0 <= max(ax, bx) && b.cbox.z1 >= min(az, bz) && b.cbox.z0 <= max(az, bz)
+	return b.cbox.X1 >= min(ax, bx) && b.cbox.X0 <= max(ax, bx) && b.cbox.Z1 >= min(az, bz) && b.cbox.Z0 <= max(az, bz)
 }
 
 // floor is generateDefaultFloor (sub_4E5F680).
@@ -1527,7 +1528,7 @@ func (o *Overworld) NearestMonument(x, z int32, maxRegions int32) (Scattered, bo
 	for _, c := range cands {
 		if m := o.monumentAt(c.cx, c.cz); m != nil {
 			bb := m.pieces[0].bb
-			return Scattered{Kind: "ocean_monument", X: (bb.x0 + bb.x1) / 2, Y: bb.y1, Z: (bb.z0 + bb.z1) / 2}, true
+			return Scattered{Kind: "ocean_monument", X: (bb.X0 + bb.X1) / 2, Y: bb.Y1, Z: (bb.Z0 + bb.Z1) / 2}, true
 		}
 	}
 	return Scattered{}, false

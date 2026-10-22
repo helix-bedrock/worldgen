@@ -6,6 +6,7 @@ import (
 	"strings"
 
 	"github.com/helix-bedrock/worldgen/rand"
+	"github.com/helix-bedrock/worldgen/structure"
 )
 
 // Scattered features: desert pyramids, jungle temples, swamp huts and
@@ -227,7 +228,7 @@ func (o *Overworld) placeScattered(cx, cz int32, c *Chunk, raw func(cx, cz int32
 		if start == nil {
 			return
 		}
-		b := scBuild{o: o, c: c, cbox: box{cx * 16, MinY, cz * 16, cx*16 + 15, MaxY - 1, cz*16 + 15},
+		b := scBuild{o: o, c: c, cbox: structure.NewBox(cx*16, MinY, cz*16, cx*16+15, MaxY-1, cz*16+15),
 			x0: sx * 16, y0: o.scatteredY(kind, sx, sz, start), z0: sz * 16}
 		b.ids()
 		if kind == scatterIgloo {
@@ -254,7 +255,7 @@ func (o *Overworld) placeScattered(cx, cz int32, c *Chunk, raw func(cx, cz int32
 type scBuild struct {
 	o          *Overworld
 	c          *Chunk
-	cbox       box
+	cbox       structure.Box
 	r          rand.MT
 	x0, y0, z0 int32
 
@@ -291,7 +292,7 @@ func (o *Overworld) state(name string, props map[string]any) uint32 {
 // get is a piece's getBlock: air outside the chunk.
 func (b *scBuild) get(x, y, z int32) uint32 {
 	wx, wy, wz := b.x0+x, b.y0+y, b.z0+z
-	if !b.cbox.contains([3]int32{wx, wy, wz}) {
+	if !b.cbox.Contains([3]int32{wx, wy, wz}) {
 		return b.air
 	}
 	return b.c.Block(int(wx&15), int(wy), int(wz&15))
@@ -299,7 +300,7 @@ func (b *scBuild) get(x, y, z int32) uint32 {
 
 // setWorld writes a block at a world position inside the chunk.
 func (b *scBuild) setWorld(wx, wy, wz int32, s uint32) bool {
-	if !b.cbox.contains([3]int32{wx, wy, wz}) {
+	if !b.cbox.Contains([3]int32{wx, wy, wz}) {
 		return false
 	}
 	i := (wy-MinY)<<8 | (wz&15)<<4 | wx&15
@@ -327,11 +328,11 @@ func (b *scBuild) put(s uint32, x, y, z int32) bool {
 // position, and returns its data (nil if the block has none).
 func (b *scBuild) entity(x, y, z int32, table string) map[string]any {
 	wx, wy, wz := b.x0+x, b.y0+y, b.z0+z
-	d := b.o.blockEntityFor(b.c.Block(int(wx&15), int(wy), int(wz&15)), "", wx, wy, wz)
+	d := b.o.st.BlockEntityFor(b.c.Block(int(wx&15), int(wy), int(wz&15)), "", wx, wy, wz)
 	if d == nil {
 		return nil
 	}
-	be := BlockEntity{X: wx, Y: wy, Z: wz, Data: d, LootTable: table}
+	be := structure.BlockEntity{X: wx, Y: wy, Z: wz, Data: d, LootTable: table}
 	if table != "" {
 		d["LootTable"] = table
 	}
@@ -384,7 +385,7 @@ func (b *scBuild) fillDown(s uint32, x, y, z int32) {
 
 // fillDownWorld is fillDown at a world position.
 func (b *scBuild) fillDownWorld(s uint32, wx, wy, wz int32) {
-	if !b.cbox.contains([3]int32{wx, wy, wz}) {
+	if !b.cbox.Contains([3]int32{wx, wy, wz}) {
 		return
 	}
 	at := func(y int32) uint32 { return b.c.Block(int(wx&15), int(y), int(wz&15)) }
@@ -413,7 +414,7 @@ var cardinalOf = map[int32]string{2: "north", 3: "south", 4: "west", 5: "east"}
 // and a seed drawn from the random, unless a chest is already there.
 func (b *scBuild) chest(x, y, z, dir int32, table string) {
 	wx, wy, wz := b.x0+x, b.y0+y, b.z0+z
-	if !b.cbox.contains([3]int32{wx, wy, wz}) || b.o.blockName(b.get(x, y, z)) == "minecraft:chest" {
+	if !b.cbox.Contains([3]int32{wx, wy, wz}) || b.o.blockName(b.get(x, y, z)) == "minecraft:chest" {
 		return
 	}
 	b.put(b.o.state("minecraft:chest", map[string]any{"minecraft:cardinal_direction": cardinalOf[dir]}), x, y, z)
@@ -425,7 +426,7 @@ func (b *scBuild) chest(x, y, z, dir int32, table string) {
 // dispenser is createDispenser (sub_D255620), the chest's counterpart.
 func (b *scBuild) dispenser(x, y, z, facing int32, table string) {
 	wx, wy, wz := b.x0+x, b.y0+y, b.z0+z
-	if !b.cbox.contains([3]int32{wx, wy, wz}) || b.o.blockName(b.get(x, y, z)) == "minecraft:dispenser" {
+	if !b.cbox.Contains([3]int32{wx, wy, wz}) || b.o.blockName(b.get(x, y, z)) == "minecraft:dispenser" {
 		return
 	}
 	b.put(b.o.state("minecraft:dispenser", map[string]any{"facing_direction": facing}), x, y, z)
@@ -869,7 +870,7 @@ func (b *scBuild) swampHut() {
 	table, _ := o.reg.Default("minecraft:crafting_table")
 	b.put(table, 3, 2, 6)
 	// The cauldron: 2, 4 or 6 levels of water holding a random potion.
-	if wx, wy, wz := b.x0+4, b.y0+2, b.z0+6; b.cbox.contains([3]int32{wx, wy, wz}) && o.blockName(b.get(4, 2, 6)) != "minecraft:cauldron" {
+	if wx, wy, wz := b.x0+4, b.y0+2, b.z0+6; b.cbox.Contains([3]int32{wx, wy, wz}) && o.blockName(b.get(4, 2, 6)) != "minecraft:cauldron" {
 		level := 2*b.r.IntN(3) + 2
 		b.put(o.state("minecraft:cauldron", map[string]any{"fill_level": level}), 4, 2, 6)
 		if d := b.entity(4, 2, 6, ""); d != nil {
@@ -910,7 +911,7 @@ func (b *scBuild) igloo(y int32) {
 	// Each section sits where its connection point meets the top's
 	// (sub_D2B50C0: both points turned, then subtracted).
 	at := func(a, c [3]int32) [3]int32 {
-		ra, rc := rotatePos(a, rot), rotatePos(c, rot)
+		ra, rc := structure.RotatePos(a, rot), structure.RotatePos(c, rot)
 		return [3]int32{origin[0] + ra[0] - rc[0], origin[1] + ra[1] - rc[1], origin[2] + ra[2] - rc[2]}
 	}
 	for k := range max(n, 1) {
@@ -947,16 +948,16 @@ type templateMarker struct {
 // become air and are returned.
 func (b *scBuild) template(path string, origin [3]int32, rot int) []templateMarker {
 	o := b.o
-	jt := o.template(path)
+	jt := o.st.Template(path)
 	if jt == nil {
 		return nil
 	}
-	conv := o.templateStates(jt, rot)
+	conv := o.st.TemplateStates(jt, rot)
 	var markers []templateMarker
-	for _, tb := range jt.tpl.Blocks {
-		rp := rotatePos(tb.Pos, rot)
+	for _, tb := range jt.Template.Blocks {
+		rp := structure.RotatePos(tb.Pos, rot)
 		p := [3]int32{origin[0] + rp[0], origin[1] + rp[1], origin[2] + rp[2]}
-		st := jt.tpl.Palette[tb.State]
+		st := jt.Template.Palette[tb.State]
 		cs := conv[tb.State]
 		switch st.Name {
 		case "minecraft:structure_void", "minecraft:anvil":
@@ -965,17 +966,17 @@ func (b *scBuild) template(path string, origin [3]int32, rot int) []templateMark
 			if m, _ := tb.NBT["metadata"].(string); m != "" {
 				markers = append(markers, templateMarker{p, m})
 			}
-			cs = convertedState{o.ids.air, false, true}
+			cs = structure.ConvertedState{ID: o.ids.air, Water: false, OK: true}
 		}
-		if !cs.ok || !b.setWorld(p[0], p[1], p[2], cs.id) {
+		if !cs.OK || !b.setWorld(p[0], p[1], p[2], cs.ID) {
 			continue
 		}
-		if cs.water {
+		if cs.Water {
 			i := (p[1]-MinY)<<8 | (p[2]&15)<<4 | p[0]&15
 			b.c.Water[i>>6] |= 1 << (i & 63)
 		}
-		if d := o.blockEntityFor(cs.id, st.Name, p[0], p[1], p[2]); d != nil {
-			b.c.BlockEntities = append(b.c.BlockEntities, BlockEntity{X: p[0], Y: p[1], Z: p[2], Data: d})
+		if d := o.st.BlockEntityFor(cs.ID, st.Name, p[0], p[1], p[2]); d != nil {
+			b.c.BlockEntities = append(b.c.BlockEntities, structure.BlockEntity{X: p[0], Y: p[1], Z: p[2], Data: d})
 		}
 	}
 	return markers
@@ -1016,13 +1017,13 @@ func (o *Overworld) NearestScattered(x, z int32, kind string, maxRegions int32) 
 // returned is the trapdoor over the ladder down. It is safe for concurrent
 // use.
 func (o *Overworld) NearestIglooBasement(x, z int32, maxRegions int32) (Scattered, bool) {
-	jt := o.template("igloo/igloo_top_trapdoor")
+	jt := o.st.Template("igloo/igloo_top_trapdoor")
 	if jt == nil {
 		return Scattered{}, false
 	}
 	var door [3]int32
-	for _, b := range jt.tpl.Blocks {
-		if strings.HasSuffix(jt.tpl.Palette[b.State].Name, "trapdoor") {
+	for _, b := range jt.Template.Blocks {
+		if strings.HasSuffix(jt.Template.Palette[b.State].Name, "trapdoor") {
 			door = b.Pos
 		}
 	}
@@ -1040,7 +1041,7 @@ func (o *Overworld) NearestIglooBasement(x, z int32, maxRegions int32) (Scattere
 		var ch Chunk
 		o.GenerateChunk(c[0], c[1], &ch)
 		y := o.topSolid(Pack(&ch), c[0]*16, c[1]*16, false) - 1
-		d := rotatePos(door, rot)
+		d := structure.RotatePos(door, rot)
 		return Scattered{Kind: "igloo_basement", X: c[0]*16 + d[0], Y: y + d[1], Z: c[1]*16 + d[2]}, true
 	}
 	return Scattered{}, false

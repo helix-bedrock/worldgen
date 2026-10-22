@@ -60,11 +60,11 @@ func TestStrongholdBlocks(t *testing.T) {
 	tc := NewTerrainCache(o, 256)
 	counts := map[string]int{}
 	chests, spawners := 0, 0
-	for cx := s.bb.x0 >> 4; cx <= s.bb.x1>>4; cx++ {
-		for cz := s.bb.z0 >> 4; cz <= s.bb.z1>>4; cz++ {
+	for cx := s.bb.X0 >> 4; cx <= s.bb.X1>>4; cx++ {
+		for cz := s.bb.Z0 >> 4; cz <= s.bb.Z1>>4; cz++ {
 			var c Chunk
 			tc.Generate(cx, cz, &c)
-			for y := s.bb.y0; y <= s.bb.y1; y++ {
+			for y := s.bb.Y0; y <= s.bb.Y1; y++ {
 				for x := 0; x < 16; x++ {
 					for z := 0; z < 16; z++ {
 						id := c.Block(x, int(y), z)

@@ -1,4 +1,4 @@
-package overworld
+package structure
 
 import (
 	"strconv"
@@ -89,8 +89,8 @@ var bedColors = map[string]uint8{"white": 0, "orange": 1, "magenta": 2, "light_b
 
 // blockEntityFor returns the block entity data of a converted block placed
 // at (x, y, z), nil if it has none. javaName gives the bed colour.
-func (o *Overworld) blockEntityFor(id uint32, javaName string, x, y, z int32) map[string]any {
-	name := o.blockName(id)
+func (l *Lib) BlockEntityFor(id uint32, javaName string, x, y, z int32) map[string]any {
+	name := l.BlockName(id)
 	beID, ok := blockEntityIDs[name]
 	if !ok {
 		switch {
@@ -172,7 +172,7 @@ func withJavaProp(p map[string]string, k, v string) map[string]string {
 
 // convertJavaState returns the registry index of the Bedrock block for a
 // Java template state and whether it is waterlogged.
-func (o *Overworld) convertJavaState(st TemplateState) (uint32, bool, bool) {
+func (l *Lib) ConvertJavaState(st TemplateState) (uint32, bool, bool) {
 	name := strings.TrimPrefix(st.Name, "minecraft:")
 	// Older templates (the shipwrecks, the mansion) still use Java's
 	// pre-1.13 names, with the wood, colour or stone in a property.
@@ -246,11 +246,11 @@ func (o *Overworld) convertJavaState(st TemplateState) (uint32, bool, bool) {
 		}
 	}
 	full := "minecraft:" + target
-	def, ok := o.reg.Default(full)
+	def, ok := l.reg.Default(full)
 	if !ok {
 		return 0, false, false
 	}
-	ds, _ := o.reg.State(def)
+	ds, _ := l.reg.State(def)
 	props := make(map[string]any, len(ds.Props))
 	for k, v := range ds.Props {
 		props[k] = v
@@ -290,7 +290,7 @@ func (o *Overworld) convertJavaState(st TemplateState) (uint32, bool, bool) {
 			if strings.HasSuffix(target, "_door") && !strings.Contains(target, "trapdoor") {
 				// Doors: the legacy direction 0 was Java east and became
 				// "south" (block upgrade schema 1.21.60), a quarter turn.
-				set("minecraft:cardinal_direction", rotateFacing(v, 1))
+				set("minecraft:cardinal_direction", RotateFacing(v, 1))
 			} else {
 				set("minecraft:cardinal_direction", v)
 			}
@@ -300,7 +300,7 @@ func (o *Overworld) convertJavaState(st TemplateState) (uint32, bool, bool) {
 			}
 			// A wall torch's Java facing points away from its wall; Bedrock
 			// names the side it hangs on.
-			set("torch_facing_direction", opposite(v))
+			set("torch_facing_direction", Opposite(v))
 			switch {
 			case strings.HasSuffix(target, "_door"):
 				set("direction", dirESWN[v])
@@ -362,6 +362,9 @@ func (o *Overworld) convertJavaState(st TemplateState) (uint32, bool, bool) {
 			set("powered_bit", v == "true")
 		case "lit":
 			set("lit", v == "true")
+		case "hanging":
+			// Lanterns and chains hung from a ceiling.
+			set("hanging", v == "true")
 		case "attached":
 			set("attached_bit", v == "true")
 		case "age", "level", "layers", "rotation", "pickles", "bites", "moisture", "candles":
@@ -405,7 +408,7 @@ func (o *Overworld) convertJavaState(st TemplateState) (uint32, bool, bool) {
 		set("lever_direction", leverDirection(st.Props))
 		set("open_bit", st.Props["powered"] == "true")
 	}
-	id, ok := o.reg.Lookup(full, props)
+	id, ok := l.reg.Lookup(full, props)
 	if !ok {
 		id = def
 	}

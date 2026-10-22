@@ -4,6 +4,7 @@ import (
 	"math"
 
 	"github.com/helix-bedrock/worldgen/rand"
+	"github.com/helix-bedrock/worldgen/structure"
 )
 
 // Strongholds, written from BDS 1.26.52: the placement (the first three,
@@ -49,7 +50,7 @@ const (
 
 type shPiece struct {
 	kind   uint8
-	bb     box
+	bb     structure.Box
 	orient int32 // 0 south, 1 west, 2 north, 3 east
 	depth  int32
 	door   int32 // the entry door
@@ -68,13 +69,13 @@ func (p *shPiece) worldPos(x, y, z int32) (int32, int32, int32) {
 	b := p.bb
 	switch p.orient {
 	case 0:
-		return b.x0 + x, b.y0 + y, b.z0 + z
+		return b.X0 + x, b.Y0 + y, b.Z0 + z
 	case 1:
-		return b.x1 - z, b.y0 + y, b.z0 + x
+		return b.X1 - z, b.Y0 + y, b.Z0 + x
 	case 2:
-		return b.x0 + x, b.y0 + y, b.z1 - z
+		return b.X0 + x, b.Y0 + y, b.Z1 - z
 	case 3:
-		return b.x0 + z, b.y0 + y, b.z0 + x
+		return b.X0 + z, b.Y0 + y, b.Z0 + x
 	}
 	return x, y, z
 }
@@ -82,7 +83,7 @@ func (p *shPiece) worldPos(x, y, z int32) (int32, int32, int32) {
 // stronghold is an assembled stronghold and the box around its pieces.
 type stronghold struct {
 	pieces []*shPiece
-	bb     box
+	bb     structure.Box
 	portal *shPiece
 }
 
@@ -213,7 +214,7 @@ type shLayout struct {
 	weights []shWeight
 	prev    uint8
 	imposed uint8
-	start   box
+	start   structure.Box
 	portal  *shPiece
 }
 
@@ -230,7 +231,7 @@ func (o *Overworld) layStronghold(cx, cz int32) *stronghold {
 		{shFiveCrossing, 5, 4, 0, 0}, {shChestCorridor, 5, 4, 0, 0}, {shLibrary, 10, 2, 5, 0}, {shPortalRoom, 10, 1, 6, 0},
 	}}
 	start := &shPiece{kind: shStairsDown, source: true, orient: r.IntN(4),
-		bb: box{cx*16 + 2, 64, cz*16 + 2, cx*16 + 6, 74, cz*16 + 6}}
+		bb: structure.NewBox(cx*16+2, 64, cz*16+2, cx*16+6, 74, cz*16+6)}
 	l.start = start.bb
 	l.pieces = []*shPiece{start}
 	l.children(start, &r)
@@ -246,17 +247,18 @@ func (o *Overworld) layStronghold(cx, cz int32) *stronghold {
 	s := &stronghold{pieces: l.pieces, portal: l.portal}
 	s.bb = s.pieces[0].bb
 	for _, p := range s.pieces[1:] {
-		s.bb = box{min(s.bb.x0, p.bb.x0), min(s.bb.y0, p.bb.y0), min(s.bb.z0, p.bb.z0),
-			max(s.bb.x1, p.bb.x1), max(s.bb.y1, p.bb.y1), max(s.bb.z1, p.bb.z1)}
+		s.bb = structure.NewBox(min(s.bb.X0, p.bb.X0), min(s.bb.Y0, p.bb.Y0), min(s.bb.Z0, p.bb.Z0),
+			max(s.bb.X1, p.bb.X1), max(s.bb.Y1, p.bb.Y1), max(s.bb.Z1, p.bb.Z1))
+
 	}
-	top := s.bb.y1 - s.bb.y0 + MinY + 2
+	top := s.bb.Y1 - s.bb.Y0 + MinY + 2
 	if lim := int32(SeaLevel - 10); lim > top {
 		top += r.IntN(lim - top)
 	}
-	dy := top - s.bb.y1
-	s.bb = s.bb.raise(dy)
+	dy := top - s.bb.Y1
+	s.bb = s.bb.Raise(dy)
 	for _, p := range s.pieces {
-		p.bb = p.bb.raise(dy)
+		p.bb = p.bb.Raise(dy)
 	}
 	return s
 }
@@ -271,24 +273,24 @@ func (l *shLayout) portalFallback() {
 	l.pieces = l.pieces[:len(l.pieces)-1]
 	prev := l.pieces[len(l.pieces)-1]
 	b := prev.bb
-	var bb box
+	var bb structure.Box
 	switch last.orient {
 	case 0:
-		mid := (b.x0 + b.x1) / 2
-		bb = box{mid - 3, b.y0, b.z1, mid + 7, b.y0 + 7, b.z1 + 15}
+		mid := (b.X0 + b.X1) / 2
+		bb = structure.NewBox(mid-3, b.Y0, b.Z1, mid+7, b.Y0+7, b.Z1+15)
 	case 1:
-		mid := (b.z0 + b.z1) / 2
-		bb = box{b.x0 - 15, b.y0, mid - 5, b.x0, b.y0 + 7, mid + 5}
+		mid := (b.Z0 + b.Z1) / 2
+		bb = structure.NewBox(b.X0-15, b.Y0, mid-5, b.X0, b.Y0+7, mid+5)
 	case 2:
-		mid := (b.x0 + b.x1) / 2
-		bb = box{mid - 5, b.y0, b.z0 - 15, mid + 5, b.y0 + 7, b.z0}
+		mid := (b.X0 + b.X1) / 2
+		bb = structure.NewBox(mid-5, b.Y0, b.Z0-15, mid+5, b.Y0+7, b.Z0)
 	case 3:
-		mid := (b.z0 + b.z1) / 2
-		bb = box{b.x1, b.y0, mid - 3, b.x1 + 15, b.y0 + 7, mid + 7}
+		mid := (b.Z0 + b.Z1) / 2
+		bb = structure.NewBox(b.X1, b.Y0, mid-3, b.X1+15, b.Y0+7, mid+7)
 	default:
-		bb = box{-4, b.y0, 0, 6, b.y0 + 7, 15}
+		bb = structure.NewBox(-4, b.Y0, 0, 6, b.Y0+7, 15)
 	}
-	if b.y0 < 11 {
+	if b.Y0 < 11 {
 		return
 	}
 	l.portal = &shPiece{kind: shPortalRoom, bb: bb, orient: last.orient, depth: prev.depth}
@@ -297,22 +299,22 @@ func (l *shLayout) portalFallback() {
 
 // orientedBox is a piece box at (x, y, z) heading o, with the side and
 // height offsets and the size of the piece seen facing south.
-func orientedBox(x, y, z, ox, oy, w, h, d, o int32) box {
+func orientedBox(x, y, z, ox, oy, w, h, d, o int32) structure.Box {
 	y0, y1 := y+oy, y+oy+h-1
 	switch o {
 	case 1:
-		return box{x - d + 1, y0, z + ox, x, y1, z + ox + w - 1}
+		return structure.NewBox(x-d+1, y0, z+ox, x, y1, z+ox+w-1)
 	case 2:
-		return box{x + ox, y0, z - d + 1, x + ox + w - 1, y1, z}
+		return structure.NewBox(x+ox, y0, z-d+1, x+ox+w-1, y1, z)
 	case 3:
-		return box{x, y0, z + ox, x + d - 1, y1, z + ox + w - 1}
+		return structure.NewBox(x, y0, z+ox, x+d-1, y1, z+ox+w-1)
 	}
-	return box{x + ox, y0, z, x + ox + w - 1, y1, z + d - 1}
+	return structure.NewBox(x+ox, y0, z, x+ox+w-1, y1, z+d-1)
 }
 
-func (l *shLayout) collides(bb box) bool {
+func (l *shLayout) collides(bb structure.Box) bool {
 	for _, p := range l.pieces {
-		if p.bb.intersects(bb) {
+		if p.bb.Intersects(bb) {
 			return true
 		}
 	}
@@ -335,8 +337,8 @@ func shDoor(r *rand.MT) int32 {
 // factory makes a piece of kind k at (x, y, z) heading o if its box is
 // high enough and free.
 func (l *shLayout) factory(k uint8, r *rand.MT, x, y, z, o, depth int32) *shPiece {
-	fits := func(bb box) bool { return bb.y0 > 10 && !l.collides(bb) }
-	var bb box
+	fits := func(bb structure.Box) bool { return bb.Y0 > 10 && !l.collides(bb) }
+	var bb structure.Box
 	switch k {
 	case shStraight, shChestCorridor:
 		bb = orientedBox(x, y, z, -1, -1, 5, 5, 7, o)
@@ -381,7 +383,7 @@ func (l *shLayout) factory(k uint8, r *rand.MT, x, y, z, o, depth int32) *shPiec
 		p.open[3] = nextBool(r)
 		p.open[2] = r.IntN(3) > 0
 	case shLibrary:
-		p.tall = bb.y1-bb.y0+1 >= 7
+		p.tall = bb.Y1-bb.Y0+1 >= 7
 	}
 	return p
 }
@@ -389,7 +391,7 @@ func (l *shLayout) factory(k uint8, r *rand.MT, x, y, z, o, depth int32) *shPiec
 // next is the child picker: the imposed piece, else up to five weighted
 // tries, else a filler corridor up to the piece in the way.
 func (l *shLayout) next(r *rand.MT, x, y, z, o, depth int32) {
-	if depth > 50 || abs32i(x-l.start.x0) > 112 || abs32i(z-l.start.z0) > 112 {
+	if depth > 50 || abs32i(x-l.start.X0) > 112 || abs32i(z-l.start.Z0) > 112 {
 		return
 	}
 	cp := *r
@@ -454,32 +456,32 @@ func (l *shLayout) add(p *shPiece) {
 // filler is the corridor that runs up to the piece in the way, three, two
 // or one block long, when that piece's floor is level with it.
 func (l *shLayout) filler(x, y, z, o, depth int32) *shPiece {
-	var bb box
+	var bb structure.Box
 	switch o {
 	case 0:
-		bb = box{x - 1, y - 1, z, x + 3, y + 3, z + 3}
+		bb = structure.NewBox(x-1, y-1, z, x+3, y+3, z+3)
 	case 1:
-		bb = box{x - 3, y - 1, z - 1, x, y + 3, z + 3}
+		bb = structure.NewBox(x-3, y-1, z-1, x, y+3, z+3)
 	case 2:
-		bb = box{x - 1, y - 1, z - 3, x + 3, y + 3, z}
+		bb = structure.NewBox(x-1, y-1, z-3, x+3, y+3, z)
 	default:
-		bb = box{x, y - 1, z - 1, x + 3, y + 3, z + 3}
+		bb = structure.NewBox(x, y-1, z-1, x+3, y+3, z+3)
 	}
 	var hit *shPiece
 	for _, p := range l.pieces {
-		if p.bb.intersects(bb) {
+		if p.bb.Intersects(bb) {
 			hit = p
 			break
 		}
 	}
-	if hit == nil || hit.bb.y0 != y-1 {
+	if hit == nil || hit.bb.Y0 != y-1 {
 		return nil
 	}
 	h := hit.bb
 	// within is the flat test of the piece in the way against a column
 	// span; the spans can be empty, as in BDS.
 	within := func(x0, z0, x1, z1 int32) bool {
-		return h.z0 <= z1 && h.z1 >= z0 && h.x1 >= x0 && h.x0 <= x1
+		return h.Z0 <= z1 && h.Z1 >= z0 && h.X1 >= x0 && h.X0 <= x1
 	}
 	length := int32(3)
 	var x0, z0, x1, z1 int32
@@ -531,7 +533,7 @@ func (l *shLayout) filler(x, y, z, o, depth int32) *shPiece {
 	if x1 < x0 || y < 3 || z1 < z0 {
 		return nil
 	}
-	p := &shPiece{kind: shFiller, orient: o, depth: depth, bb: box{x0, y - 1, z0, x1, y + 3, z1}}
+	p := &shPiece{kind: shFiller, orient: o, depth: depth, bb: structure.NewBox(x0, y-1, z0, x1, y+3, z1)}
 	if o&1 == 0 {
 		p.steps = z1 - z0 + 1
 	} else {
@@ -545,13 +547,13 @@ func (l *shLayout) forward(p *shPiece, r *rand.MT, xOff int32) {
 	b := p.bb
 	switch p.orient {
 	case 0:
-		l.next(r, b.x0+xOff, b.y0+1, b.z1+1, 0, p.depth)
+		l.next(r, b.X0+xOff, b.Y0+1, b.Z1+1, 0, p.depth)
 	case 1:
-		l.next(r, b.x0-1, b.y0+1, b.z0+xOff, 1, p.depth)
+		l.next(r, b.X0-1, b.Y0+1, b.Z0+xOff, 1, p.depth)
 	case 2:
-		l.next(r, b.x0+xOff, b.y0+1, b.z0-1, 2, p.depth)
+		l.next(r, b.X0+xOff, b.Y0+1, b.Z0-1, 2, p.depth)
 	case 3:
-		l.next(r, b.x1+1, b.y0+1, b.z0+xOff, 3, p.depth)
+		l.next(r, b.X1+1, b.Y0+1, b.Z0+xOff, 3, p.depth)
 	}
 }
 
@@ -559,9 +561,9 @@ func (l *shLayout) left(p *shPiece, r *rand.MT, yOff, hOff int32) {
 	b := p.bb
 	switch p.orient {
 	case 0, 2:
-		l.next(r, b.x0-1, b.y0+yOff, b.z0+hOff, 1, p.depth)
+		l.next(r, b.X0-1, b.Y0+yOff, b.Z0+hOff, 1, p.depth)
 	case 1, 3:
-		l.next(r, b.x0+hOff, b.y0+yOff, b.z0-1, 2, p.depth)
+		l.next(r, b.X0+hOff, b.Y0+yOff, b.Z0-1, 2, p.depth)
 	}
 }
 
@@ -569,9 +571,9 @@ func (l *shLayout) right(p *shPiece, r *rand.MT, yOff, hOff int32) {
 	b := p.bb
 	switch p.orient {
 	case 0, 2:
-		l.next(r, b.x1+1, b.y0+yOff, b.z0+hOff, 3, p.depth)
+		l.next(r, b.X1+1, b.Y0+yOff, b.Z0+hOff, 3, p.depth)
 	case 1, 3:
-		l.next(r, b.x0+hOff, b.y0+yOff, b.z1+1, 0, p.depth)
+		l.next(r, b.X0+hOff, b.Y0+yOff, b.Z1+1, 0, p.depth)
 	}
 }
 
@@ -632,10 +634,10 @@ func (l *shLayout) children(p *shPiece, r *rand.MT) {
 // chunk (cx, cz) into c (connectBlocks joins their fences and iron bars).
 // raw gives the terrain of neighbouring chunks.
 func (o *Overworld) placeStrongholds(cx, cz int32, c *Chunk, raw func(cx, cz int32) *PackedChunk) {
-	cbox := box{cx * 16, MinY, cz * 16, cx*16 + 15, MaxY - 1, cz*16 + 15}
+	cbox := structure.NewBox(cx*16, MinY, cz*16, cx*16+15, MaxY-1, cz*16+15)
 	o.strongholdsNear(cx, cz, shReach, func(sx, sz int32) {
 		s := o.strongholdAt(sx, sz)
-		if s == nil || !s.bb.intersects(cbox) {
+		if s == nil || !s.bb.Intersects(cbox) {
 			return
 		}
 		o.buildStronghold(s, cx, cz, c)
@@ -645,12 +647,12 @@ func (o *Overworld) placeStrongholds(cx, cz int32, c *Chunk, raw func(cx, cz int
 // buildStronghold builds the pieces of s that reach chunk (cx, cz) into c,
 // with the chunk's random.
 func (o *Overworld) buildStronghold(s *stronghold, cx, cz int32, c *Chunk) {
-	cbox := box{cx * 16, MinY, cz * 16, cx*16 + 15, MaxY - 1, cz*16 + 15}
+	cbox := structure.NewBox(cx*16, MinY, cz*16, cx*16+15, MaxY-1, cz*16+15)
 	b := &shBuild{scBuild: scBuild{o: o, c: c, cbox: cbox}}
 	b.ids()
 	b.r.Seed(populationSeed(o.seed, cx, cz))
 	for _, p := range s.pieces {
-		if p.bb.intersects(cbox) {
+		if p.bb.Intersects(cbox) {
 			b.p = p
 			b.build()
 		}
@@ -660,12 +662,12 @@ func (o *Overworld) buildStronghold(s *stronghold, cx, cz int32, c *Chunk) {
 // strongholdReaches reports whether a stronghold has a piece in chunk
 // (cx, cz).
 func (o *Overworld) strongholdReaches(cx, cz int32) bool {
-	cbox := box{cx * 16, MinY, cz * 16, cx*16 + 15, MaxY - 1, cz*16 + 15}
+	cbox := structure.NewBox(cx*16, MinY, cz*16, cx*16+15, MaxY-1, cz*16+15)
 	hit := false
 	o.strongholdsNear(cx, cz, shReach, func(sx, sz int32) {
-		if s := o.strongholdAt(sx, sz); s != nil && !hit && s.bb.intersects(cbox) {
+		if s := o.strongholdAt(sx, sz); s != nil && !hit && s.bb.Intersects(cbox) {
 			for _, p := range s.pieces {
-				if p.bb.intersects(cbox) {
+				if p.bb.Intersects(cbox) {
 					hit = true
 					return
 				}
@@ -712,7 +714,7 @@ func (b *shBuild) put(s uint32, x, y, z int32) {
 // at is getBlock: air outside the chunk.
 func (b *shBuild) at(x, y, z int32) uint32 {
 	wx, wy, wz := b.p.worldPos(x, y, z)
-	if !b.cbox.contains([3]int32{wx, wy, wz}) {
+	if !b.cbox.Contains([3]int32{wx, wy, wz}) {
 		return b.air
 	}
 	return b.c.Block(int(wx&15), int(wy), int(wz&15))
@@ -865,18 +867,18 @@ func (b *shBuild) smallDoor(kind, x, y, z int32) {
 // with a loot table, unless a chest is already there.
 func (b *shBuild) chest(x, y, z, facing int32, table string) {
 	wx, wy, wz := b.p.worldPos(x, y, z)
-	if !b.cbox.contains([3]int32{wx, wy, wz}) || b.o.blockName(b.at(x, y, z)) == "minecraft:chest" {
+	if !b.cbox.Contains([3]int32{wx, wy, wz}) || b.o.blockName(b.at(x, y, z)) == "minecraft:chest" {
 		return
 	}
 	b.put(b.o.state("minecraft:chest", map[string]any{"minecraft:cardinal_direction": cardinalOf[facing]}), x, y, z)
-	d := b.o.blockEntityFor(b.c.Block(int(wx&15), int(wy), int(wz&15)), "", wx, wy, wz)
+	d := b.o.st.BlockEntityFor(b.c.Block(int(wx&15), int(wy), int(wz&15)), "", wx, wy, wz)
 	if d == nil {
 		return
 	}
 	table = "loot_tables/chests/" + table + ".json"
 	d["LootTable"] = table
 	d["LootTableSeed"] = int32(b.r.Uint32() >> 1)
-	b.c.BlockEntities = append(b.c.BlockEntities, BlockEntity{X: wx, Y: wy, Z: wz, Data: d, LootTable: table})
+	b.c.BlockEntities = append(b.c.BlockEntities, structure.BlockEntity{X: wx, Y: wy, Z: wz, Data: d, LootTable: table})
 }
 
 func (b *shBuild) build() {
@@ -1236,13 +1238,13 @@ func (b *shBuild) buildPortalRoom() {
 		}
 	}
 	wx, wy, wz := p.worldPos(5, 3, 6)
-	if b.cbox.contains([3]int32{wx, wy, wz}) {
+	if b.cbox.Contains([3]int32{wx, wy, wz}) {
 		sp := b.id("mob_spawner")
 		if b.setWorld(wx, wy, wz, sp) {
 			b.dropEntity([3]int32{wx, wy, wz})
-			if d := b.o.blockEntityFor(sp, "", wx, wy, wz); d != nil {
+			if d := b.o.st.BlockEntityFor(sp, "", wx, wy, wz); d != nil {
 				d["EntityIdentifier"] = "minecraft:silverfish"
-				b.c.BlockEntities = append(b.c.BlockEntities, BlockEntity{X: wx, Y: wy, Z: wz, Data: d})
+				b.c.BlockEntities = append(b.c.BlockEntities, structure.BlockEntity{X: wx, Y: wy, Z: wz, Data: d})
 			}
 		}
 	}

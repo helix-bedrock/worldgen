@@ -16,6 +16,7 @@ import (
 	"github.com/helix-bedrock/worldgen/noise"
 	"github.com/helix-bedrock/worldgen/overworld/terrain"
 	"github.com/helix-bedrock/worldgen/rand"
+	"github.com/helix-bedrock/worldgen/structure"
 )
 
 // Overworld dimensions.
@@ -30,6 +31,10 @@ const (
 // indices (16 bits, which halves the memory of cached chunks; NewOverworld
 // refuses larger registries), index (y-MinY)<<8 | z<<4 | x. Biomes holds one biome ID per
 // block, same index: BDS stores biomes per block (see fillBiomes).
+// BlockEntity is the Bedrock block entity data of one block a structure
+// placed.
+type BlockEntity = structure.BlockEntity
+
 type Chunk struct {
 	Blocks [16 * 16 * Height]uint16
 	Biomes [16 * 16 * Height]uint16
@@ -39,20 +44,7 @@ type Chunk struct {
 	Water [16 * 16 * Height / 64]uint64
 	// BlockEntities are the block entities of blocks structures placed
 	// (beds, bells, chests...): the client draws these blocks from them.
-	BlockEntities []BlockEntity
-}
-
-// BlockEntity is the Bedrock block entity data of one block, at a world
-// position. Data holds "id" and the block's fields, as the game saves them.
-type BlockEntity struct {
-	X, Y, Z int32
-	Data    map[string]any
-	// LootTable is the loot table of a container the structure fills, as a
-	// Bedrock path ("loot_tables/chests/village/village_plains_house.json"),
-	// empty otherwise. It is also in Data, with a LootTableSeed, so the game
-	// fills the chest when it is first opened; a server that wants other
-	// loot can put its own Items in Data instead.
-	LootTable string
+	BlockEntities []structure.BlockEntity
 }
 
 // Waterlogged reports whether the block at local (x, z) and world y also
@@ -170,12 +162,13 @@ type Overworld struct {
 	strongholds sync.Map
 	// jigsaw is the village pools and elements; templates caches prepared
 	// templates by path and villages assembled villages by start chunk.
-	jigsaw    *jigsawData
-	templates sync.Map
-	villages  sync.Map
+	jigsaw *structure.JigsawData
+	// st prepares the structure templates.
+	st       *structure.Lib
+	villages sync.Map
 	// city is the ancient city pools and elements; cities holds assembled
 	// cities by start chunk.
-	city   *jigsawData
+	city   *structure.JigsawData
 	cities sync.Map
 	// plainHeights caches surfaceNoStructures height maps by chunk.
 	plainHeights lru.LRU[*[256]int16]
@@ -412,10 +405,13 @@ func NewOverworld(seed int64, reg *blocks.Registry, biomeIDs map[string]uint32, 
 			o.villageType[id] = d.Village
 		}
 	}
-	if o.jigsaw, err = loadJigsawData("villages.json", reg); err != nil {
+	if o.st, err = structure.NewLib(seed, reg); err != nil {
 		return nil, err
 	}
-	if o.city, err = loadJigsawData("ancient_city.json", reg); err != nil {
+	if o.jigsaw, err = structure.LoadJigsawData("villages.json", reg); err != nil {
+		return nil, err
+	}
+	if o.city, err = structure.LoadJigsawData("ancient_city.json", reg); err != nil {
 		return nil, err
 	}
 	o.kernel = beardKernel()

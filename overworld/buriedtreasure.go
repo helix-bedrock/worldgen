@@ -5,6 +5,7 @@ import (
 	"slices"
 
 	"github.com/helix-bedrock/worldgen/rand"
+	"github.com/helix-bedrock/worldgen/structure"
 )
 
 // Buried treasure, written from BDS 1.26.52: BuriedTreasureFeature
@@ -80,18 +81,18 @@ func (o *Overworld) placeTreasure(cx, cz int32, c *Chunk, raw *PackedChunk) {
 	var r rand.MT
 	r.Seed(populationSeed(o.seed, cx, cz))
 	p := o.treasureSpot(cx, cz, c, raw, &r)
-	b := scBuild{o: o, c: c, cbox: box{cx * 16, MinY, cz * 16, cx*16 + 15, MaxY - 1, cz*16 + 15}}
+	b := scBuild{o: o, c: c, cbox: structure.NewBox(cx*16, MinY, cz*16, cx*16+15, MaxY-1, cz*16+15)}
 	b.ids()
 	chest, _ := o.reg.Default("minecraft:chest")
 	if !b.setWorld(p[0], p[1], p[2], chest) {
 		return
 	}
 	b.dropEntity(p)
-	if d := o.blockEntityFor(chest, "", p[0], p[1], p[2]); d != nil {
+	if d := o.st.BlockEntityFor(chest, "", p[0], p[1], p[2]); d != nil {
 		table := "loot_tables/chests/buriedtreasure.json"
 		d["LootTable"] = table
 		d["LootTableSeed"] = int32(r.Uint32() >> 1)
-		c.BlockEntities = append(c.BlockEntities, BlockEntity{X: p[0], Y: p[1], Z: p[2], Data: d, LootTable: table})
+		c.BlockEntities = append(c.BlockEntities, structure.BlockEntity{X: p[0], Y: p[1], Z: p[2], Data: d, LootTable: table})
 	}
 }
 

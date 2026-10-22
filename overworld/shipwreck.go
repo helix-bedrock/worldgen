@@ -6,6 +6,7 @@ import (
 	"strings"
 
 	"github.com/helix-bedrock/worldgen/rand"
+	"github.com/helix-bedrock/worldgen/structure"
 )
 
 // Shipwrecks, written from BDS 1.26.52: ShipwreckFeature (constructor
@@ -76,8 +77,8 @@ type shipwreck struct {
 	seeds []int32
 	// area is the ship's footprint (all heights); mid is the part of it
 	// whose floor sets the height, and deep the extra drop.
-	area box
-	mid  box
+	area structure.Box
+	mid  structure.Box
 	deep int32
 }
 
@@ -150,13 +151,13 @@ func (o *Overworld) layShip(sx, sz int32) *shipwreck {
 	}
 	s.path = "shipwreck/" + shipTemplates[idx]
 	s.woods = shipWoods[r.IntN(9)]
-	jt := o.template(s.path)
+	jt := o.st.Template(s.path)
 	if jt == nil {
 		return nil
 	}
 	// The middle half of the rotated footprint, measured from the corner
 	// the template turns about (C division, as BDS's).
-	w, d := jt.tpl.Size[0], jt.tpl.Size[2]
+	w, d := jt.Template.Size[0], jt.Template.Size[2]
 	if s.rot == 1 || s.rot == 3 {
 		w, d = d, w
 	}
@@ -170,15 +171,15 @@ func (o *Overworld) layShip(sx, sz int32) *shipwreck {
 		oz, za, zb = 15, -3*d/4, d/-4
 	}
 	s.x, s.z = x0+ox, z0+oz
-	s.mid = box{s.x + min(xa, xb), 0, s.z + min(za, zb), s.x + max(xa, xb), 0, s.z + max(za, zb)}
+	s.mid = structure.NewBox(s.x+min(xa, xb), 0, s.z+min(za, zb), s.x+max(xa, xb), 0, s.z+max(za, zb))
 	s.deep = 2
 	if idx >= 14 {
 		s.deep = 4
 	}
-	e := rotatePos([3]int32{jt.tpl.Size[0] - 1, 0, jt.tpl.Size[2] - 1}, s.rot)
-	s.area = box{min(s.x, s.x+e[0]), MinY, min(s.z, s.z+e[2]), max(s.x, s.x+e[0]), MaxY - 1, max(s.z, s.z+e[2])}
+	e := structure.RotatePos([3]int32{jt.Template.Size[0] - 1, 0, jt.Template.Size[2] - 1}, s.rot)
+	s.area = structure.NewBox(min(s.x, s.x+e[0]), MinY, min(s.z, s.z+e[2]), max(s.x, s.x+e[0]), MaxY-1, max(s.z, s.z+e[2]))
 	// The chest rolls and loot seeds follow the placement.
-	for _, tb := range jt.tpl.Blocks {
+	for _, tb := range jt.Template.Blocks {
 		m, _ := tb.NBT["metadata"].(string)
 		switch m {
 		case "treasureChest", "supplyChest":
@@ -200,8 +201,8 @@ func (o *Overworld) layShip(sx, sz int32) *shipwreck {
 // stays at sea level or above.
 func (o *Overworld) shipY(s *shipwreck, raw func(cx, cz int32) *PackedChunk) int32 {
 	var sum, n int32
-	for x := s.mid.x0; x <= s.mid.x1; x++ {
-		for z := s.mid.z0; z <= s.mid.z1; z++ {
+	for x := s.mid.X0; x <= s.mid.X1; x++ {
+		for z := s.mid.Z0; z <= s.mid.Z1; z++ {
 			sum += o.topSolid(raw(x>>4, z>>4), x, z, false)
 			n++
 		}
@@ -216,14 +217,14 @@ func (o *Overworld) shipY(s *shipwreck, raw func(cx, cz int32) *PackedChunk) int
 // shipsReach calls f for each shipwreck with a block in chunk (cx, cz).
 // Ships reach at most 2 chunks from their start.
 func (o *Overworld) shipsReach(cx, cz int32, f func(s *shipwreck)) {
-	chunk := box{cx * 16, MinY, cz * 16, cx*16 + 15, MaxY - 1, cz*16 + 15}
+	chunk := structure.NewBox(cx*16, MinY, cz*16, cx*16+15, MaxY-1, cz*16+15)
 	for rx := floorDivRegion(cx-2, shipSpacing); rx <= floorDivRegion(cx+2, shipSpacing); rx++ {
 		for rz := floorDivRegion(cz-2, shipSpacing); rz <= floorDivRegion(cz+2, shipSpacing); rz++ {
 			sx, sz := o.shipPick(rx, rz)
 			if sx < cx-2 || sx > cx+2 || sz < cz-2 || sz > cz+2 {
 				continue
 			}
-			if s := o.shipAt(sx, sz); s != nil && s.area.intersects(chunk) {
+			if s := o.shipAt(sx, sz); s != nil && s.area.Intersects(chunk) {
 				f(s)
 			}
 		}
@@ -241,7 +242,7 @@ func (o *Overworld) shipReaches(cx, cz int32) bool {
 // gives undecorated terrain.
 func (o *Overworld) placeShips(cx, cz int32, c *Chunk, raw func(cx, cz int32) *PackedChunk) {
 	o.shipsReach(cx, cz, func(s *shipwreck) {
-		b := &scBuild{o: o, c: c, cbox: box{cx * 16, MinY, cz * 16, cx*16 + 15, MaxY - 1, cz*16 + 15}}
+		b := &scBuild{o: o, c: c, cbox: structure.NewBox(cx*16, MinY, cz*16, cx*16+15, MaxY-1, cz*16+15)}
 		b.ids()
 		b.ship(s, o.shipY(s, raw))
 	})
@@ -252,16 +253,16 @@ func (o *Overworld) placeShips(cx, cz int32, c *Chunk, raw func(cx, cz int32) *P
 // ship is beached), then its chest markers.
 func (b *scBuild) ship(s *shipwreck, y int32) {
 	o := b.o
-	jt := o.template(s.path)
-	conv := o.templateStates(jt, s.rot)
+	jt := o.st.Template(s.path)
+	conv := o.st.TemplateStates(jt, s.rot)
 	type marker struct {
 		pos  [3]int32
 		name string
 	}
 	var markers []marker
-	for _, tb := range jt.tpl.Blocks {
-		st := jt.tpl.Palette[tb.State]
-		rp := rotatePos(tb.Pos, s.rot)
+	for _, tb := range jt.Template.Blocks {
+		st := jt.Template.Palette[tb.State]
+		rp := structure.RotatePos(tb.Pos, s.rot)
 		pos := [3]int32{s.x + rp[0], y + rp[1], s.z + rp[2]}
 		switch st.Name {
 		case "minecraft:structure_block":
@@ -273,10 +274,10 @@ func (b *scBuild) ship(s *shipwreck, y int32) {
 			continue
 		}
 		cs := conv[tb.State]
-		if !cs.ok || !b.cbox.contains(pos) {
+		if !cs.OK || !b.cbox.Contains(pos) {
 			continue
 		}
-		id := o.shipWood(cs.id, s.woods)
+		id := o.shipWood(cs.ID, s.woods)
 		name := o.blockName(id)
 		below := !s.beached && pos[1] < SeaLevel
 		if id == o.ids.air && below {
@@ -286,12 +287,12 @@ func (b *scBuild) ship(s *shipwreck, y int32) {
 			continue
 		}
 		b.dropEntity(pos)
-		if o.holdsLiquid[name] && (below || cs.water) {
+		if o.holdsLiquid[name] && (below || cs.Water) {
 			i := (pos[1]-MinY)<<8 | (pos[2]&15)<<4 | pos[0]&15
 			b.c.Water[i>>6] |= 1 << (i & 63)
 		}
-		if d := o.blockEntityFor(id, st.Name, pos[0], pos[1], pos[2]); d != nil {
-			b.c.BlockEntities = append(b.c.BlockEntities, BlockEntity{X: pos[0], Y: pos[1], Z: pos[2], Data: d})
+		if d := o.st.BlockEntityFor(id, st.Name, pos[0], pos[1], pos[2]); d != nil {
+			b.c.BlockEntities = append(b.c.BlockEntities, structure.BlockEntity{X: pos[0], Y: pos[1], Z: pos[2], Data: d})
 		}
 	}
 	seed := 0
@@ -315,11 +316,11 @@ func (b *scBuild) shipChest(pos [3]int32, name string, keep bool, seed int32) {
 	if pos[1] < SeaLevel {
 		fill = o.ids.water
 	}
-	if b.cbox.contains(pos) && b.setWorld(pos[0], pos[1], pos[2], fill) {
+	if b.cbox.Contains(pos) && b.setWorld(pos[0], pos[1], pos[2], fill) {
 		b.dropEntity(pos)
 	}
 	cp := [3]int32{pos[0], pos[1] - 1, pos[2]}
-	if !b.cbox.contains(cp) {
+	if !b.cbox.Contains(cp) {
 		return
 	}
 	if !keep {

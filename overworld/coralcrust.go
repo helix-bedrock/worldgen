@@ -5,6 +5,7 @@ import (
 	"sync"
 
 	"github.com/helix-bedrock/worldgen/rand"
+	"github.com/helix-bedrock/worldgen/structure"
 )
 
 // coralCrustFeature lays the dead coral crusts and outcroppings of warm
@@ -21,7 +22,7 @@ type coralCrustFeature struct {
 type crustTemplate struct {
 	path string
 	once [4]sync.Once
-	conv [4][]convertedState
+	conv [4][]structure.ConvertedState
 }
 
 // crustProbe and crustOrigin are BDS's per-crust, per-turn offsets
@@ -70,9 +71,9 @@ func newCoralCrust(cf *coralFeature) *coralCrustFeature {
 // colour drawn from a random seeded with the milliseconds since the server
 // started, once per template load (sub_D276010), so no two BDS runs agree;
 // here the colour comes from the world seed and the template's name.
-func (f *coralCrustFeature) palette(o *Overworld, t *crustTemplate, jt *jigsawTemplate, rot int) []convertedState {
+func (f *coralCrustFeature) palette(o *Overworld, t *crustTemplate, jt *structure.JigsawTemplate, rot int) []structure.ConvertedState {
 	t.once[rot].Do(func() {
-		conv := append([]convertedState(nil), o.templateStates(jt, rot)...)
+		conv := append([]structure.ConvertedState(nil), o.st.TemplateStates(jt, rot)...)
 		h := uint32(2166136261)
 		for i := 0; i < len(t.path); i++ {
 			h = (h ^ uint32(t.path[i])) * 16777619
@@ -80,9 +81,9 @@ func (f *coralCrustFeature) palette(o *Overworld, t *crustTemplate, jt *jigsawTe
 		var r rand.MT
 		r.Seed(uint32(o.seed) ^ uint32(o.seed>>32) ^ h)
 		dead := f.coral.blocks[5+(r.Uint32()>>1)%5]
-		for i, st := range jt.tpl.Palette {
+		for i, st := range jt.Template.Palette {
 			if st.Name == "minecraft:coral_block" {
-				conv[i] = convertedState{id: dead, ok: true}
+				conv[i] = structure.ConvertedState{ID: dead, OK: true}
 			}
 		}
 		t.conv[rot] = conv
@@ -157,24 +158,24 @@ func (f *coralCrustFeature) place(w *featureWorld, x, y, z int32, r *rand.MT) (b
 // (the data structure blocks).
 func (f *coralCrustFeature) placeTemplate(w *featureWorld, t *crustTemplate, at blockPos, rot int, r *rand.MT) {
 	o := w.o
-	jt := o.template(t.path)
+	jt := o.st.Template(t.path)
 	if jt == nil {
 		return
 	}
 	conv := f.palette(o, t, jt, rot)
 	var markers []blockPos
-	for _, tb := range jt.tpl.Blocks {
-		rp := rotatePos(tb.Pos, rot)
+	for _, tb := range jt.Template.Blocks {
+		rp := structure.RotatePos(tb.Pos, rot)
 		p := blockPos{at[0] + rp[0], at[1] + rp[1], at[2] + rp[2]}
-		switch jt.tpl.Palette[tb.State].Name {
+		switch jt.Template.Palette[tb.State].Name {
 		case "minecraft:structure_block":
 			markers = append(markers, p)
 			continue
 		case "minecraft:jigsaw", "minecraft:structure_void":
 			continue
 		}
-		if cs := conv[tb.State]; cs.ok {
-			w.set(p[0], p[1], p[2], cs.id)
+		if cs := conv[tb.State]; cs.OK {
+			w.set(p[0], p[1], p[2], cs.ID)
 		}
 	}
 	f.growMarkers(w, markers, r)

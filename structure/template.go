@@ -1,4 +1,4 @@
-package overworld
+package structure
 
 import (
 	"compress/gzip"
@@ -17,6 +17,9 @@ type Template struct {
 	Palette  []TemplateState
 	Blocks   []TemplateBlock
 	Entities []TemplateEntity
+	// Bedrock marks an .mcstructure template, whose jigsaws name their
+	// final states by Bedrock names.
+	Bedrock bool
 }
 
 // TemplateState is one Java block state: its name ("minecraft:oak_stairs")
@@ -55,7 +58,7 @@ func LoadTemplate(r io.Reader) (*Template, error) {
 		return nil, fmt.Errorf("template: read: %w", err)
 	}
 	t := &Template{}
-	size, ok := intList(root["size"], 3)
+	size, ok := IntList(root["size"], 3)
 	if !ok {
 		return nil, fmt.Errorf("template: bad size")
 	}
@@ -85,7 +88,7 @@ func LoadTemplate(r io.Reader) (*Template, error) {
 		if !ok {
 			return nil, fmt.Errorf("template: block %d is not a compound", i)
 		}
-		pos, ok := intList(m["pos"], 3)
+		pos, ok := IntList(m["pos"], 3)
 		if !ok {
 			return nil, fmt.Errorf("template: block %d has a bad pos", i)
 		}
@@ -110,7 +113,7 @@ func LoadTemplate(r io.Reader) (*Template, error) {
 				te.Pos[k], _ = p[k].(float64)
 			}
 		}
-		if bp, ok := intList(m["blockPos"], 3); ok {
+		if bp, ok := IntList(m["blockPos"], 3); ok {
 			copy(te.BlockPos[:], bp)
 		}
 		te.NBT, _ = m["nbt"].(map[string]any)
@@ -120,7 +123,7 @@ func LoadTemplate(r io.Reader) (*Template, error) {
 }
 
 // intList reads an NBT list of n ints.
-func intList(v any, n int) ([]int32, bool) {
+func IntList(v any, n int) ([]int32, bool) {
 	l, ok := v.([]any)
 	if !ok || len(l) != n {
 		return nil, false

@@ -117,7 +117,7 @@ world seed and the template instead, so the same seed always gives the same colo
 | --- | --- |
 | Villages (all biome types and farm kinds, with loot chests; ground raised and cut under the houses as BDS does) | Close (placement matches BDS; the assembly follows BDS and the first pieces of a compared village match, but it drifts at one decoration, where BDS places a lamp and worldgen hay) |
 | Mineshafts (normal and badlands; cobwebs, rails, torches, cave spider spawners; fences joined to their walls) | Close |
-| Ancient cities, with the cave around them and their sculk | Close |
+| Ancient cities, with the cave around them and their sculk | Close (the jigsaw rotation order and the block rules' random now follow BDS, as checked on bastions) |
 | Mineshaft minecarts with chests | Not yet |
 | Ocean ruins (warm and cold, large ones with clusters of small ones, chests) | Close (not yet compared with BDS; no suspicious sand or gravel yet) |
 | Shipwrecks (ocean and beached, random wood pairs, supply, map and treasure chests) | Close (not yet compared with BDS) |
@@ -151,5 +151,5 @@ game.
 | Nether cave carver | Matches BDS (lava that BDS let flow into the caves while ticking is not generation) |
 | Nether fortresses (all bridge and castle pieces, blaze spawners, chests, nether wart) | Matches BDS: every block of a fortress and the 110 chunks around it, fence connections included (fences join after decoration). Chests get their loot table; the test server has no fortress loot yet |
 | Nether ruined portals (blackstone aging, chains, netherrack and magma spread) | Matches BDS: two portals in fully generated BDS chunks match block for block except stair corner shapes, which BDS sets in a later pass (refinement). Where ores or a fortress reached the box before BDS built the portal, BDS's portal differs a little; here the portal always goes on the bare terrain first |
-| Bastions | Not yet |
+| Bastions (all four kinds: bridge, treasure, hoglin stables, housing units; cracked bricks, gilded blackstone, chests) | Matches BDS: the four BDS bastions compared match block for block (99.6 to 99.9% of their chunks; the rest is lava BDS let flow while ticking and Nether decoration). Blackstone wall connections differ in a few spots (refinement). Piglins and hoglins are not placed: worldgen places no mobs |
 | The End | Not yet |

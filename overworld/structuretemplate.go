@@ -6,6 +6,7 @@ import (
 	"sync"
 
 	"github.com/helix-bedrock/worldgen/rand"
+	"github.com/helix-bedrock/worldgen/structure"
 )
 
 // structureTemplateFeature places an .mcstructure template (BDS's
@@ -30,7 +31,7 @@ type structureTemplateFeature struct {
 	motionOnly bool
 
 	once sync.Once
-	t    *mcStructure
+	t    *structure.MCStructure
 	// The constraint cells, in template coordinates, built from the
 	// template once (the constraint constructors sub_D281340, sub_D281A60,
 	// sub_D280350).
@@ -70,32 +71,32 @@ func (o *Overworld) parseStructureTemplate(raw json.RawMessage) (placer, error) 
 // load reads the template and builds the constraint cells. A template that
 // fails to load leaves the feature placing nothing.
 func (f *structureTemplateFeature) load() {
-	t, err := f.o.loadMCStructure(f.path)
+	t, err := f.o.st.LoadMCStructure(f.path)
 	if err != nil {
 		return
 	}
 	f.t = t
 	o := f.o
 	g := f.groundLayer()
-	air := func(b uint32) bool { return b == voidCell || b == o.ids.air }
-	for x := int32(0); x < t.size[0]; x++ {
-		for z := int32(0); z < t.size[2]; z++ {
+	air := func(b uint32) bool { return b == structure.VoidCell || b == o.ids.air }
+	for x := int32(0); x < t.Size[0]; x++ {
+		for z := int32(0); z < t.Size[2]; z++ {
 			// Leveled: the ground under every filled cell of the ground
 			// layer. Unburied: open air over every filled top cell.
-			if !air(t.cell(x, g, z)) {
+			if !air(t.Cell(x, g, z)) {
 				f.level = append(f.level, [3]int32{x, -1, z})
 			}
-			if !air(t.cell(x, t.size[1]-1, z)) {
-				f.open = append(f.open, [3]int32{x, t.size[1], z})
+			if !air(t.Cell(x, t.Size[1]-1, z)) {
+				f.open = append(f.open, [3]int32{x, t.Size[1], z})
 			}
 		}
 	}
-	for x := int32(0); x < t.size[0]; x++ {
-		for y := int32(0); y < t.size[1]; y++ {
-			for z := int32(0); z < t.size[2]; z++ {
-				b := t.cell(x, y, z)
+	for x := int32(0); x < t.Size[0]; x++ {
+		for y := int32(0); y < t.Size[1]; y++ {
+			for z := int32(0); z < t.Size[2]; z++ {
+				b := t.Cell(x, y, z)
 				switch {
-				case b == voidCell:
+				case b == structure.VoidCell:
 				case o.solidMaterial(b):
 					f.solidCells = append(f.solidCells, [3]int32{x, y, z})
 				default:
@@ -111,7 +112,7 @@ func (f *structureTemplateFeature) groundLayer() int32 {
 	if f.ground < 0 {
 		return 0
 	}
-	return min(f.ground, max(f.t.size[1], 2)-1)
+	return min(f.ground, max(f.t.Size[1], 2)-1)
 }
 
 // rotate turns a template offset by rot quarter turns as BDS does (90:
@@ -136,7 +137,7 @@ func (f *structureTemplateFeature) place(w *featureWorld, x, y, z int32, r *rand
 	rot := int(r.IntN(4))
 	var px, pz int32
 	if f.center {
-		px, pz = -(f.t.size[0] / 2), -(f.t.size[2] / 2)
+		px, pz = -(f.t.Size[0] / 2), -(f.t.Size[2] / 2)
 	}
 	// The spiral of candidate offsets: runs of 1, 1, 2, 2, 3, 3... steps,
 	// turning a quarter after each run.
@@ -235,11 +236,11 @@ func (f *structureTemplateFeature) isLeveled(w *featureWorld, x, y, z int32, rot
 func (f *structureTemplateFeature) build(w *featureWorld, x, y, z int32, rot int, px, pz int32) {
 	t := f.t
 	g := f.groundLayer()
-	for tx := int32(0); tx < t.size[0]; tx++ {
-		for ty := int32(0); ty < t.size[1]; ty++ {
-			for tz := int32(0); tz < t.size[2]; tz++ {
-				b := t.cell(tx, ty, tz)
-				if b == voidCell {
+	for tx := int32(0); tx < t.Size[0]; tx++ {
+		for ty := int32(0); ty < t.Size[1]; ty++ {
+			for tz := int32(0); tz < t.Size[2]; tz++ {
+				b := t.Cell(tx, ty, tz)
+				if b == structure.VoidCell {
 					continue
 				}
 				wx, wy, wz := at([3]int32{tx, ty - g, tz}, x, y, z, rot, px, pz)

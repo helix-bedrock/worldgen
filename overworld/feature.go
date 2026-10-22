@@ -14,6 +14,7 @@ import (
 	"github.com/helix-bedrock/worldgen/biome"
 	"github.com/helix-bedrock/worldgen/feature"
 	"github.com/helix-bedrock/worldgen/rand"
+	"github.com/helix-bedrock/worldgen/structure"
 )
 
 // Feature rules (behavior pack feature_rules/*.json) decide where features
@@ -379,7 +380,7 @@ type featureWorld struct {
 	o         *Overworld
 	ox, oz    int32 // the origin chunk
 	slots     [16]writeList
-	entities  [16][]BlockEntity // block entities placed, by slot as slots
+	entities  [16][]structure.BlockEntity // block entities placed, by slot as slots
 	neighbour func(cx, cz int32) *PackedChunk
 	lastX     int32
 	lastZ     int32
@@ -511,7 +512,7 @@ func (w *featureWorld) set(x, y, z int32, b uint32) {
 
 // setEntity records the block entity of a block the current origin placed
 // at (x, y, z), for the chunk it is in.
-func (w *featureWorld) setEntity(be BlockEntity) {
+func (w *featureWorld) setEntity(be structure.BlockEntity) {
 	if sx, sz := be.X>>4-w.ox+1, be.Z>>4-w.oz+1; uint32(sx) < 4 && uint32(sz) < 4 {
 		w.entities[sx*4+sz] = append(w.entities[sx*4+sz], be)
 	}
@@ -534,7 +535,7 @@ type featureWrites struct {
 	uses     atomic.Int32
 	pos      []uint32
 	blk      []uint16
-	entities [16][]BlockEntity // by slot; nil for most origins
+	entities [16][]structure.BlockEntity // by slot; nil for most origins
 }
 
 // originFeatures runs the rules of origin chunk (ox, oz). It returns nil
@@ -833,7 +834,7 @@ func (o *Overworld) dropOverwrittenBlockEntities(c *Chunk) {
 	kept := c.BlockEntities[:0]
 	for _, be := range c.BlockEntities {
 		b := c.Block(int(be.X&15), int(be.Y), int(be.Z&15))
-		if o.blockEntityFor(b, "", be.X, be.Y, be.Z) != nil {
+		if o.st.BlockEntityFor(b, "", be.X, be.Y, be.Z) != nil {
 			kept = append(kept, be)
 		}
 	}

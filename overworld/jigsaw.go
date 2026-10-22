@@ -1,14 +1,10 @@
 package overworld
 
 import (
-	"encoding/json"
-	"fmt"
-	"github.com/helix-bedrock/worldgen"
-	"strconv"
 	"strings"
-	"sync"
 
 	"github.com/helix-bedrock/worldgen/rand"
+	"github.com/helix-bedrock/worldgen/structure"
 )
 
 // Jigsaw structures (villages for now), after BDS 1.26.52:
@@ -22,652 +18,40 @@ import (
 // sub_D2B4120 and Java's JigsawPlacement; both are to be compared block by
 // block with BDS villages.
 
-// jigsawData is the pools and elements of the jigsaw structures.
-type jigsawData struct {
-	pools    map[string]*jigsawPool
-	elements map[string]*jigsawElement
-}
-
-// blockRule is one rule of a template's block rules: a block (or one of a
-// set) turns into output with a chance, unless the world already holds a
-// block of notIn there, or, with at set, only where the world holds at.
-type blockRule struct {
-	block  string
-	set    map[string]bool
-	chance float32
-	notIn  map[string]bool
-	at     string
-	output uint32
-}
-
-type jigsawPool struct {
-	name, fallback string
-	entries        []jigsawEntry
-}
-
-type jigsawEntry struct {
-	el     *jigsawElement
-	weight int32
-}
-
-type jigsawElement struct {
-	id, template, feature string
-	terrainMatching       bool
-	// rules are the block rules applied as the element is placed.
-	rules []blockRule
-	// capped are capped processors run after the rules (data-driven
-	// structures).
-	capped []cappedRule
-}
-
-// jigsawTemplate is a template prepared for placement: its blocks converted
-// per rotation lazily, and its jigsaw connectors.
-type jigsawTemplate struct {
-	tpl     *Template
-	jigsaws []jigsawBlock
-	// once and conv cache the converted palette per turn, then per turn
-	// with each mirror (index rot+4*mirror).
-	once [12]sync.Once
-	conv [12][]convertedState
-
-	// at indexes the blocks by position, built once.
-	atOnce sync.Once
-	at     map[[3]int32]int
-
-	// chest is the spot WithHouseChests puts a chest in, computed once.
-	chestOnce sync.Once
-	chest     chestSpot
-}
-
-// chestSpot is where an extra chest goes in a house template, in template
-// space; ok is false when the house has a chest or no room for one.
-type chestSpot struct {
-	pos    [3]int32
-	facing string
-	ok     bool
-}
-
-// houseChestSpot finds a floor spot for a chest inside a house template:
-// air with air above, a solid floor below, walls somewhere in all four
-// directions and a roof, not next to a door. When the house has a bed the
-// spot must be beside the bed. The chest faces open air.
-func (jt *jigsawTemplate) houseChestSpot() chestSpot {
-	jt.chestOnce.Do(func() {
-		t := jt.tpl
-		names := map[[3]int32]string{}
-		var beds [][3]int32
-		for _, b := range t.Blocks {
-			n := t.Palette[b.State].Name
-			if strings.Contains(n, "chest") {
-				return
-			}
-			names[b.Pos] = n
-			if strings.HasSuffix(n, "_bed") {
-				beds = append(beds, b.Pos)
-			}
-		}
-		name := func(p [3]int32) string {
-			if n, ok := names[p]; ok {
-				return n
-			}
-			return "minecraft:air"
-		}
-		air := func(p [3]int32) bool {
-			n := name(p)
-			return n == "minecraft:air" || n == "minecraft:structure_void" || n == "minecraft:cave_air"
-		}
-		// solid is a full block a chest may stand on or against: no glass,
-		// doors, beds, plants, crops or structure markers.
-		solid := func(p [3]int32) bool {
-			n := name(p)
-			if air(p) || n == "minecraft:jigsaw" || n == "minecraft:structure_block" || n == "minecraft:farmland" {
-				return false
-			}
-			for _, s := range []string{"door", "pane", "glass", "torch", "bed", "carpet", "flower", "wheat", "carrots", "potatoes",
-				"beetroots", "short_grass", "tall_grass", "fern", "sapling", "fence", "wall", "stairs", "slab", "trapdoor", "lantern", "bell", "path"} {
-				if strings.Contains(n, s) {
-					return false
-				}
-			}
-			return true
-		}
-		inside := func(p [3]int32) bool {
-			for _, d := range [4][2]int32{{1, 0}, {-1, 0}, {0, 1}, {0, -1}} {
-				q, hit := p, false
-				for {
-					q = [3]int32{q[0] + d[0], q[1], q[2] + d[1]}
-					if q[0] < 0 || q[2] < 0 || q[0] >= t.Size[0] || q[2] >= t.Size[2] {
-						break
-					}
-					if solid(q) || strings.Contains(name(q), "glass") || strings.Contains(name(q), "door") {
-						hit = true
-						break
-					}
-					if !air(q) {
-						// Crops, fences and the like are not walls.
-						continue
-					}
-				}
-				if !hit {
-					return false
-				}
-			}
-			for y := p[1] + 1; y < t.Size[1]; y++ {
-				if !air([3]int32{p[0], y, p[2]}) {
-					return true
-				}
-			}
-			return false
-		}
-		doorNear := func(p [3]int32) bool {
-			for dx := int32(-1); dx <= 1; dx++ {
-				for dz := int32(-1); dz <= 1; dz++ {
-					if strings.Contains(name([3]int32{p[0] + dx, p[1], p[2] + dz}), "door") {
-						return true
-					}
-				}
-			}
-			return false
-		}
-		dirs := []struct {
-			d      [2]int32
-			facing string
-		}{{[2]int32{0, -1}, "north"}, {[2]int32{0, 1}, "south"}, {[2]int32{-1, 0}, "west"}, {[2]int32{1, 0}, "east"}}
-		ok := func(p [3]int32) bool {
-			return air(p) && air([3]int32{p[0], p[1] + 1, p[2]}) && solid([3]int32{p[0], p[1] - 1, p[2]}) &&
-				!doorNear(p) && inside(p)
-		}
-		// face picks the side with open air, preferring the one away from
-		// a wall or the bed.
-		face := func(p [3]int32) string {
-			for _, d := range dirs {
-				back := [3]int32{p[0] - d.d[0], p[1], p[2] - d.d[1]}
-				if air([3]int32{p[0] + d.d[0], p[1], p[2] + d.d[1]}) && !air(back) {
-					return d.facing
-				}
-			}
-			for _, d := range dirs {
-				if air([3]int32{p[0] + d.d[0], p[1], p[2] + d.d[1]}) {
-					return d.facing
-				}
-			}
-			return "north"
-		}
-		// Beside a bed first; then, or in a house without a bed, any floor
-		// spot inside, those against a wall before the others.
-		var besideBed, floor [][3]int32
-		for _, b := range beds {
-			for _, d := range dirs {
-				besideBed = append(besideBed, [3]int32{b[0] + d.d[0], b[1], b[2] + d.d[1]})
-			}
-		}
-		for y := int32(1); y < t.Size[1]-1; y++ {
-			for z := int32(1); z < t.Size[2]-1; z++ {
-				for x := int32(1); x < t.Size[0]-1; x++ {
-					floor = append(floor, [3]int32{x, y, z})
-				}
-			}
-		}
-		againstWall := func(p [3]int32) bool {
-			for _, d := range dirs {
-				if solid([3]int32{p[0] + d.d[0], p[1], p[2] + d.d[1]}) {
-					return true
-				}
-			}
-			return false
-		}
-		// Small houses may only have room diagonal to a door; a spot right
-		// beside a door is never used, so doorways stay clear.
-		beside := func(p [3]int32) bool {
-			for _, d := range dirs {
-				if strings.Contains(name([3]int32{p[0] + d.d[0], p[1], p[2] + d.d[1]}), "door") {
-					return true
-				}
-			}
-			return false
-		}
-		okNearDoor := func(p [3]int32) bool {
-			return air(p) && air([3]int32{p[0], p[1] + 1, p[2]}) && solid([3]int32{p[0], p[1] - 1, p[2]}) &&
-				!beside(p) && inside(p)
-		}
-		for _, pass := range []struct {
-			cands    []([3]int32)
-			wall     bool
-			nearDoor bool
-		}{{besideBed, false, false}, {floor, true, false}, {floor, false, false}, {floor, false, true}} {
-			for _, p := range pass.cands {
-				fits := ok(p)
-				if pass.nearDoor {
-					fits = okNearDoor(p)
-				}
-				if fits && (!pass.wall || againstWall(p)) {
-					jt.chest = chestSpot{pos: p, facing: face(p), ok: true}
-					return
-				}
-			}
-		}
-	})
-	return jt.chest
-}
-
-type convertedState struct {
-	id    uint32
-	water bool
-	ok    bool
-}
-
-type jigsawBlock struct {
-	pos        [3]int32
-	facing     string
-	top        string // the front_top orientation's top, for aligned joints
-	aligned    bool   // the joint must keep its top
-	selPrio    int32  // selection_priority: tried first when higher
-	placePrio  int32  // placement_priority: its child is expanded first when higher
-	attachment string
-	// name and target are the jigsaw's own name and the name it joins.
-	name, target string
-	pool         string
-	finalState   string
-}
-
-// loadJigsawData loads a jigsaw data file from data/bds (villages.json,
-// ancient_city.json). Rule outputs are looked up in reg.
-func loadJigsawData(file string, reg blockLookup) (*jigsawData, error) {
-	raw, err := worldgen.Data.ReadFile("data/bds/" + file)
-	if err != nil {
-		return nil, fmt.Errorf("worldgen: read %s: %w", file, err)
-	}
-	var doc struct {
-		Pools []struct {
-			Name, Fallback string
-			Elements       []struct {
-				Element string
-				Weight  int32
-			}
-		}
-		Elements []struct {
-			ID         string `json:"id"`
-			Template   string
-			Feature    string
-			Projection string
-			BlockRules string `json:"block_rules"`
-		}
-		BlockRules map[string][]struct {
-			Input struct {
-				Type, Block, Blocks string
-				Probability         float32
-			}
-			Location struct{ Type, Block, Blocks string }
-			Output   string
-		} `json:"block_rules"`
-		BlockSets map[string][]string `json:"block_sets"`
-	}
-	if err := json.Unmarshal(raw, &doc); err != nil {
-		return nil, fmt.Errorf("worldgen: parse %s: %w", file, err)
-	}
-	sets := map[string]map[string]bool{}
-	for name, blocks := range doc.BlockSets {
-		m := map[string]bool{}
-		for _, b := range blocks {
-			m[b] = true
-		}
-		sets[name] = m
-	}
-	rules := map[string][]blockRule{}
-	for name, rs := range doc.BlockRules {
-		for _, r := range rs {
-			out, ok := lookupState(reg, r.Output)
-			if !ok {
-				return nil, fmt.Errorf("worldgen: %s: rule %s outputs unknown block %s", file, name, r.Output)
-			}
-			br := blockRule{chance: r.Input.Probability, output: out}
-			switch r.Input.Type {
-			case "random_block_match":
-				br.block = r.Input.Block
-			case "random_blockset_match":
-				br.set = sets[r.Input.Blocks]
-			case "block_match":
-				br.block, br.chance = r.Input.Block, 1
-			default:
-				return nil, fmt.Errorf("worldgen: %s: rule %s has unknown input %s", file, name, r.Input.Type)
-			}
-			switch r.Location.Type {
-			case "not_blocks":
-				br.notIn = sets[r.Location.Blocks]
-			case "block_match":
-				br.at = r.Location.Block
-			}
-			rules[name] = append(rules[name], br)
-		}
-	}
-	d := &jigsawData{pools: map[string]*jigsawPool{}, elements: map[string]*jigsawElement{}}
-	for _, e := range doc.Elements {
-		d.elements[e.ID] = &jigsawElement{id: e.ID, template: e.Template, feature: e.Feature,
-			terrainMatching: e.Projection == "terrain_matching", rules: rules[e.BlockRules]}
-	}
-	for _, p := range doc.Pools {
-		jp := &jigsawPool{name: p.Name, fallback: p.Fallback}
-		for _, e := range p.Elements {
-			if el, ok := d.elements[e.Element]; ok {
-				jp.entries = append(jp.entries, jigsawEntry{el, e.Weight})
-			}
-		}
-		// The abandoned pools share names with nothing else; a name
-		// registered twice keeps its first definition.
-		if _, dup := d.pools[p.Name]; !dup {
-			d.pools[p.Name] = jp
-		}
-	}
-	return d, nil
-}
-
-// nbtInt reads an integer NBT value of any width, 0 if it is not one.
-func nbtInt(v any) int32 {
-	switch n := v.(type) {
-	case int32:
-		return n
-	case int16:
-		return int32(n)
-	case int8:
-		return int32(n)
-	case uint8:
-		return int32(n)
-	case int64:
-		return int32(n)
-	}
-	return 0
-}
-
-// blockLookup finds a block's default state.
-type blockLookup interface {
-	Default(name string) (uint32, bool)
-	Lookup(name string, props map[string]any) (uint32, bool)
-}
-
-// lookupState finds a block written as name or name[key=value,...]: true
-// and false are booleans, numbers numbers, anything else a string.
-func lookupState(reg blockLookup, s string) (uint32, bool) {
-	name, rest, ok := strings.Cut(s, "[")
-	if !ok {
-		return reg.Default(s)
-	}
-	props := map[string]any{}
-	for _, kv := range strings.Split(strings.TrimSuffix(rest, "]"), ",") {
-		k, v, _ := strings.Cut(kv, "=")
-		switch v {
-		case "true":
-			props[k] = true
-		case "false":
-			props[k] = false
-		default:
-			if n, err := strconv.ParseFloat(v, 64); err == nil {
-				props[k] = n
-			} else {
-				props[k] = v
-			}
-		}
-	}
-	return reg.Lookup(name, props)
-}
-
-// template returns the prepared template of an element, nil if it has none
-// or the file does not exist (BDS references two missing village files).
-func (o *Overworld) template(path string) *jigsawTemplate {
-	if path == "" {
-		return nil
-	}
-	if v, ok := o.templates.Load(path); ok {
-		jt, _ := v.(*jigsawTemplate)
-		return jt
-	}
-	var jt *jigsawTemplate
-	if f, err := worldgen.Data.Open("data/vanilla/structures/" + path + ".nbt"); err == nil {
-		tpl, err := LoadTemplate(f)
-		_ = f.Close()
-		if err == nil {
-			jt = &jigsawTemplate{tpl: tpl}
-			for _, b := range tpl.Blocks {
-				st := tpl.Palette[b.State]
-				if st.Name != "minecraft:jigsaw" {
-					continue
-				}
-				jb := jigsawBlock{pos: b.Pos, facing: st.Props["facing"]}
-				// Newer templates give the jigsaw's front and top as
-				// orientation (front_top).
-				if or := st.Props["orientation"]; jb.facing == "" && or != "" {
-					jb.facing, jb.top, _ = strings.Cut(or, "_")
-				}
-				// Joints are rollable unless named aligned; vertical ones
-				// default to aligned.
-				switch b.NBT["joint"] {
-				case "aligned":
-					jb.aligned = true
-				case "rollable":
-				default:
-					jb.aligned = jb.facing == "up" || jb.facing == "down"
-				}
-				jb.selPrio = nbtInt(b.NBT["selection_priority"])
-				jb.placePrio = nbtInt(b.NBT["placement_priority"])
-				jb.name, _ = b.NBT["name"].(string)
-				jb.target, _ = b.NBT["target"].(string)
-				jb.attachment, _ = b.NBT["attachement_type"].(string)
-				if n, ok := b.NBT["name"].(string); ok && jb.attachment == "" {
-					jb.attachment = n
-				}
-				jb.pool, _ = b.NBT["target_pool"].(string)
-				if p, ok := b.NBT["pool"].(string); ok && jb.pool == "" {
-					jb.pool = p
-				}
-				jb.finalState, _ = b.NBT["final_state"].(string)
-				jt.jigsaws = append(jt.jigsaws, jb)
-			}
-		}
-	}
-	v, _ := o.templates.LoadOrStore(path, jt)
-	jt, _ = v.(*jigsawTemplate)
-	return jt
-}
-
-// box is an inclusive block bounding box.
-type box struct{ x0, y0, z0, x1, y1, z1 int32 }
-
-func (b box) contains(p [3]int32) bool {
-	return p[0] >= b.x0 && p[0] <= b.x1 && p[1] >= b.y0 && p[1] <= b.y1 && p[2] >= b.z0 && p[2] <= b.z1
-}
-
-func (b box) intersects(c box) bool {
-	return b.x0 <= c.x1 && b.x1 >= c.x0 && b.y0 <= c.y1 && b.y1 >= c.y0 && b.z0 <= c.z1 && b.z1 >= c.z0
-}
-
-func (b box) inside(c box) bool {
-	return b.x0 >= c.x0 && b.x1 <= c.x1 && b.y0 >= c.y0 && b.y1 <= c.y1 && b.z0 >= c.z0 && b.z1 <= c.z1
-}
-
-// raise moves the box up by dy.
-func (b box) raise(dy int32) box {
-	return box{b.x0, b.y0 + dy, b.z0, b.x1, b.y1 + dy, b.z1}
-}
-
-// rotatePos rotates a template position by r quarter turns clockwise
-// around the template origin (Java's Rotation.CLOCKWISE_90: x,z -> -z,x).
-func rotatePos(p [3]int32, r int) [3]int32 {
-	x, z := p[0], p[2]
-	switch r & 3 {
-	case 1:
-		x, z = -z, x
-	case 2:
-		x, z = -x, -z
-	case 3:
-		x, z = z, -x
-	}
-	return [3]int32{x, p[1], z}
-}
-
-// Template mirrors, numbered as BDS's placement settings: mirrorZ flips z
-// (Java's LEFT_RIGHT), mirrorX flips x (Java's FRONT_BACK). A template is
-// mirrored about its origin before it is turned.
-const (
-	mirrorNone uint8 = iota
-	mirrorZ
-	mirrorX
-)
-
-// mirrorPos mirrors a template position about the origin.
-func mirrorPos(p [3]int32, m uint8) [3]int32 {
-	switch m {
-	case mirrorZ:
-		p[2] = -p[2]
-	case mirrorX:
-		p[0] = -p[0]
-	}
-	return p
-}
-
-var horizontal = []string{"north", "east", "south", "west"}
-
-func rotateFacing(f string, r int) string {
-	for i, h := range horizontal {
-		if h == f {
-			return horizontal[(i+r)&3]
-		}
-	}
-	return f
-}
-
-func opposite(f string) string {
-	switch f {
-	case "up":
-		return "down"
-	case "down":
-		return "up"
-	}
-	return rotateFacing(f, 2)
-}
-
-func jigsawDir(f string) [3]int32 {
-	switch f {
-	case "north":
-		return [3]int32{0, 0, -1}
-	case "south":
-		return [3]int32{0, 0, 1}
-	case "west":
-		return [3]int32{-1, 0, 0}
-	case "east":
-		return [3]int32{1, 0, 0}
-	case "up":
-		return [3]int32{0, 1, 0}
-	case "down":
-		return [3]int32{0, -1, 0}
-	}
-	return [3]int32{}
-}
-
-// tplBox is the box of a template placed at pos with rotation r.
-func tplBox(t *Template, pos [3]int32, r int) box {
-	// BDS's piece box (sub_D2379D0): the size turned, then the box laid out
-	// from pos by the turn. A size of 0 (a feature element) gives an empty
-	// box, one block past pos, that holds nothing.
-	sx, sy, sz := t.Size[0], t.Size[1], t.Size[2]
-	if r&1 == 1 {
-		sx, sz = sz, sx
-	}
-	bb := box{pos[0], pos[1], pos[2], pos[0] + sx - 1, pos[1] + sy - 1, pos[2] + sz - 1}
-	switch r & 3 {
-	case 1:
-		bb.x0, bb.x1 = pos[0]+1-sx, pos[0]
-	case 2:
-		bb.x0, bb.x1 = pos[0]+1-sx, pos[0]
-		bb.z0, bb.z1 = pos[2]+1-sz, pos[2]
-	case 3:
-		bb.z0, bb.z1 = pos[2]+1-sz, pos[2]
-	}
-	return bb
-}
-
-// jigsawPiece is one placed element.
-type jigsawPiece struct {
-	el       *jigsawElement
-	tpl      *jigsawTemplate
-	pos      [3]int32
-	rotation int
-	bb       box
-	depth    int
-	// ground is the piece's ground level above its bottom, for terrain
-	// adjustments.
-	ground int32
-
-	cappedOnce sync.Once
-	capped     map[int]cappedRule
-}
-
-// placedJigsaws returns a piece's jigsaw blocks in world space.
-func (p *jigsawPiece) placedJigsaws() []jigsawBlock {
-	out := make([]jigsawBlock, len(p.tpl.jigsaws))
-	for i, j := range p.tpl.jigsaws {
-		rp := rotatePos(j.pos, p.rotation)
-		j.pos = [3]int32{rp[0] + p.pos[0], rp[1] + p.pos[1], rp[2] + p.pos[2]}
-		j.facing = rotateFacing(j.facing, p.rotation)
-		j.top = rotateFacing(j.top, p.rotation)
-		out[i] = j
-	}
-	return out
-}
-
-func shuffle[T any](s []T, r *rand.MT) {
-	for i := 1; i < len(s); i++ {
-		j := int(r.Uint32() % uint32(i+1))
-		if j != i {
-			s[i], s[j] = s[j], s[i]
-		}
-	}
-}
-
-// weightedShuffle is a pool's elements, each repeated weight times, shuffled.
-func (p *jigsawPool) weightedShuffle(r *rand.MT) []*jigsawElement {
-	var out []*jigsawElement
-	for _, e := range p.entries {
-		for range e.weight {
-			out = append(out, e.el)
-		}
-	}
-	shuffle(out, r)
-	return out
-}
-
 // jigsawAssembly holds the state of one structure being assembled.
 type jigsawAssembly struct {
 	o        *Overworld
 	r        *rand.MT
 	height   func(x, z int32) int32
 	maxDepth int
-	pieces   []*jigsawPiece
+	pieces   []*structure.Piece
 }
 
 // assembleJigsaw builds a structure from a start pool at pos (y ignored:
 // the start piece sits on the ground at its centre), as BDS does
 // (sub_D2B36D0): depth first, each new piece's children built before its
 // parent's next jigsaw is tried.
-func (o *Overworld) assembleJigsaw(start *jigsawPool, pos [3]int32, rotation int, maxDepth int, r *rand.MT, height func(x, z int32) int32) []*jigsawPiece {
-	if start == nil || len(start.entries) == 0 {
+func (o *Overworld) assembleJigsaw(start *structure.Pool, pos [3]int32, rotation int, maxDepth int, r *rand.MT, height func(x, z int32) int32) []*structure.Piece {
+	if start == nil || len(start.Entries) == 0 {
 		return nil
 	}
 	// The start element is drawn from the weight-expanded pool
 	// (sub_D27F680).
-	all := start.expanded()
+	all := start.Expanded()
 	el := all[r.IntN(int32(len(all)))]
 	tpl := o.elementTemplate(el)
 	if tpl == nil {
 		return nil
 	}
-	p := &jigsawPiece{el: el, tpl: tpl, pos: pos, rotation: rotation}
-	p.bb = tplBox(tpl.tpl, pos, rotation)
-	cx, cz := (p.bb.x0+p.bb.x1)/2, (p.bb.z0+p.bb.z1)/2
+	p := &structure.Piece{Element: el, Template: tpl, Pos: pos, Rotation: rotation}
+	p.BB = structure.TemplateBox(tpl.Template, pos, rotation)
+	cx, cz := (p.BB.X0+p.BB.X1)/2, (p.BB.Z0+p.BB.Z1)/2
 	// Ground level delta 1: the bottom layer replaces the surface block.
-	dy := height(cx, cz) - 1 - p.bb.y0
-	p.pos[1] += dy
-	p.bb = p.bb.raise(dy)
-	p.ground = 1
-	a := &jigsawAssembly{o: o, r: r, height: height, maxDepth: maxDepth, pieces: []*jigsawPiece{p}}
+	dy := height(cx, cz) - 1 - p.BB.Y0
+	p.Pos[1] += dy
+	p.BB = p.BB.Raise(dy)
+	p.Ground = 1
+	a := &jigsawAssembly{o: o, r: r, height: height, maxDepth: maxDepth, pieces: []*structure.Piece{p}}
 	a.children(p)
 	return a.pieces
 }
@@ -675,25 +59,25 @@ func (o *Overworld) assembleJigsaw(start *jigsawPool, pos [3]int32, rotation int
 // children tries each jigsaw block of piece p (sub_D2B3CB0): the pool,
 // unless p is at the last depth, then its fallback if the pool placed
 // nothing. A placed piece's own children are built at once.
-func (a *jigsawAssembly) children(p *jigsawPiece) {
-	if p.depth > a.maxDepth {
+func (a *jigsawAssembly) children(p *structure.Piece) {
+	if p.Depth > a.maxDepth {
 		return
 	}
-	js := p.placedJigsaws()
-	shuffle(js, a.r)
+	js := p.PlacedJigsaws()
+	structure.Shuffle(js, a.r)
 	// inner are the pieces placed inside p's box, which only they and p
 	// itself limit.
-	var inner []box
+	var inner []structure.Box
 	for _, j := range js {
-		pool := a.o.jigsaw.pools[j.pool]
-		if pool == nil || len(pool.entries) == 0 {
+		pool := a.o.jigsaw.Pools[j.Pool]
+		if pool == nil || len(pool.Entries) == 0 {
 			continue
 		}
-		fallback := a.o.jigsaw.pools[pool.fallback]
-		if fallback != nil && len(fallback.entries) == 0 {
+		fallback := a.o.jigsaw.Pools[pool.Fallback]
+		if fallback != nil && len(fallback.Entries) == 0 {
 			fallback = nil
 		}
-		if p.depth != a.maxDepth && a.fit(p, j, pool, &inner) {
+		if p.Depth != a.maxDepth && a.fit(p, j, pool, &inner) {
 			continue
 		}
 		if fallback != nil {
@@ -704,21 +88,21 @@ func (a *jigsawAssembly) children(p *jigsawPiece) {
 
 // overlaps2D reports whether two boxes share a column (touching counts):
 // BDS tests village pieces in x and z only.
-func overlaps2D(b, c box) bool {
-	return b.x1 >= c.x0 && b.x0 <= c.x1 && b.z1 >= c.z0 && b.z0 <= c.z1
+func overlaps2D(b, c structure.Box) bool {
+	return b.X1 >= c.X0 && b.X0 <= c.X1 && b.Z1 >= c.Z0 && b.Z0 <= c.Z1
 }
 
 // fit tries the elements of pool at jigsaw j of p (sub_D2B4120) and
 // places the first that fits, with its children.
-func (a *jigsawAssembly) fit(p *jigsawPiece, j jigsawBlock, pool *jigsawPool, inner *[]box) bool {
-	dir := jigsawDir(j.facing)
-	target := [3]int32{j.pos[0] + dir[0], j.pos[1] + dir[1], j.pos[2] + dir[2]}
-	insideParent := p.bb.contains(target)
+func (a *jigsawAssembly) fit(p *structure.Piece, j structure.JigsawBlock, pool *structure.Pool, inner *[]structure.Box) bool {
+	dir := structure.JigsawDir(j.Facing)
+	target := [3]int32{j.Pos[0] + dir[0], j.Pos[1] + dir[1], j.Pos[2] + dir[2]}
+	insideParent := p.BB.Contains(target)
 	surface := int32(-1 << 30)
-	for _, el := range pool.weightedShuffle(a.r) {
+	for _, el := range pool.WeightedShuffle(a.r) {
 		// An empty element places nothing and ends the search, as a
 		// success: the fallback is not tried either.
-		if el.template == "" && el.feature == "" {
+		if el.Template == "" && el.Feature == "" {
 			return true
 		}
 		tpl := a.o.elementTemplate(el)
@@ -726,34 +110,34 @@ func (a *jigsawAssembly) fit(p *jigsawPiece, j jigsawBlock, pool *jigsawPool, in
 			continue
 		}
 		for _, rot := range a.rotations() {
-			cand := &jigsawPiece{el: el, tpl: tpl, rotation: rot}
-			cjs := cand.placedJigsaws()
-			shuffle(cjs, a.r)
+			cand := &structure.Piece{Element: el, Template: tpl, Rotation: rot}
+			cjs := cand.PlacedJigsaws()
+			structure.Shuffle(cjs, a.r)
 			for _, cj := range cjs {
-				if cj.facing != opposite(j.facing) || cj.attachment != j.attachment {
+				if cj.Facing != structure.Opposite(j.Facing) || cj.Attachment != j.Attachment {
 					continue
 				}
-				if (j.facing == "up" || j.facing == "down") && j.aligned && villageTop(j, p.rotation) != villageTop(cj, rot) {
+				if (j.Facing == "up" || j.Facing == "down") && j.Aligned && villageTop(j, p.Rotation) != villageTop(cj, rot) {
 					continue
 				}
-				off := [3]int32{target[0] - cj.pos[0], target[1] - cj.pos[1], target[2] - cj.pos[2]}
-				bb := tplBox(tpl.tpl, off, rot)
+				off := [3]int32{target[0] - cj.Pos[0], target[1] - cj.Pos[1], target[2] - cj.Pos[2]}
+				bb := structure.TemplateBox(tpl.Template, off, rot)
 				// The new box's bottom: from the parent's bottom when
 				// both pieces are rigid, else from the ground at the
 				// parent's jigsaw minus one, each plus the jigsaw's
 				// height in the parent and its vertical direction.
-				base := p.bb.y0
-				if p.el.terrainMatching || el.terrainMatching {
+				base := p.BB.Y0
+				if p.Element.TerrainMatching || el.TerrainMatching {
 					if surface == -1<<30 {
-						surface = a.height(j.pos[0], j.pos[2])
+						surface = a.height(j.Pos[0], j.Pos[2])
 					}
 					base = surface - 1
 				}
-				y := dir[1] + base + j.pos[1] - cj.pos[1] - p.bb.y0
-				dy := y - bb.y0
-				bb = bb.raise(dy)
+				y := dir[1] + base + j.Pos[1] - cj.Pos[1] - p.BB.Y0
+				dy := y - bb.Y0
+				bb = bb.Raise(dy)
 				if insideParent {
-					if bb.x0 < p.bb.x0 || bb.x1 > p.bb.x1 || bb.z0 < p.bb.z0 || bb.z1 > p.bb.z1 {
+					if bb.X0 < p.BB.X0 || bb.X1 > p.BB.X1 || bb.Z0 < p.BB.Z0 || bb.Z1 > p.BB.Z1 {
 						continue
 					}
 					clear := true
@@ -770,7 +154,7 @@ func (a *jigsawAssembly) fit(p *jigsawPiece, j jigsawBlock, pool *jigsawPool, in
 				} else {
 					clear := true
 					for _, q := range a.pieces {
-						if overlaps2D(bb, q.bb) {
+						if overlaps2D(bb, q.BB) {
 							clear = false
 							break
 						}
@@ -779,11 +163,11 @@ func (a *jigsawAssembly) fit(p *jigsawPiece, j jigsawBlock, pool *jigsawPool, in
 						continue
 					}
 				}
-				cand.pos = [3]int32{off[0], off[1] + dy, off[2]}
-				cand.bb = bb
-				cand.depth = p.depth + 1
+				cand.Pos = [3]int32{off[0], off[1] + dy, off[2]}
+				cand.BB = bb
+				cand.Depth = p.Depth + 1
 				// The joining jigsaw's height in the piece is its ground.
-				cand.ground = cj.pos[1]
+				cand.Ground = cj.Pos[1]
 				a.pieces = append(a.pieces, cand)
 				a.children(cand)
 				return true
@@ -795,11 +179,11 @@ func (a *jigsawAssembly) fit(p *jigsawPiece, j jigsawBlock, pool *jigsawPool, in
 
 // villageTop is the top of a vertical jigsaw turned by rot: an old
 // template's jigsaw has no top and keeps north before the turn.
-func villageTop(j jigsawBlock, rot int) string {
-	if j.top != "" {
-		return j.top
+func villageTop(j structure.JigsawBlock, rot int) string {
+	if j.Top != "" {
+		return j.Top
 	}
-	return rotateFacing("north", rot)
+	return structure.RotateFacing("north", rot)
 }
 
 // rotations are the four turns in BDS's order (sub_D2B3520): 1, 2, 3, 0
@@ -820,8 +204,8 @@ func (a *jigsawAssembly) rotations() [4]int {
 
 // village is an assembled village and the chunk range it covers.
 type village struct {
-	pieces []*jigsawPiece
-	bb     box
+	pieces []*structure.Piece
+	bb     structure.Box
 }
 
 // villageAt assembles the village starting in chunk (cx, cz), if any. Its
@@ -853,12 +237,13 @@ func (o *Overworld) villageAt(cx, cz int32) *village {
 		if abandoned {
 			name = "minecraft:village/abandoned/" + kind + "/town_centers"
 		}
-		pieces := o.assembleJigsaw(o.jigsaw.pools[name], [3]int32{cx * 16, y, cz * 16}, rotation, 6, &r, o.surfaceNoStructures)
+		pieces := o.assembleJigsaw(o.jigsaw.Pools[name], [3]int32{cx * 16, y, cz * 16}, rotation, 6, &r, o.surfaceNoStructures)
 		if len(pieces) > 0 {
-			vil = &village{pieces: pieces, bb: pieces[0].bb}
+			vil = &village{pieces: pieces, bb: pieces[0].BB}
 			for _, p := range pieces[1:] {
-				vil.bb = box{min(vil.bb.x0, p.bb.x0), min(vil.bb.y0, p.bb.y0), min(vil.bb.z0, p.bb.z0),
-					max(vil.bb.x1, p.bb.x1), max(vil.bb.y1, p.bb.y1), max(vil.bb.z1, p.bb.z1)}
+				vil.bb = structure.NewBox(min(vil.bb.X0, p.BB.X0), min(vil.bb.Y0, p.BB.Y0), min(vil.bb.Z0, p.BB.Z0),
+					max(vil.bb.X1, p.BB.X1), max(vil.bb.Y1, p.BB.Y1), max(vil.bb.Z1, p.BB.Z1))
+
 			}
 		}
 	}
@@ -876,7 +261,7 @@ func (o *Overworld) placeVillages(cx, cz int32, c *Chunk, height func(x, z int32
 	// Villages reach up to 80 blocks from their start chunk.
 	r0x, r1x := floorDivRegion(cx-6, villageSpacing), floorDivRegion(cx+6, villageSpacing)
 	r0z, r1z := floorDivRegion(cz-6, villageSpacing), floorDivRegion(cz+6, villageSpacing)
-	chunkBox := box{cx * 16, MinY, cz * 16, cx*16 + 15, MaxY - 1, cz*16 + 15}
+	chunkBox := structure.NewBox(cx*16, MinY, cz*16, cx*16+15, MaxY-1, cz*16+15)
 	for rx := r0x; rx <= r1x; rx++ {
 		for rz := r0z; rz <= r1z; rz++ {
 			sx, sz, ok := o.villagePick(rx, rz)
@@ -884,11 +269,11 @@ func (o *Overworld) placeVillages(cx, cz int32, c *Chunk, height func(x, z int32
 				continue
 			}
 			v := o.villageAt(sx, sz)
-			if v == nil || !v.bb.intersects(chunkBox) {
+			if v == nil || !v.bb.Intersects(chunkBox) {
 				continue
 			}
 			for _, p := range v.pieces {
-				if p.el.feature == "" && p.bb.intersects(chunkBox) {
+				if p.Element.Feature == "" && p.BB.Intersects(chunkBox) {
 					o.placePiece(p, c, chunkBox, height)
 					if o.opts.houseChests {
 						o.placeHouseChest(p, c, chunkBox)
@@ -911,104 +296,39 @@ func (o *Overworld) villagePick(rx, rz int32) (int32, int32, bool) {
 	return x, z, true
 }
 
-// placePiece writes a piece's blocks inside the chunk.
-func (o *Overworld) placePiece(p *jigsawPiece, c *Chunk, chunkBox box, height func(x, z int32) int32) {
-	t := p.tpl.tpl
-	rot := p.rotation
-	conv := o.templateStates(p.tpl, rot)
-	var picks map[int]cappedRule
-	if len(p.el.capped) > 0 {
-		picks = o.cappedPicks(p)
-	}
-	for bi, b := range t.Blocks {
-		rp := rotatePos(b.Pos, rot)
-		x, z := rp[0]+p.pos[0], rp[2]+p.pos[2]
-		y := rp[1] + p.pos[1]
-		if p.el.terrainMatching {
-			y = height(x, z) - 1 + b.Pos[1]
-		}
-		if !chunkBox.contains([3]int32{x, y, z}) || y < MinY || y >= MaxY {
-			continue
-		}
-		st := t.Palette[b.State]
-		cs := conv[b.State]
-		switch st.Name {
-		case "minecraft:jigsaw":
-			fs, _ := b.NBT["final_state"].(string)
-			cs = o.parseFinalState(fs, rot)
-		case "minecraft:structure_block", "minecraft:structure_void":
-			// Data markers are handled by the element, not placed.
-			if st.Name == "minecraft:structure_void" {
-				continue
-			}
-			cs = convertedState{o.ids.air, false, true}
-		}
-		if !cs.ok {
-			continue
-		}
-		lx, lz := int(x&15), int(z&15)
-		i := int(y-MinY)<<8 | lz<<4 | lx
-		if len(p.el.rules) > 0 {
-			cs = o.applyRules(p.el.rules, cs, x, y, z, uint32(c.Blocks[i]))
-		}
-		loot := ""
-		if cr, ok := picks[bi]; ok {
-			cs, loot = convertedState{cr.output, false, true}, cr.loot
-		}
-		if o.floorBedrock(uint32(c.Blocks[i]), y) {
-			continue
-		}
-		// A block that can hold water keeps the water it replaces, as in
-		// BDS's template placement (sub_D2B7A10).
-		wet := cs.water || o.isWater(uint32(c.Blocks[i])) && o.holdsWater(cs.id)
-		c.Blocks[i] = uint16(cs.id)
-		if d := o.blockEntityFor(cs.id, st.Name, x, y, z); d != nil {
-			be := BlockEntity{X: x, Y: y, Z: z, Data: d}
-			if loot != "" {
-				be.LootTable = loot
-				d["LootTable"] = loot
-				d["LootTableSeed"] = int32(positionSeed(o.seed, x, y, z))
-			} else if lt, ok := b.NBT["LootTable"].(string); ok && lt != "" {
-				be.LootTable = "loot_tables/" + strings.TrimPrefix(lt, "minecraft:") + ".json"
-				d["LootTable"] = be.LootTable
-				d["LootTableSeed"] = int32(positionSeed(o.seed, x, y, z))
-			}
-			c.BlockEntities = append(c.BlockEntities, be)
-		}
-		if wet {
-			c.Water[i>>6] |= 1 << (i & 63)
-		} else {
-			c.Water[i>>6] &^= 1 << (i & 63)
-		}
-	}
+// placePiece writes the blocks of a piece that fall in chunkBox into c.
+func (o *Overworld) placePiece(p *structure.Piece, c *Chunk, chunkBox structure.Box, height func(x, z int32) int32) {
+	o.st.PlacePiece(p, chunkWorld{o, c}, chunkBox, height)
 }
 
-// templateStates returns a template's palette turned rot quarter turns and
-// converted to Bedrock states, converting it once.
-func (o *Overworld) templateStates(jt *jigsawTemplate, rot int) []convertedState {
-	return o.templateStatesMirror(jt, rot, mirrorNone)
+// chunkWorld places into an overworld chunk.
+type chunkWorld struct {
+	o *Overworld
+	c *Chunk
 }
 
-// templateStatesMirror is templateStates with the palette first mirrored
-// (mirrorZ or mirrorX).
-func (o *Overworld) templateStatesMirror(jt *jigsawTemplate, rot int, mirror uint8) []convertedState {
-	k := rot&3 + 4*int(min(mirror, mirrorX))
-	jt.once[k].Do(func() {
-		conv := make([]convertedState, len(jt.tpl.Palette))
-		for i, st := range jt.tpl.Palette {
-			switch mirror {
-			case mirrorZ:
-				st.Props = mirrorPropsZ(st.Props)
-			case mirrorX:
-				st.Props = mirrorPropsX(st.Props)
-			}
-			st.Props = rotateProps(st.Props, rot)
-			id, w, ok := o.convertJavaState(st)
-			conv[i] = convertedState{id, w, ok}
-		}
-		jt.conv[k] = conv
-	})
-	return jt.conv[k]
+func (w chunkWorld) Bounds() (int32, int32) { return MinY, MaxY }
+
+func (w chunkWorld) Block(x, y, z int32) uint32 {
+	return uint32(w.c.Blocks[int(y-MinY)<<8|int(z&15)<<4|int(x&15)])
+}
+
+func (w chunkWorld) Set(x, y, z int32, id uint32, water bool) bool {
+	i := int(y-MinY)<<8 | int(z&15)<<4 | int(x&15)
+	if w.o.floorBedrock(uint32(w.c.Blocks[i]), y) {
+		return false
+	}
+	w.c.Blocks[i] = uint16(id)
+	if water {
+		w.c.Water[i>>6] |= 1 << (i & 63)
+	} else {
+		w.c.Water[i>>6] &^= 1 << (i & 63)
+	}
+	return true
+}
+
+func (w chunkWorld) Entity(be structure.BlockEntity) {
+	w.c.BlockEntities = append(w.c.BlockEntities, be)
 }
 
 // isDwelling reports whether a houses-pool template is a building one lives
@@ -1026,24 +346,24 @@ func isDwelling(template string) bool {
 
 // placeHouseChest puts the WithHouseChests chest of a house piece into the
 // chunk, if its spot is inside it.
-func (o *Overworld) placeHouseChest(p *jigsawPiece, c *Chunk, chunkBox box) {
-	i := strings.Index(p.el.template, "/houses/")
-	if i < 0 || !isDwelling(p.el.template) {
+func (o *Overworld) placeHouseChest(p *structure.Piece, c *Chunk, chunkBox structure.Box) {
+	i := strings.Index(p.Element.Template, "/houses/")
+	if i < 0 || !isDwelling(p.Element.Template) {
 		return
 	}
-	if pick := o.opts.houseChestsPick; pick != nil && !pick(p.el.template) {
+	if pick := o.opts.houseChestsPick; pick != nil && !pick(p.Element.Template) {
 		return
 	}
-	spot := p.tpl.houseChestSpot()
-	if !spot.ok {
+	spot := p.Template.HouseChestSpot()
+	if !spot.OK {
 		return
 	}
-	rp := rotatePos(spot.pos, p.rotation)
-	x, y, z := rp[0]+p.pos[0], rp[1]+p.pos[1], rp[2]+p.pos[2]
-	if !chunkBox.contains([3]int32{x, y, z}) {
+	rp := structure.RotatePos(spot.Pos, p.Rotation)
+	x, y, z := rp[0]+p.Pos[0], rp[1]+p.Pos[1], rp[2]+p.Pos[2]
+	if !chunkBox.Contains([3]int32{x, y, z}) {
 		return
 	}
-	cs, _, ok := o.convertJavaState(TemplateState{Name: "minecraft:chest", Props: map[string]string{"facing": rotateFacing(spot.facing, p.rotation)}})
+	cs, _, ok := o.st.ConvertJavaState(structure.TemplateState{Name: "minecraft:chest", Props: map[string]string{"facing": structure.RotateFacing(spot.Facing, p.Rotation)}})
 	if !ok {
 		return
 	}
@@ -1052,79 +372,12 @@ func (o *Overworld) placeHouseChest(p *jigsawPiece, c *Chunk, chunkBox box) {
 		return
 	}
 	c.Blocks[idx] = uint16(cs)
-	kind := strings.TrimPrefix(p.el.template[:i], "village/")
-	d := o.blockEntityFor(cs, "minecraft:chest", x, y, z)
-	be := BlockEntity{X: x, Y: y, Z: z, Data: d, LootTable: "loot_tables/chests/village/village_" + kind + "_house.json"}
+	kind := strings.TrimPrefix(p.Element.Template[:i], "village/")
+	d := o.st.BlockEntityFor(cs, "minecraft:chest", x, y, z)
+	be := structure.BlockEntity{X: x, Y: y, Z: z, Data: d, LootTable: "loot_tables/chests/village/village_" + kind + "_house.json"}
 	d["LootTable"] = be.LootTable
-	d["LootTableSeed"] = int32(positionSeed(o.seed, x, y, z))
+	d["LootTableSeed"] = int32(structure.PositionSeed(o.seed, x, y, z))
 	c.BlockEntities = append(c.BlockEntities, be)
-}
-
-// parseFinalState converts a jigsaw block's final_state ("minecraft:x[a=b]").
-func (o *Overworld) parseFinalState(s string, rot int) convertedState {
-	if s == "" {
-		return convertedState{o.ids.air, false, true}
-	}
-	st := TemplateState{Name: s}
-	if i := strings.IndexByte(s, '['); i >= 0 && strings.HasSuffix(s, "]") {
-		st.Name = s[:i]
-		st.Props = map[string]string{}
-		for _, kv := range strings.Split(s[i+1:len(s)-1], ",") {
-			if k, v, ok := strings.Cut(kv, "="); ok {
-				st.Props[k] = v
-			}
-		}
-	}
-	st.Props = rotateProps(st.Props, rot)
-	id, w, ok := o.convertJavaState(st)
-	return convertedState{id, w, ok}
-}
-
-// rotateProps rotates the direction properties of a Java state.
-func rotateProps(p map[string]string, rot int) map[string]string {
-	if rot == 0 || len(p) == 0 {
-		return p
-	}
-	out := make(map[string]string, len(p))
-	for k, v := range p {
-		out[k] = v
-	}
-	if f, ok := p["facing"]; ok {
-		out["facing"] = rotateFacing(f, rot)
-		// Older floor and ceiling levers name their axis.
-		switch f {
-		case "up_x", "up_z", "down_x", "down_z":
-			if rot&1 == 1 {
-				out["facing"] = map[string]string{"up_x": "up_z", "up_z": "up_x", "down_x": "down_z", "down_z": "down_x"}[f]
-			}
-		}
-	}
-	if a, ok := p["axis"]; ok && rot&1 == 1 {
-		switch a {
-		case "x":
-			out["axis"] = "z"
-		case "z":
-			out["axis"] = "x"
-		}
-	}
-	if r, ok := p["rotation"]; ok {
-		var n int
-		if _, err := fmt.Sscan(r, &n); err == nil {
-			out["rotation"] = fmt.Sprint((n + rot*4) & 15)
-		}
-	}
-	// Fence and pane connections.
-	if rot != 0 {
-		sides := [4]string{p["north"], p["east"], p["south"], p["west"]}
-		if sides != [4]string{} {
-			for i, h := range horizontal {
-				if v := sides[(i-rot+4)&3]; v != "" {
-					out[h] = v
-				}
-			}
-		}
-	}
-	return out
 }
 
 // surfaceHeight is the y above the highest non-air block of a column in the
@@ -1147,16 +400,6 @@ func (o *Overworld) surfaceHeight(terrain func(cx, cz int32) *PackedChunk, x, z 
 		}
 	}
 	return MinY
-}
-
-// positionSeed mixes the world seed and a block position into a seed for a
-// container's loot (the game rolls the table with it when it is opened).
-func positionSeed(seed int64, x, y, z int32) uint32 {
-	h := uint64(seed) ^ uint64(uint32(x))*0x9E3779B97F4A7C15 ^ uint64(uint32(y))*0xC2B2AE3D27D4EB4F ^ uint64(uint32(z))*0x165667B19E3779F9
-	h ^= h >> 31
-	h *= 0xBF58476D1CE4E5B9
-	h ^= h >> 29
-	return uint32(h)
 }
 
 // placeStructures writes the structures that reach chunk (cx, cz) into c,
@@ -1194,15 +437,15 @@ func (o *Overworld) villagesReach(cx, cz int32) bool {
 	if o.jigsaw == nil {
 		return false
 	}
-	chunkBox := box{cx * 16, MinY, cz * 16, cx*16 + 15, MaxY - 1, cz*16 + 15}
+	chunkBox := structure.NewBox(cx*16, MinY, cz*16, cx*16+15, MaxY-1, cz*16+15)
 	r0x, r1x := floorDivRegion(cx-6, villageSpacing), floorDivRegion(cx+6, villageSpacing)
 	r0z, r1z := floorDivRegion(cz-6, villageSpacing), floorDivRegion(cz+6, villageSpacing)
 	for rx := r0x; rx <= r1x; rx++ {
 		for rz := r0z; rz <= r1z; rz++ {
 			sx, sz, _ := o.villagePick(rx, rz)
-			if v := o.villageAt(sx, sz); v != nil && v.bb.intersects(chunkBox) {
+			if v := o.villageAt(sx, sz); v != nil && v.bb.Intersects(chunkBox) {
 				for _, p := range v.pieces {
-					if p.bb.intersects(chunkBox) {
+					if p.BB.Intersects(chunkBox) {
 						return true
 					}
 				}
@@ -1306,7 +549,7 @@ func (o *Overworld) villageFeatures(w *featureWorld, ox, oz int32, pop uint32) {
 	if o.jigsaw == nil {
 		return
 	}
-	chunkBox := box{ox * 16, MinY, oz * 16, ox*16 + 15, MaxY - 1, oz*16 + 15}
+	chunkBox := structure.NewBox(ox*16, MinY, oz*16, ox*16+15, MaxY-1, oz*16+15)
 	var r *rand.MT
 	r0x, r1x := floorDivRegion(ox-6, villageSpacing), floorDivRegion(ox+6, villageSpacing)
 	r0z, r1z := floorDivRegion(oz-6, villageSpacing), floorDivRegion(oz+6, villageSpacing)
@@ -1314,11 +557,11 @@ func (o *Overworld) villageFeatures(w *featureWorld, ox, oz int32, pop uint32) {
 		for rz := r0z; rz <= r1z; rz++ {
 			sx, sz, _ := o.villagePick(rx, rz)
 			v := o.villageAt(sx, sz)
-			if v == nil || !v.bb.intersects(chunkBox) {
+			if v == nil || !v.bb.Intersects(chunkBox) {
 				continue
 			}
 			for _, p := range v.pieces {
-				if p.el.feature == "" {
+				if p.Element.Feature == "" {
 					if n := chestsInChunk(p, ox, oz); n > 0 {
 						if r == nil {
 							r = rand.NewMT(pop)
@@ -1329,17 +572,17 @@ func (o *Overworld) villageFeatures(w *featureWorld, ox, oz int32, pop uint32) {
 					}
 					continue
 				}
-				if p.pos[0]>>4 != ox || p.pos[2]>>4 != oz {
+				if p.Pos[0]>>4 != ox || p.Pos[2]>>4 != oz {
 					continue
 				}
-				f, ok := o.features.get(p.el.feature)
+				f, ok := o.features.get(p.Element.Feature)
 				if !ok {
 					continue
 				}
 				if r == nil {
 					r = rand.NewMT(pop)
 				}
-				f.place(w, p.pos[0], p.pos[1], p.pos[2], r)
+				f.place(w, p.Pos[0], p.Pos[1], p.Pos[2], r)
 			}
 		}
 	}
@@ -1368,12 +611,12 @@ func (o *Overworld) VillagePieces(cx, cz int32) []PieceInfo {
 	}
 	out := make([]PieceInfo, 0, len(v.pieces))
 	for _, p := range v.pieces {
-		name := p.el.template
+		name := p.Element.Template
 		if name == "" {
-			name = "feature:" + p.el.feature
+			name = "feature:" + p.Element.Feature
 		}
-		out = append(out, PieceInfo{Template: name, Box: [6]int32{p.bb.x0, p.bb.y0, p.bb.z0, p.bb.x1, p.bb.y1, p.bb.z1},
-			Rotation: p.rotation, Depth: p.depth})
+		out = append(out, PieceInfo{Template: name, Box: [6]int32{p.BB.X0, p.BB.Y0, p.BB.Z0, p.BB.X1, p.BB.Y1, p.BB.Z1},
+			Rotation: p.Rotation, Depth: p.Depth})
 	}
 	return out
 }

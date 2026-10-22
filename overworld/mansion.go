@@ -7,6 +7,7 @@ import (
 	"strings"
 
 	"github.com/helix-bedrock/worldgen/rand"
+	"github.com/helix-bedrock/worldgen/structure"
 )
 
 // Woodland mansions, written from BDS 1.26.52: WoodlandMansionFeature
@@ -408,7 +409,7 @@ type mansionPiece struct {
 	pos    [3]int32
 	rot    int
 	mirror uint8
-	bb     box
+	bb     structure.Box
 }
 
 // mansion is a laid out woodland mansion.
@@ -416,7 +417,7 @@ type mansion struct {
 	origin [3]int32
 	rot    int
 	pieces []mansionPiece
-	bb     box
+	bb     structure.Box
 }
 
 // mansionPlacer is MansionPiecePlacer (sub_4FBFFB0).
@@ -431,11 +432,12 @@ type mansionPlacer struct {
 func (p *mansionPlacer) add(name string, pos [3]int32, rot int, mirror uint8) {
 	rot &= 3
 	mp := mansionPiece{name: name, pos: pos, rot: rot, mirror: mirror}
-	if jt := p.o.template("mansion/" + name); jt != nil {
-		s := jt.tpl.Size
-		e := rotatePos(mirrorPos([3]int32{s[0], 0, s[2]}, mirror), rot)
-		mp.bb = box{min(pos[0], pos[0]+e[0]), pos[1], min(pos[2], pos[2]+e[2]),
-			max(pos[0], pos[0]+e[0]), pos[1] + s[1] - 1, max(pos[2], pos[2]+e[2])}
+	if jt := p.o.st.Template("mansion/" + name); jt != nil {
+		s := jt.Template.Size
+		e := structure.RotatePos(structure.MirrorPos([3]int32{s[0], 0, s[2]}, mirror), rot)
+		mp.bb = structure.NewBox(min(pos[0], pos[0]+e[0]), pos[1], min(pos[2], pos[2]+e[2]),
+			max(pos[0], pos[0]+e[0]), pos[1]+s[1]-1, max(pos[2], pos[2]+e[2]))
+
 	}
 	p.pieces = append(p.pieces, mp)
 }
@@ -452,7 +454,7 @@ const mansionStartX, mansionStartY = mansionEntryX + 1, mansionEntryY + 1
 
 func (p *mansionPlacer) create(origin [3]int32, rot int, l *mansionLayout) {
 	d := placement{rot, origin, "wall_flat"}
-	p.add("entrance", rel(origin, rotDir(rot, dirWest), 9), rot, mirrorNone)
+	p.add("entrance", rel(origin, rotDir(rot, dirWest), 9), rot, structure.MirrorNone)
 	d.pos = rel(d.pos, rotDir(rot, dirSouth), 16)
 	d2 := placement{rot, [3]int32{d.pos[0], d.pos[1] + 8, d.pos[2]}, "wall_window"}
 	p.outerWalls(&d, &l.base, mansionStartX, mansionStartY, mansionStartX, mansionEntryY)
@@ -509,14 +511,14 @@ func (p *mansionPlacer) outerWalls(d *placement, g *mansionGrid, x, y, endX, end
 // turn is traverseTurn: a wall corner, then the walk turns clockwise.
 func (p *mansionPlacer) turn(d *placement) {
 	d.pos = rel(d.pos, rotDir(d.rot, dirSouth), -1)
-	p.add("wall_corner", d.pos, d.rot, mirrorNone)
+	p.add("wall_corner", d.pos, d.rot, structure.MirrorNone)
 	d.pos = rel(rel(d.pos, rotDir(d.rot, dirSouth), -7), rotDir(d.rot, dirWest), -6)
 	d.rot = (d.rot + 1) & 3
 }
 
 // wallPiece is traverseWallPiece (sub_4FC82D0).
 func (p *mansionPlacer) wallPiece(d *placement) {
-	p.add(d.wall, rel(d.pos, rotDir(d.rot, dirEast), 7), d.rot, mirrorNone)
+	p.add(d.wall, rel(d.pos, rotDir(d.rot, dirEast), 7), d.rot, structure.MirrorNone)
 	d.pos = rel(d.pos, rotDir(d.rot, dirSouth), 8)
 }
 
@@ -536,18 +538,18 @@ func (p *mansionPlacer) roof(origin [3]int32, rot int, g, upper *mansionGrid) {
 				continue
 			}
 			c := cellPos(origin, rot, x, y, 0)
-			p.add("roof", [3]int32{c[0], c[1] + 3, c[2]}, rot, mirrorNone)
+			p.add("roof", [3]int32{c[0], c[1] + 3, c[2]}, rot, structure.MirrorNone)
 			if !g.house(x+1, y) {
-				p.add("roof_front", rel(c, e, 6), rot, mirrorNone)
+				p.add("roof_front", rel(c, e, 6), rot, structure.MirrorNone)
 			}
 			if !g.house(x-1, y) {
-				p.add("roof_front", rel(c, s, 7), rot+2, mirrorNone)
+				p.add("roof_front", rel(c, s, 7), rot+2, structure.MirrorNone)
 			}
 			if !g.house(x, y-1) {
-				p.add("roof_front", rel(c, w, 1), rot+3, mirrorNone)
+				p.add("roof_front", rel(c, w, 1), rot+3, structure.MirrorNone)
 			}
 			if !g.house(x, y+1) {
-				p.add("roof_front", rel(rel(c, e, 6), s, 6), rot+1, mirrorNone)
+				p.add("roof_front", rel(rel(c, e, 6), s, 6), rot+1, structure.MirrorNone)
 			}
 		}
 	}
@@ -559,31 +561,31 @@ func (p *mansionPlacer) roof(origin [3]int32, rot int, g, upper *mansionGrid) {
 				}
 				c := cellPos(origin, rot, x, y, 0)
 				if !g.house(x+1, y) {
-					p.add("small_wall", rel(c, e, 7), rot, mirrorNone)
+					p.add("small_wall", rel(c, e, 7), rot, structure.MirrorNone)
 				}
 				if !g.house(x-1, y) {
-					p.add("small_wall", rel(rel(c, w, 1), s, 6), rot+2, mirrorNone)
+					p.add("small_wall", rel(rel(c, w, 1), s, 6), rot+2, structure.MirrorNone)
 				}
 				if !g.house(x, y-1) {
-					p.add("small_wall", rel(c, n, 1), rot+3, mirrorNone)
+					p.add("small_wall", rel(c, n, 1), rot+3, structure.MirrorNone)
 				}
 				if !g.house(x, y+1) {
-					p.add("small_wall", rel(rel(c, e, 6), s, 7), rot+1, mirrorNone)
+					p.add("small_wall", rel(rel(c, e, 6), s, 7), rot+1, structure.MirrorNone)
 				}
 				if !g.house(x+1, y) {
 					if !g.house(x, y-1) {
-						p.add("small_wall_corner", rel(rel(c, e, 7), n, 2), rot, mirrorNone)
+						p.add("small_wall_corner", rel(rel(c, e, 7), n, 2), rot, structure.MirrorNone)
 					}
 					if !g.house(x, y+1) {
-						p.add("small_wall_corner", rel(rel(c, e, 8), s, 7), rot+1, mirrorNone)
+						p.add("small_wall_corner", rel(rel(c, e, 8), s, 7), rot+1, structure.MirrorNone)
 					}
 				}
 				if !g.house(x-1, y) {
 					if !g.house(x, y-1) {
-						p.add("small_wall_corner", rel(rel(c, w, 2), n, 1), rot+3, mirrorNone)
+						p.add("small_wall_corner", rel(rel(c, w, 2), n, 1), rot+3, structure.MirrorNone)
 					}
 					if !g.house(x, y+1) {
-						p.add("small_wall_corner", rel(rel(c, w, 1), s, 8), rot+2, mirrorNone)
+						p.add("small_wall_corner", rel(rel(c, w, 1), s, 8), rot+2, structure.MirrorNone)
 					}
 				}
 			}
@@ -598,26 +600,26 @@ func (p *mansionPlacer) roof(origin [3]int32, rot int, g, upper *mansionGrid) {
 			if !g.house(x+1, y) {
 				q := rel(c, e, 6)
 				if !g.house(x, y+1) {
-					p.add("roof_corner", rel(q, s, 6), rot, mirrorNone)
+					p.add("roof_corner", rel(q, s, 6), rot, structure.MirrorNone)
 				} else if g.house(x+1, y+1) {
-					p.add("roof_inner_corner", rel(q, s, 5), rot, mirrorNone)
+					p.add("roof_inner_corner", rel(q, s, 5), rot, structure.MirrorNone)
 				}
 				if !g.house(x, y-1) {
-					p.add("roof_corner", q, rot+3, mirrorNone)
+					p.add("roof_corner", q, rot+3, structure.MirrorNone)
 				} else if g.house(x+1, y-1) {
-					p.add("roof_inner_corner", rel(rel(c, e, 9), n, 2), rot+1, mirrorNone)
+					p.add("roof_inner_corner", rel(rel(c, e, 9), n, 2), rot+1, structure.MirrorNone)
 				}
 			}
 			if !g.house(x-1, y) {
 				if !g.house(x, y+1) {
-					p.add("roof_corner", rel(c, s, 6), rot+1, mirrorNone)
+					p.add("roof_corner", rel(c, s, 6), rot+1, structure.MirrorNone)
 				} else if g.house(x-1, y+1) {
-					p.add("roof_inner_corner", rel(rel(c, s, 8), w, 3), rot+3, mirrorNone)
+					p.add("roof_inner_corner", rel(rel(c, s, 8), w, 3), rot+3, structure.MirrorNone)
 				}
 				if !g.house(x, y-1) {
-					p.add("roof_corner", c, rot+2, mirrorNone)
+					p.add("roof_corner", c, rot+2, structure.MirrorNone)
 				} else if g.house(x-1, y-1) {
-					p.add("roof_inner_corner", rel(c, s, 1), rot+2, mirrorNone)
+					p.add("roof_inner_corner", rel(c, s, 1), rot+2, structure.MirrorNone)
 				}
 			}
 		}
@@ -651,18 +653,18 @@ func (p *mansionPlacer) floor(f int, origin [3]int32, rot int, l *mansionLayout)
 				continue
 			}
 			c := cellPos(base, rot, x, y, 0)
-			p.add(corridor, c, rot, mirrorNone)
+			p.add(corridor, c, rot, structure.MirrorNone)
 			if open(x, y-1) {
-				p.add("carpet_north", up(rel(c, e, 1)), rot, mirrorNone)
+				p.add("carpet_north", up(rel(c, e, 1)), rot, structure.MirrorNone)
 			}
 			if open(x+1, y) {
-				p.add("carpet_east", up(rel(rel(c, s, 1), e, 5)), rot, mirrorNone)
+				p.add("carpet_east", up(rel(rel(c, s, 1), e, 5)), rot, structure.MirrorNone)
 			}
 			if open(x, y+1) {
-				p.add(carpetS, rel(rel(c, s, 5), w, 1), rot, mirrorNone)
+				p.add(carpetS, rel(rel(c, s, 5), w, 1), rot, structure.MirrorNone)
 			}
 			if open(x-1, y) {
-				p.add(carpetW, rel(rel(c, w, 1), n, 1), rot, mirrorNone)
+				p.add(carpetW, rel(rel(c, w, 1), n, 1), rot, structure.MirrorNone)
 			}
 		}
 	}
@@ -700,16 +702,16 @@ func (p *mansionPlacer) floor(f int, origin [3]int32, rot int, l *mansionLayout)
 			}
 			c := cellPos(base, rot, x, y, -1)
 			if g.house(x-1, y) && rooms.get(x-1, y)&0xFFFF != id {
-				p.add(pick(dirWest), c, rot, mirrorNone)
+				p.add(pick(dirWest), c, rot, structure.MirrorNone)
 			}
 			if g.get(x+1, y) == 1 && !entry {
-				p.add(pick(dirEast), rel(c, e, 8), rot, mirrorNone)
+				p.add(pick(dirEast), rel(c, e, 8), rot, structure.MirrorNone)
 			}
 			if g.house(x, y+1) && rooms.get(x, y+1)&0xFFFF != id {
-				p.add(pick(dirSouth), rel(rel(c, s, 7), e, 7), rot+1, mirrorNone)
+				p.add(pick(dirSouth), rel(rel(c, s, 7), e, 7), rot+1, structure.MirrorNone)
 			}
 			if g.get(x, y-1) == 1 && !entry {
-				p.add(pick(dirNorth), rel(rel(c, n, 1), e, 7), rot+1, mirrorNone)
+				p.add(pick(dirNorth), rel(rel(c, n, 1), e, 7), rot+1, structure.MirrorNone)
 			}
 			switch {
 			case typ == room1x1:
@@ -717,7 +719,7 @@ func (p *mansionPlacer) floor(f int, origin [3]int32, rot int, l *mansionLayout)
 			case typ == room1x2 && door != dirNone:
 				p.room1x2(c, rot, roomDirection(rooms, x, y, id), door, coll, room&roomStairs != 0)
 			case typ == room2x2 && door == dirUp:
-				p.add(coll.secret2x2(), rel(c, e, 1), rot, mirrorNone)
+				p.add(coll.secret2x2(), rel(c, e, 1), rot, structure.MirrorNone)
 			case typ == room2x2 && door != dirNone:
 				dir := dirCW(door)
 				if dx, dz := dirStep(dir); rooms.get(x+dx, y+dz)&0xFFFF != id {
@@ -745,8 +747,8 @@ func (p *mansionPlacer) room1x1(c [3]int32, rot int, door int32, coll mansionRoo
 	default:
 		name = coll.secret1x1(p.r)
 	}
-	o := rotatePos(off, rot)
-	p.add(name, [3]int32{c[0] + o[0], c[1], c[2] + o[2]}, rot+turn, mirrorNone)
+	o := structure.RotatePos(off, rot)
+	p.add(name, [3]int32{c[0] + o[0], c[1], c[2] + o[2]}, rot+turn, structure.MirrorNone)
 }
 
 // room1x2 is addRoom1x2: the table of door side and room direction
@@ -755,59 +757,59 @@ func (p *mansionPlacer) room1x2(c [3]int32, rot int, dir, door int32, coll mansi
 	n, e, s, w := rotDir(rot, dirNorth), rotDir(rot, dirEast), rotDir(rot, dirSouth), rotDir(rot, dirWest)
 	switch {
 	case door == dirEast && dir == dirSouth:
-		p.add(coll.side1x2(p.r, stairs), rel(c, e, 1), rot, mirrorNone)
+		p.add(coll.side1x2(p.r, stairs), rel(c, e, 1), rot, structure.MirrorNone)
 	case door == dirEast && dir == dirNorth:
-		p.add(coll.side1x2(p.r, stairs), rel(rel(c, e, 1), s, 6), rot, mirrorZ)
+		p.add(coll.side1x2(p.r, stairs), rel(rel(c, e, 1), s, 6), rot, structure.MirrorZ)
 	case door == dirWest && dir == dirNorth:
-		p.add(coll.side1x2(p.r, stairs), rel(rel(c, e, 7), s, 6), rot+2, mirrorNone)
+		p.add(coll.side1x2(p.r, stairs), rel(rel(c, e, 7), s, 6), rot+2, structure.MirrorNone)
 	case door == dirWest && dir == dirSouth:
-		p.add(coll.side1x2(p.r, stairs), rel(c, e, 7), rot, mirrorX)
+		p.add(coll.side1x2(p.r, stairs), rel(c, e, 7), rot, structure.MirrorX)
 	case door == dirSouth && dir == dirEast:
-		p.add(coll.side1x2(p.r, stairs), rel(c, e, 1), rot+1, mirrorZ)
+		p.add(coll.side1x2(p.r, stairs), rel(c, e, 1), rot+1, structure.MirrorZ)
 	case door == dirSouth && dir == dirWest:
-		p.add(coll.side1x2(p.r, stairs), rel(c, e, 7), rot+1, mirrorNone)
+		p.add(coll.side1x2(p.r, stairs), rel(c, e, 7), rot+1, structure.MirrorNone)
 	case door == dirNorth && dir == dirWest:
-		p.add(coll.side1x2(p.r, stairs), rel(rel(c, e, 7), s, 6), rot+1, mirrorX)
+		p.add(coll.side1x2(p.r, stairs), rel(rel(c, e, 7), s, 6), rot+1, structure.MirrorX)
 	case door == dirNorth && dir == dirEast:
-		p.add(coll.side1x2(p.r, stairs), rel(rel(c, e, 1), s, 6), rot+3, mirrorNone)
+		p.add(coll.side1x2(p.r, stairs), rel(rel(c, e, 1), s, 6), rot+3, structure.MirrorNone)
 	case door == dirSouth && dir == dirNorth:
-		p.add(coll.front1x2(p.r, stairs), rel(rel(c, e, 1), n, 8), rot, mirrorNone)
+		p.add(coll.front1x2(p.r, stairs), rel(rel(c, e, 1), n, 8), rot, structure.MirrorNone)
 	case door == dirNorth && dir == dirSouth:
-		p.add(coll.front1x2(p.r, stairs), rel(rel(c, e, 7), s, 14), rot+2, mirrorNone)
+		p.add(coll.front1x2(p.r, stairs), rel(rel(c, e, 7), s, 14), rot+2, structure.MirrorNone)
 	case door == dirWest && dir == dirEast:
-		p.add(coll.front1x2(p.r, stairs), rel(c, e, 15), rot+1, mirrorNone)
+		p.add(coll.front1x2(p.r, stairs), rel(c, e, 15), rot+1, structure.MirrorNone)
 	case door == dirEast && dir == dirWest:
-		p.add(coll.front1x2(p.r, stairs), rel(rel(c, w, 7), s, 6), rot+3, mirrorNone)
+		p.add(coll.front1x2(p.r, stairs), rel(rel(c, w, 7), s, 6), rot+3, structure.MirrorNone)
 	case door == dirUp && dir == dirEast:
-		p.add(coll.secret1x2(p.r), rel(c, e, 15), rot+1, mirrorNone)
+		p.add(coll.secret1x2(p.r), rel(c, e, 15), rot+1, structure.MirrorNone)
 	case door == dirUp && dir == dirSouth:
-		p.add(coll.secret1x2(p.r), rel(c, e, 1), rot, mirrorNone)
+		p.add(coll.secret1x2(p.r), rel(c, e, 1), rot, structure.MirrorNone)
 	}
 }
 
 // room2x2 is addRoom2x2.
 func (p *mansionPlacer) room2x2(c [3]int32, rot int, dir, door int32, coll mansionRooms) {
 	var x, z int32
-	turn, mirror := 0, mirrorNone
+	turn, mirror := 0, structure.MirrorNone
 	switch {
 	case door == dirEast && dir == dirSouth:
 		x = -7
 	case door == dirEast && dir == dirNorth:
-		x, z, mirror = -7, 6, mirrorZ
+		x, z, mirror = -7, 6, structure.MirrorZ
 	case door == dirNorth && dir == dirEast:
 		x, z, turn = 1, 14, 3
 	case door == dirNorth && dir == dirWest:
-		x, z, turn, mirror = 7, 14, 3, mirrorZ
+		x, z, turn, mirror = 7, 14, 3, structure.MirrorZ
 	case door == dirSouth && dir == dirWest:
 		x, z, turn = 7, -8, 1
 	case door == dirSouth && dir == dirEast:
-		x, z, turn, mirror = 1, -8, 1, mirrorZ
+		x, z, turn, mirror = 1, -8, 1, structure.MirrorZ
 	case door == dirWest && dir == dirNorth:
 		x, z, turn = 15, 6, 2
 	case door == dirWest && dir == dirSouth:
-		x, mirror = 15, mirrorX
+		x, mirror = 15, structure.MirrorX
 	}
-	o := rotatePos([3]int32{x, 0, z}, rot)
+	o := structure.RotatePos([3]int32{x, 0, z}, rot)
 	p.add(coll.room2x2(p.r), [3]int32{c[0] + o[0], c[1], c[2] + o[2]}, rot+turn, mirror)
 }
 
@@ -917,10 +919,11 @@ func (o *Overworld) layMansion(cx, cz int32, start *PackedChunk) *mansion {
 	p := &mansionPlacer{o: o, r: r}
 	p.create(m.origin, rot, newMansionLayout(r))
 	m.pieces = p.pieces
-	m.bb = box{x0: 1 << 30, y0: 1 << 30, z0: 1 << 30, x1: -1 << 30, y1: -1 << 30, z1: -1 << 30}
+	m.bb = structure.Box{X0: 1 << 30, Y0: 1 << 30, Z0: 1 << 30, X1: -1 << 30, Y1: -1 << 30, Z1: -1 << 30}
 	for _, pc := range m.pieces {
-		m.bb = box{min(m.bb.x0, pc.bb.x0), min(m.bb.y0, pc.bb.y0), min(m.bb.z0, pc.bb.z0),
-			max(m.bb.x1, pc.bb.x1), max(m.bb.y1, pc.bb.y1), max(m.bb.z1, pc.bb.z1)}
+		m.bb = structure.NewBox(min(m.bb.X0, pc.bb.X0), min(m.bb.Y0, pc.bb.Y0), min(m.bb.Z0, pc.bb.Z0),
+			max(m.bb.X1, pc.bb.X1), max(m.bb.Y1, pc.bb.Y1), max(m.bb.Z1, pc.bb.Z1))
+
 	}
 	return m
 }
@@ -931,14 +934,14 @@ const mansionReach = 8
 
 // mansionsReach calls f for each mansion with a piece in chunk (cx, cz).
 func (o *Overworld) mansionsReach(cx, cz int32, raw func(cx, cz int32) *PackedChunk, f func(m *mansion)) {
-	chunk := box{cx * 16, MinY, cz * 16, cx*16 + 15, MaxY - 1, cz*16 + 15}
+	chunk := structure.NewBox(cx*16, MinY, cz*16, cx*16+15, MaxY-1, cz*16+15)
 	for rx := floorDivRegion(cx-mansionReach, mansionSpacing); rx <= floorDivRegion(cx+mansionReach, mansionSpacing); rx++ {
 		for rz := floorDivRegion(cz-mansionReach, mansionSpacing); rz <= floorDivRegion(cz+mansionReach, mansionSpacing); rz++ {
 			sx, sz := o.mansionPick(rx, rz)
 			if sx < cx-mansionReach || sx > cx+mansionReach || sz < cz-mansionReach || sz > cz+mansionReach {
 				continue
 			}
-			if m := o.mansionAt(sx, sz, raw); m != nil && m.bb.intersects(chunk) {
+			if m := o.mansionAt(sx, sz, raw); m != nil && m.bb.Intersects(chunk) {
 				f(m)
 			}
 		}
@@ -957,12 +960,12 @@ func (o *Overworld) mansionReaches(cx, cz int32, raw func(cx, cz int32) *PackedC
 // (WoodlandMansionStart's post pass). raw gives undecorated terrain.
 func (o *Overworld) placeMansions(cx, cz int32, c *Chunk, raw func(cx, cz int32) *PackedChunk) {
 	o.mansionsReach(cx, cz, raw, func(m *mansion) {
-		b := &scBuild{o: o, c: c, cbox: box{cx * 16, MinY, cz * 16, cx*16 + 15, MaxY - 1, cz*16 + 15}}
+		b := &scBuild{o: o, c: c, cbox: structure.NewBox(cx*16, MinY, cz*16, cx*16+15, MaxY-1, cz*16+15)}
 		b.ids()
 		// The chunk's random rolls the allays and the chest seeds.
 		b.r.Seed(populationSeed(o.seed, cx, cz))
 		for _, p := range m.pieces {
-			if p.bb.intersects(b.cbox) {
+			if p.bb.Intersects(b.cbox) {
 				b.mansionPiece(p)
 			}
 		}
@@ -982,30 +985,24 @@ func (o *Overworld) isPane(id uint32) bool {
 func (o *Overworld) mansionBlockAt(m *mansion, pos [3]int32) uint32 {
 	for i := len(m.pieces) - 1; i >= 0; i-- {
 		p := m.pieces[i]
-		if !p.bb.contains(pos) {
+		if !p.bb.Contains(pos) {
 			continue
 		}
-		jt := o.template("mansion/" + p.name)
+		jt := o.st.Template("mansion/" + p.name)
 		if jt == nil {
 			continue
 		}
-		jt.atOnce.Do(func() {
-			jt.at = make(map[[3]int32]int, len(jt.tpl.Blocks))
-			for _, tb := range jt.tpl.Blocks {
-				jt.at[tb.Pos] = int(tb.State)
-			}
-		})
-		local := mirrorPos(rotatePos([3]int32{pos[0] - p.pos[0], pos[1] - p.pos[1], pos[2] - p.pos[2]}, 4-p.rot), p.mirror)
-		st, ok := jt.at[local]
+		local := structure.MirrorPos(structure.RotatePos([3]int32{pos[0] - p.pos[0], pos[1] - p.pos[1], pos[2] - p.pos[2]}, 4-p.rot), p.mirror)
+		st, ok := jt.StateAt(local)
 		if !ok {
 			continue
 		}
-		switch jt.tpl.Palette[st].Name {
+		switch jt.Template.Palette[st].Name {
 		case "minecraft:structure_block", "minecraft:structure_void", "minecraft:jigsaw":
 			continue
 		}
-		if cs := o.templateStatesMirror(jt, p.rot, p.mirror)[st]; cs.ok {
-			return cs.id
+		if cs := o.st.TemplateStatesMirror(jt, p.rot, p.mirror)[st]; cs.OK {
+			return cs.ID
 		}
 	}
 	return o.ids.air
@@ -1015,15 +1012,15 @@ func (o *Overworld) mansionBlockAt(m *mansion, pos [3]int32) uint32 {
 // markers (sub_4FC6500).
 func (b *scBuild) mansionPiece(p mansionPiece) {
 	o := b.o
-	jt := o.template("mansion/" + p.name)
+	jt := o.st.Template("mansion/" + p.name)
 	if jt == nil {
 		return
 	}
-	conv := o.templateStatesMirror(jt, p.rot, p.mirror)
+	conv := o.st.TemplateStatesMirror(jt, p.rot, p.mirror)
 	var markers []templateMarker
-	for _, tb := range jt.tpl.Blocks {
-		st := jt.tpl.Palette[tb.State]
-		rp := rotatePos(mirrorPos(tb.Pos, p.mirror), p.rot)
+	for _, tb := range jt.Template.Blocks {
+		st := jt.Template.Palette[tb.State]
+		rp := structure.RotatePos(structure.MirrorPos(tb.Pos, p.mirror), p.rot)
 		pos := [3]int32{p.pos[0] + rp[0], p.pos[1] + rp[1], p.pos[2] + rp[2]}
 		switch st.Name {
 		case "minecraft:structure_block":
@@ -1035,16 +1032,16 @@ func (b *scBuild) mansionPiece(p mansionPiece) {
 			continue
 		}
 		cs := conv[tb.State]
-		if !cs.ok || !b.setWorld(pos[0], pos[1], pos[2], cs.id) {
+		if !cs.OK || !b.setWorld(pos[0], pos[1], pos[2], cs.ID) {
 			continue
 		}
 		b.dropEntity(pos)
-		if cs.water && o.holdsLiquid[o.blockName(cs.id)] {
+		if cs.Water && o.holdsLiquid[o.blockName(cs.ID)] {
 			i := (pos[1]-MinY)<<8 | (pos[2]&15)<<4 | pos[0]&15
 			b.c.Water[i>>6] |= 1 << (i & 63)
 		}
-		if d := o.blockEntityFor(cs.id, st.Name, pos[0], pos[1], pos[2]); d != nil {
-			b.c.BlockEntities = append(b.c.BlockEntities, BlockEntity{X: pos[0], Y: pos[1], Z: pos[2], Data: d})
+		if d := o.st.BlockEntityFor(cs.ID, st.Name, pos[0], pos[1], pos[2]); d != nil {
+			b.c.BlockEntities = append(b.c.BlockEntities, structure.BlockEntity{X: pos[0], Y: pos[1], Z: pos[2], Data: d})
 		}
 	}
 	for _, m := range markers {
@@ -1056,22 +1053,22 @@ func (b *scBuild) mansionPiece(p mansionPiece) {
 		switch {
 		case m.name == "ChestEast":
 			side = 1
-			if p.mirror == mirrorX {
+			if p.mirror == structure.MirrorX {
 				side = 3
 			}
 		case m.name == "ChestSouth":
 			side = 2
-			if p.mirror == mirrorZ {
+			if p.mirror == structure.MirrorZ {
 				side = 0
 			}
 		case m.name == "ChestWest":
 			side = 3
-			if p.mirror == mirrorX {
+			if p.mirror == structure.MirrorX {
 				side = 1
 			}
 		case strings.HasPrefix(m.name, "Chest"):
 			side = 0
-			if p.mirror == mirrorZ {
+			if p.mirror == structure.MirrorZ {
 				side = 2
 			}
 		case m.name == "Group of Allays":
@@ -1109,15 +1106,15 @@ func (b *scBuild) fillDownCobble(x, y, z int32) {
 // mansionFoundation fills cobblestone under the mansion's floor where a
 // piece's box stands over air or liquid.
 func (b *scBuild) mansionFoundation(m *mansion) {
-	y0 := m.bb.y0
-	for x := b.cbox.x0; x <= b.cbox.x1; x++ {
-		for z := b.cbox.z0; z <= b.cbox.z1; z++ {
+	y0 := m.bb.Y0
+	for x := b.cbox.X0; x <= b.cbox.X1; x++ {
+		for z := b.cbox.Z0; z <= b.cbox.Z1; z++ {
 			p := [3]int32{x, y0, z}
-			if b.get(x, y0, z) == b.air || !m.bb.contains(p) {
+			if b.get(x, y0, z) == b.air || !m.bb.Contains(p) {
 				continue
 			}
 			for _, pc := range m.pieces {
-				if pc.bb.contains(p) {
+				if pc.bb.Contains(p) {
 					b.fillDownCobble(x, y0, z)
 					break
 				}
@@ -1152,7 +1149,7 @@ func (b *scBuild) mansionSteps(m *mansion) {
 // spot is air, each with cobblestone under it.
 func (b *scBuild) stepRun(pos [3]int32, dir int32, st uint32) {
 	dx, dz := dirStep(dir)
-	for b.cbox.contains(pos) && b.get(pos[0], pos[1], pos[2]) == b.air {
+	for b.cbox.Contains(pos) && b.get(pos[0], pos[1], pos[2]) == b.air {
 		b.put(st, pos[0], pos[1], pos[2])
 		b.fillDownCobble(pos[0], pos[1], pos[2])
 		pos = [3]int32{pos[0] + dx, pos[1] - 1, pos[2] + dz}
@@ -1198,7 +1195,7 @@ func (o *Overworld) NearestMansion(x, z int32, maxRegions int32) (Scattered, boo
 		if m == nil {
 			continue
 		}
-		return Scattered{Kind: "mansion", X: m.origin[0], Y: m.bb.y1, Z: m.origin[2]}, true
+		return Scattered{Kind: "mansion", X: m.origin[0], Y: m.bb.Y1, Z: m.origin[2]}, true
 	}
 	return Scattered{}, false
 }

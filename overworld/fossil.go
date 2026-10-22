@@ -5,6 +5,7 @@ import (
 
 	"github.com/helix-bedrock/worldgen/biome"
 	"github.com/helix-bedrock/worldgen/rand"
+	"github.com/helix-bedrock/worldgen/structure"
 )
 
 // Desert wells and fossils, the two template-like features, written from
@@ -95,11 +96,11 @@ func (f *desertWellFeature) place(w *featureWorld, x, y, z int32, r *rand.MT) (b
 	b := cross[r.IntN(5)]
 	for _, p := range [2][3]int32{{x + a[0], y - 1, z + a[1]}, {x + b[0], y - 2, z + b[1]}} {
 		w.set(p[0], p[1], p[2], f.sus)
-		if d := w.o.blockEntityFor(f.sus, "", p[0], p[1], p[2]); d != nil {
+		if d := w.o.st.BlockEntityFor(f.sus, "", p[0], p[1], p[2]); d != nil {
 			table := "loot_tables/entities/desert_well_brushable_block.json"
 			d["LootTable"] = table
 			d["LootTableSeed"] = int32(r.Uint32() >> 1)
-			w.setEntity(BlockEntity{X: p[0], Y: p[1], Z: p[2], Data: d, LootTable: table})
+			w.setEntity(structure.BlockEntity{X: p[0], Y: p[1], Z: p[2], Data: d, LootTable: table})
 		}
 	}
 	return blockPos{x, y, z}, true
@@ -148,11 +149,11 @@ func (f *fossilFeature) place(w *featureWorld, x, y, z int32, r *rand.MT) (block
 		return blockPos{}, false
 	}
 	rot := int(r.IntN(4))
-	jt := o.template(fossilTemplates[r.IntN(8)])
+	jt := o.st.Template(fossilTemplates[r.IntN(8)])
 	if jt == nil {
 		return blockPos{}, false
 	}
-	size := jt.tpl.Size
+	size := jt.Template.Size
 	sx, sz := size[0], size[2]
 	if rot&1 == 1 {
 		sx, sz = sz, sx
@@ -166,7 +167,7 @@ func (f *fossilFeature) place(w *featureWorld, x, y, z int32, r *rand.MT) (block
 	}
 	y = max(y-r.IntN(10)-15, MinY+10)
 	x0, z0 := x+ox, z+oz
-	far := rotatePos([3]int32{size[0] - 1, size[1] - 1, size[2] - 1}, rot)
+	far := structure.RotatePos([3]int32{size[0] - 1, size[1] - 1, size[2] - 1}, rot)
 	x1, yTop, z1 := x0+far[0], y+far[1], z0+far[2]
 	empty := int32(0)
 	for _, c := range [8][3]int32{{x0, yTop, z0}, {x0, yTop, z1}, {x1, yTop, z0}, {x1, yTop, z1},
@@ -182,8 +183,8 @@ func (f *fossilFeature) place(w *featureWorld, x, y, z int32, r *rand.MT) (block
 	// VERIFY: the fixed heights look like old-world leftovers; read
 	// literally, no fossil block is placed below y 0.
 	cx, cz := x>>4, z>>4
-	clip := box{cx * 16, 0, cz * 16, cx*16 + 15, 319, cz*16 + 15}
-	conv := o.templateStates(jt, rot)
+	clip := structure.NewBox(cx*16, 0, cz*16, cx*16+15, 319, cz*16+15)
+	conv := o.st.TemplateStates(jt, rot)
 	seed := w.featSeed
 	for pass := range 2 {
 		integrity := float32(0.9)
@@ -192,8 +193,8 @@ func (f *fossilFeature) place(w *featureWorld, x, y, z int32, r *rand.MT) (block
 		}
 		var ir rand.MT
 		ir.Seed(seed)
-		for _, tb := range jt.tpl.Blocks {
-			st := jt.tpl.Palette[tb.State]
+		for _, tb := range jt.Template.Blocks {
+			st := jt.Template.Palette[tb.State]
 			switch st.Name {
 			case "minecraft:air", "minecraft:structure_block", "minecraft:structure_void", "minecraft:jigsaw":
 				// Air is the settings' ignored block.
@@ -204,12 +205,12 @@ func (f *fossilFeature) place(w *featureWorld, x, y, z int32, r *rand.MT) (block
 				continue
 			}
 			cs := conv[tb.State]
-			rp := rotatePos(tb.Pos, rot)
+			rp := structure.RotatePos(tb.Pos, rot)
 			p := [3]int32{x0 + rp[0], y + rp[1], z0 + rp[2]}
-			if !cs.ok || !clip.contains(p) {
+			if !cs.OK || !clip.Contains(p) {
 				continue
 			}
-			id := cs.id
+			id := cs.ID
 			if pass == 1 && st.Name == "minecraft:bone_block" {
 				id = f.ore
 			}

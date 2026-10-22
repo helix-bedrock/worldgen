@@ -1,6 +1,10 @@
 package overworld
 
-import "math"
+import (
+	"math"
+
+	"github.com/helix-bedrock/worldgen/structure"
+)
 
 // Terrain adjustments around structure pieces, after BDS 1.26.52
 // (FeatureTerrainAdjustments). Ancient city pieces register a "beard and
@@ -58,11 +62,11 @@ const (
 	shaverAbove = 5.0
 )
 
-func newBeardShaver(bb box, groundDelta int32) beardShaver {
-	w, d := bb.x1-bb.x0+5, bb.z1-bb.z0+5
+func newBeardShaver(bb structure.Box, groundDelta int32) beardShaver {
+	w, d := bb.X1-bb.X0+5, bb.Z1-bb.Z0+5
 	return beardShaver{
-		x0: bb.x0 - 2, y0: bb.y0, z0: bb.z0 - 2, x1: bb.x1 + 2, y1: bb.y1, z1: bb.z1 + 2,
-		ground: bb.y0 + groundDelta, cx: w/2 + bb.x0 - 2, cz: d/2 + bb.z0 - 2,
+		x0: bb.X0 - 2, y0: bb.Y0, z0: bb.Z0 - 2, x1: bb.X1 + 2, y1: bb.Y1, z1: bb.Z1 + 2,
+		ground: bb.Y0 + groundDelta, cx: w/2 + bb.X0 - 2, cz: d/2 + bb.Z0 - 2,
 		radius: max(float32(d)*0.5, float32(w)*0.5),
 	}
 }
@@ -87,9 +91,9 @@ func (o *Overworld) cityAdjustments(chunkX, chunkZ int32) []beardShaver {
 			for _, p := range c.pieces {
 				// A piece is registered in the chunks its box reaches within
 				// 12 blocks (sub_D1EC770).
-				if (p.bb.x0-12)>>4 <= chunkX && chunkX <= (p.bb.x1+12)>>4 &&
-					(p.bb.z0-12)>>4 <= chunkZ && chunkZ <= (p.bb.z1+12)>>4 {
-					out = append(out, newBeardShaver(p.bb, p.ground))
+				if (p.BB.X0-12)>>4 <= chunkX && chunkX <= (p.BB.X1+12)>>4 &&
+					(p.BB.Z0-12)>>4 <= chunkZ && chunkZ <= (p.BB.Z1+12)>>4 {
+					out = append(out, newBeardShaver(p.BB, p.Ground))
 				}
 			}
 		}
@@ -104,8 +108,8 @@ type beardBox struct {
 	x0, z0, x1, z1, ground int32
 }
 
-func newBeardBox(bb box, groundDelta int32) beardBox {
-	return beardBox{x0: bb.x0 - 2, z0: bb.z0 - 2, x1: bb.x1 + 2, z1: bb.z1 + 2, ground: bb.y0 + groundDelta}
+func newBeardBox(bb structure.Box, groundDelta int32) beardBox {
+	return beardBox{x0: bb.X0 - 2, z0: bb.Z0 - 2, x1: bb.X1 + 2, z1: bb.Z1 + 2, ground: bb.Y0 + groundDelta}
 }
 
 // villageBeards lists the beards registered in chunk (chunkX, chunkZ): the
@@ -128,12 +132,12 @@ func (o *Overworld) villageBeards(chunkX, chunkZ int32) []beardBox {
 			for _, p := range v.pieces {
 				// Feature pieces get no beard (BDS registers only pieces
 				// whose element places a template, element vfunc +40).
-				if p.el.terrainMatching || p.el.feature != "" {
+				if p.Element.TerrainMatching || p.Element.Feature != "" {
 					continue
 				}
-				if (p.bb.x0-12)>>4 <= chunkX && chunkX <= (p.bb.x1+12)>>4 &&
-					(p.bb.z0-12)>>4 <= chunkZ && chunkZ <= (p.bb.z1+12)>>4 {
-					out = append(out, newBeardBox(p.bb, p.ground))
+				if (p.BB.X0-12)>>4 <= chunkX && chunkX <= (p.BB.X1+12)>>4 &&
+					(p.BB.Z0-12)>>4 <= chunkZ && chunkZ <= (p.BB.Z1+12)>>4 {
+					out = append(out, newBeardBox(p.BB, p.Ground))
 				}
 			}
 		}
