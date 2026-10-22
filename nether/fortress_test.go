@@ -7,7 +7,6 @@ import (
 
 	"github.com/helix-bedrock/worldgen/biome"
 	"github.com/helix-bedrock/worldgen/blocks"
-	"github.com/helix-bedrock/worldgen/overworld"
 	"github.com/helix-bedrock/worldgen/rand"
 )
 
@@ -38,11 +37,7 @@ func testNether(t testing.TB, seed int64) *Nether {
 	if err != nil {
 		t.Fatal(err)
 	}
-	ow, err := overworld.NewOverworld(seed, reg, ids)
-	if err != nil {
-		t.Fatal(err)
-	}
-	n, err := New(seed, reg, ids, ow)
+	n, err := New(seed, reg, ids)
 	if err != nil {
 		t.Fatal(err)
 	}

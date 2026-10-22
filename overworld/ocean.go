@@ -146,3 +146,10 @@ func (f *seaAnemoneFeature) place(w *featureWorld, x, y, z int32, r *rand.MT) (b
 	}
 	return blockPos{x, y, z}, true
 }
+
+func iabs(v int32) int32 {
+	if v < 0 {
+		return -v
+	}
+	return v
+}

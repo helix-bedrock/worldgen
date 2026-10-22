@@ -4,7 +4,7 @@
 > **This is early and not finished.** It is under active, heavy development, and it will take a
 > while before it is complete.
 >
-> Status as of 2026-10-21:
+> Status as of 2026-10-22:
 >
 > - **The base Overworld matches BDS:** terrain, all biomes, surface layers, caves and canyons,
 >   underground water and lava, ores and stone patches, and an unbroken bedrock floor.
@@ -86,8 +86,8 @@ The generator returns indices into the block list; your server maps them to its 
 
 Each dimension has its own package: [`overworld`](overworld) and [`nether`](nether) today, with the
 End to follow. The shared vanilla data and the `biome`, `blocks`, `noise` and `rand` packages stay at the top,
-with [`structure`](structure): templates, jigsaw assembly and block rules shared by every dimension's
-structures.
+with [`structure`](structure): templates, jigsaw assembly, block rules and the ruined portal builder
+shared by every dimension's structures. The dimension packages do not import each other.
 
 ## Features
 

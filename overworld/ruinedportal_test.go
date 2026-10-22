@@ -30,13 +30,11 @@ func TestListRuinedPortals(t *testing.T) {
 				continue
 			}
 			n := 0
-			for _, ws := range p.writes {
-				n += len(ws)
+			for _, bs := range p.Blocks {
+				n += len(bs)
 			}
-			s := o.portalSim(tc.Raw)
-			top := s.height((p.bb.X0+p.bb.X1)/2, (p.bb.Z0+p.bb.Z1)/2, true)
-			fmt.Printf("portal %d %d %s under=%v rot=%d mirror=%v box=%v surface=%d blocks=%d\n",
-				cx*16+8, cz*16+8, p.path, p.under, p.rot, p.mirror, p.bb, top, n)
+			fmt.Printf("portal %d %d %s under=%v rot=%d mirror=%v box=%v blocks=%d\n",
+				cx*16+8, cz*16+8, p.Path, p.Under, p.Rot, p.Mirror, p.Box, n)
 		}
 	}
 }

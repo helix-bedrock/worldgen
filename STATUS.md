@@ -1,6 +1,6 @@
 # What worldgen generates
 
-Status as of 2026-10-21. This page lists everything worldgen places today and what is still
+Status as of 2026-10-22. This page lists everything worldgen places today and what is still
 missing, so you know what to expect in a world. Only the **Overworld** is generated so far.
 
 Every part is built from the Bedrock Dedicated Server (BDS 1.26.52) and compared with chunks that

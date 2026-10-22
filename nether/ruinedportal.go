@@ -4,12 +4,12 @@ import (
 	"cmp"
 	"slices"
 
-	"github.com/helix-bedrock/worldgen/overworld"
+	"github.com/helix-bedrock/worldgen/structure"
 )
 
-// Nether ruined portals are BDS's RuinedPortalFeature on the Nether's grid
-// (overworld.NetherPortalPick); the overworld package builds them with the
-// Nether branches of the same code. Every grid region has one. BDS builds
+// Nether ruined portals are BDS's RuinedPortalFeature on the Nether's grid;
+// structure.Lib.RuinedPortal builds them with the Nether branches of the
+// code the overworld uses. Every grid region has one. BDS builds
 // the whole portal from its start chunk into the world as it stands; a
 // BDS world shows fortress support columns stopping on a portal's magma,
 // so the portal is built first, on the bare terrain, and fortress pieces
@@ -34,19 +34,24 @@ func (n *Nether) placePortals(cx, cz int32, c *Chunk) {
 			c.set(int(b.X&15), int(b.Y), int(b.Z&15), b.ID)
 			c.dropEntity(b.X, b.Y, b.Z)
 			if b.Data != nil {
-				c.BlockEntities = append(c.BlockEntities, overworld.BlockEntity{X: b.X, Y: b.Y, Z: b.Z, Data: b.Data})
+				c.BlockEntities = append(c.BlockEntities, structure.BlockEntity{X: b.X, Y: b.Y, Z: b.Z, Data: b.Data})
 			}
 		}
 	})
 }
 
+// portalPick is the start chunk of the portal of placement region (rx, rz).
+func (n *Nether) portalPick(rx, rz int32) (int32, int32) {
+	return structure.PortalPick(n.seed, rx, rz, structure.NetherPortalSpacing, structure.NetherPortalSeparation)
+}
+
 // portalsReach calls f with the start chunk of each portal that may have
 // blocks in chunk (cx, cz).
 func (n *Nether) portalsReach(cx, cz int32, f func(sx, sz int32)) {
-	sp := int32(overworld.NetherPortalSpacing)
+	sp := int32(structure.NetherPortalSpacing)
 	for rx := floorDiv(cx-portalReach, sp); rx <= floorDiv(cx+portalReach, sp); rx++ {
 		for rz := floorDiv(cz-portalReach, sp); rz <= floorDiv(cz+portalReach, sp); rz++ {
-			sx, sz := overworld.NetherPortalPick(n.seed, rx, rz)
+			sx, sz := n.portalPick(rx, rz)
 			if abs32(sx-cx) <= portalReach && abs32(sz-cz) <= portalReach {
 				f(sx, sz)
 			}
@@ -56,10 +61,10 @@ func (n *Nether) portalsReach(cx, cz int32, f func(sx, sz int32)) {
 
 // portalAt returns the portal starting in chunk (sx, sz), built once. sx,
 // sz must be a start chunk.
-func (n *Nether) portalAt(sx, sz int32) *overworld.NetherPortal {
+func (n *Nether) portalAt(sx, sz int32) *structure.RuinedPortal {
 	k := [2]int32{sx, sz}
 	if v, ok := n.portals.Load(k); ok {
-		p, _ := v.(*overworld.NetherPortal)
+		p, _ := v.(*structure.RuinedPortal)
 		return p
 	}
 	chunks := map[[2]int32]*Chunk{}
@@ -73,9 +78,9 @@ func (n *Nether) portalAt(sx, sz int32) *overworld.NetherPortal {
 		}
 		return c.Block(int(x&15), int(y), int(z&15))
 	}
-	p := n.ow.NetherRuinedPortal(sx, sz, Height, SeaLevel, read)
+	p := n.st.RuinedPortal(sx, sz, structure.PortalWorld{Block: read, MaxY: Height, Sea: SeaLevel, Nether: true, Solid: n.solid})
 	v, _ := n.portals.LoadOrStore(k, p)
-	p, _ = v.(*overworld.NetherPortal)
+	p, _ = v.(*structure.RuinedPortal)
 	return p
 }
 
@@ -89,11 +94,11 @@ func (n *Nether) NearestRuinedPortal(x, z, maxRegions int32) (px, py, pz int32, 
 		d      int64
 	}
 	var cands []cand
-	sp := int32(overworld.NetherPortalSpacing)
+	sp := int32(structure.NetherPortalSpacing)
 	rx0, rz0 := floorDiv(x>>4, sp), floorDiv(z>>4, sp)
 	for rx := rx0 - maxRegions; rx <= rx0+maxRegions; rx++ {
 		for rz := rz0 - maxRegions; rz <= rz0+maxRegions; rz++ {
-			cx, cz := overworld.NetherPortalPick(n.seed, rx, rz)
+			cx, cz := n.portalPick(rx, rz)
 			dx, dz := int64(cx*16+8-x), int64(cz*16+8-z)
 			cands = append(cands, cand{cx, cz, dx*dx + dz*dz})
 		}
@@ -101,7 +106,7 @@ func (n *Nether) NearestRuinedPortal(x, z, maxRegions int32) (px, py, pz int32, 
 	slices.SortFunc(cands, func(a, b cand) int { return cmp.Compare(a.d, b.d) })
 	for _, c := range cands {
 		if p := n.portalAt(c.cx, c.cz); p != nil {
-			return (p.X0 + p.X1) / 2, p.Y0 + 1, (p.Z0 + p.Z1) / 2, true
+			return (p.Box.X0 + p.Box.X1) / 2, p.Box.Y0 + 1, (p.Box.Z0 + p.Box.Z1) / 2, true
 		}
 	}
 	return 0, 0, 0, false
@@ -113,7 +118,7 @@ func (c *Chunk) dropEntity(x, y, z int32) {
 	if len(c.BlockEntities) == 0 {
 		return
 	}
-	c.BlockEntities = slices.DeleteFunc(c.BlockEntities, func(e overworld.BlockEntity) bool {
+	c.BlockEntities = slices.DeleteFunc(c.BlockEntities, func(e structure.BlockEntity) bool {
 		return e.X == x && e.Y == y && e.Z == z
 	})
 }

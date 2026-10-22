@@ -9,7 +9,6 @@ import (
 
 	"github.com/helix-bedrock/worldgen/blocks"
 	"github.com/helix-bedrock/worldgen/noise"
-	"github.com/helix-bedrock/worldgen/overworld"
 	"github.com/helix-bedrock/worldgen/rand"
 	"github.com/helix-bedrock/worldgen/structure"
 )
@@ -29,7 +28,7 @@ type Chunk struct {
 	Biomes [16 * 16]uint16
 	// BlockEntities are the block entities of blocks structures placed
 	// (chests and spawners).
-	BlockEntities []overworld.BlockEntity
+	BlockEntities []structure.BlockEntity
 }
 
 // Biome returns the biome ID at local (x, z).
@@ -78,10 +77,8 @@ type Nether struct {
 	fenceJoin  []uint8  // by state: what it is to a nether brick fence
 	fortresses sync.Map // [2]int32 start chunk -> *fortress
 
-	// ow builds the structures BDS shares with the overworld (ruined
-	// portals); portals caches them by start chunk.
-	ow      *overworld.Overworld
-	portals sync.Map // [2]int32 start chunk -> *overworld.NetherPortal
+	// portals caches the ruined portals by start chunk.
+	portals sync.Map // [2]int32 start chunk -> *structure.RuinedPortal
 
 	// st prepares structure templates; bastionData holds the bastion
 	// pools, bastionBiomes the biomes a bastion may start in and bastions
@@ -94,16 +91,12 @@ type Nether struct {
 
 // New builds the noises for a seed. reg must contain the vanilla blocks the
 // generator places; biomeIDs maps biome names (no "minecraft:" prefix) to
-// numeric IDs, as from biome.LoadIDs. ow is the overworld of the same seed
-// and block list: it builds the structures both dimensions share.
-func New(seed int64, reg *blocks.Registry, biomeIDs map[string]uint32, ow *overworld.Overworld) (*Nether, error) {
+// numeric IDs, as from biome.LoadIDs.
+func New(seed int64, reg *blocks.Registry, biomeIDs map[string]uint32) (*Nether, error) {
 	if reg.Len() > 1<<16 {
 		return nil, fmt.Errorf("worldgen: %d block states do not fit the 16-bit chunk storage", reg.Len())
 	}
-	if ow == nil || ow.Seed() != seed || ow.Registry() != reg {
-		return nil, fmt.Errorf("worldgen: the Nether needs the overworld of the same seed and block list")
-	}
-	n := &Nether{seed: seed, reg: reg, ow: ow}
+	n := &Nether{seed: seed, reg: reg}
 	for _, b := range []struct {
 		dst  *uint32
 		name string

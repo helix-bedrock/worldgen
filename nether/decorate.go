@@ -9,8 +9,8 @@ import (
 	"github.com/helix-bedrock/worldgen"
 	"github.com/helix-bedrock/worldgen/feature"
 	"github.com/helix-bedrock/worldgen/internal/lru"
-	"github.com/helix-bedrock/worldgen/overworld"
 	"github.com/helix-bedrock/worldgen/rand"
+	"github.com/helix-bedrock/worldgen/structure"
 )
 
 // Decoration is BDS's NetherGenerator postProcess (sub_51650F0): a fixed
@@ -510,7 +510,7 @@ func (c *Cache) Generate(chunkX, chunkZ int32, out *Chunk) {
 	t := c.Terrain(chunkX, chunkZ)
 	*out = *t
 	// The terrain is shared: its block entities are copied, data too.
-	out.BlockEntities = make([]overworld.BlockEntity, len(t.BlockEntities))
+	out.BlockEntities = make([]structure.BlockEntity, len(t.BlockEntities))
 	for i, be := range t.BlockEntities {
 		be.Data = maps.Clone(be.Data)
 		out.BlockEntities[i] = be

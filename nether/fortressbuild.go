@@ -1,8 +1,8 @@
 package nether
 
 import (
-	"github.com/helix-bedrock/worldgen/overworld"
 	"github.com/helix-bedrock/worldgen/rand"
+	"github.com/helix-bedrock/worldgen/structure"
 )
 
 // fortressIDs are the blocks fortress pieces place.
@@ -151,7 +151,7 @@ func (b *nbBuild) chest(x, y, z int32) {
 	b.c.set(int(wx&15), int(wy), int(wz&15), b.n.nb.chest)
 	b.c.dropEntity(wx, wy, wz)
 	table := "loot_tables/chests/nether_bridge.json"
-	b.c.BlockEntities = append(b.c.BlockEntities, overworld.BlockEntity{X: wx, Y: wy, Z: wz, LootTable: table,
+	b.c.BlockEntities = append(b.c.BlockEntities, structure.BlockEntity{X: wx, Y: wy, Z: wz, LootTable: table,
 		Data: map[string]any{"id": "Chest", "x": wx, "y": wy, "z": wz, "isMovable": uint8(1),
 			"LootTable": table, "LootTableSeed": int32(b.r.Uint32() >> 1)}})
 }
@@ -349,7 +349,7 @@ func (b *nbBuild) buildMonsterThrone() {
 	b.box(2, 8, 8, 4, 8, 8, f, f)
 	if wx, wy, wz := b.p.worldPos(3, 5, 5); b.cbox.contains(wx, wy, wz) {
 		b.c.set(int(wx&15), int(wy), int(wz&15), b.n.nb.spawner)
-		b.c.BlockEntities = append(b.c.BlockEntities, overworld.BlockEntity{X: wx, Y: wy, Z: wz,
+		b.c.BlockEntities = append(b.c.BlockEntities, structure.BlockEntity{X: wx, Y: wy, Z: wz,
 			Data: map[string]any{"id": "MobSpawner", "x": wx, "y": wy, "z": wz, "isMovable": uint8(1),
 				"EntityIdentifier": "minecraft:blaze"}})
 	}
