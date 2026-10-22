@@ -13,16 +13,26 @@ import (
 
 // Facings as BDS numbers them: 2 north (-z), 3 south (+z), 4 west (-x),
 // 5 east (+x).
-var (
-	facingVec        = [6][3]int32{{0, -1, 0}, {0, 1, 0}, {0, 0, -1}, {0, 0, 1}, {-1, 0, 0}, {1, 0, 0}}
-	facingOpposite   = [6]uint8{1, 0, 3, 2, 5, 4}
-	facingClockwise  = [4]uint8{5, 4, 2, 3} // by facing - 2
-	facingCounterCW  = [4]uint8{4, 5, 3, 2}
-	coralExceptTable = [4][3]uint8{{5, 3, 4}, {5, 2, 4}, {5, 3, 2}, {2, 3, 4}} // by facing - 2
-	// wallFanDirection is the coral_direction state for a wall fan facing
-	// away from its block (by facing - 2).
-	wallFanDirection = [4]int32{2, 3, 0, 1}
-)
+func facingVec() [6][3]int32 {
+	return [6][3]int32{{0, -1, 0}, {0, 1, 0}, {0, 0, -1}, {0, 0, 1}, {-1, 0, 0}, {1, 0, 0}}
+}
+func facingOpposite() [6]uint8 {
+	return [6]uint8{1, 0, 3, 2, 5, 4}
+}
+func facingClockwise() [4]uint8 {
+	return [4]uint8{5, 4, 2, 3}
+} // by facing - 2
+func facingCounterCW() [4]uint8 {
+	return [4]uint8{4, 5, 3, 2}
+}
+func coralExceptTable() [4][3]uint8 {
+	return [4][3]uint8{{5, 3, 4}, {5, 2, 4}, {5, 3, 2}, {2, 3, 4}}
+} // by facing - 2
+// wallFanDirection is the coral_direction state for a wall fan facing
+// away from its block (by facing - 2).
+func wallFanDirection() [4]int32 {
+	return [4]int32{2, 3, 0, 1}
+}
 
 // coralThird picks the plant's third arm direction from the two sides the
 // first two did not use, in BDS's table order (byte_148FC70..7A).
@@ -118,12 +128,12 @@ func (f *coralFeature) place(w *featureWorld, x, y, z int32, r *rand.MT) (blockP
 	for _, s := range b.sides {
 		base, _ := w.block(s.pos[0], s.pos[1], s.pos[2])
 		attach := f.coralIndex(base) >= 0 || base == f.stone
-		row := coralExceptTable[2] // BDS's default row (byte_148FC6D)
+		row := coralExceptTable()[2] // BDS's default row (byte_148FC6D)
 		if s.dir >= 2 && s.dir <= 5 {
-			row = coralExceptTable[s.dir-2]
+			row = coralExceptTable()[s.dir-2]
 		}
 		nd := row[r.IntN(3)]
-		v := facingVec[nd]
+		v := facingVec()[nd]
 		tx, ty, tz := s.pos[0]+v[0], s.pos[1]+v[1], s.pos[2]+v[2]
 		t, _ := w.block(tx, ty, tz)
 		if !o.waterMaterial(t) || !attach {
@@ -133,7 +143,7 @@ func (f *coralFeature) place(w *featureWorld, x, y, z int32, r *rand.MT) (blockP
 		// water there (BlockSource vfunc +88); taken to be always yes.
 		c := r.IntN(2) + 2*r.IntN(3)
 		c = min(max(c, 0), 4)
-		w.set(tx, ty, tz, f.wallFans[c][wallFanDirection[nd-2]])
+		w.set(tx, ty, tz, f.wallFans[c][wallFanDirection()[nd-2]])
 	}
 	return blockPos{x, y, z}, true
 }
@@ -190,7 +200,7 @@ func (b *coralBuild) setOnSolid(p blockPos) bool {
 }
 
 func add(p blockPos, d uint8) blockPos {
-	v := facingVec[d]
+	v := facingVec()[d]
 	return blockPos{p[0] + v[0], p[1] + v[1], p[2] + v[2]}
 }
 
@@ -248,7 +258,7 @@ func (b *coralBuild) plantLike(s blockPos) {
 		return
 	}
 	first := uint8(b.r.IntN(4) + 2)
-	second := coralExceptTable[first-2][b.r.IntN(3)]
+	second := coralExceptTable()[first-2][b.r.IntN(3)]
 	third := coralThird(first, second, b.r)
 	dirs := [3]uint8{first, second, third}
 	if !b.canOverwrite(top) {
@@ -307,7 +317,7 @@ func (b *coralBuild) arm(p blockPos, dir uint8, last bool) {
 				return
 			}
 		}
-		p = add(up(p, 1), facingOpposite[dir])
+		p = add(up(p, 1), facingOpposite()[dir])
 		if !b.underwater(up(p, 1)) || !b.canOverwrite(p) {
 			return
 		}
@@ -342,9 +352,9 @@ func (b *coralBuild) arm(p blockPos, dir uint8, last bool) {
 				return
 			}
 		}
-		turn := facingCounterCW[dir-2]
+		turn := facingCounterCW()[dir-2]
 		if b.r.Uint32()>>27&1 != 0 {
-			turn = facingClockwise[dir-2]
+			turn = facingClockwise()[dir-2]
 		}
 		q := up(add(p, turn), 1)
 		for i := int32(0); i < 2; i++ {
@@ -495,8 +505,8 @@ func (b *coralBuild) smallClump(o blockPos) {
 
 func (b *coralBuild) hand(o blockPos) {
 	dir := uint8(b.r.IntN(4)) + 2
-	cw := facingClockwise[dir-2]
-	ccw := facingOpposite[cw]
+	cw := facingClockwise()[dir-2]
+	ccw := facingOpposite()[cw]
 	wide := b.r.IntN(2) != 0
 	h := b.r.IntN(3) + 1
 	if !b.underwater(up(o, h+2)) {
@@ -601,14 +611,14 @@ func (f *coralHangFeature) place(w *featureWorld, x, y, z int32, r *rand.MT) (bl
 	dir := uint8(2)
 	for n := int32(4); n > 0; n-- {
 		i := r.IntN(n)
-		v := facingVec[dirs[i]]
+		v := facingVec()[dirs[i]]
 		if b, _ := w.block(x+v[0], py+v[1], z+v[2]); o.waterMaterial(b) {
 			dir = dirs[i]
 			break
 		}
 		dirs[i], dirs[n-1] = dirs[n-1], dirs[i]
 	}
-	v := facingVec[dir]
+	v := facingVec()[dir]
 	if b, _ := w.block(x+v[0], py+v[1], z+v[2]); !o.waterMaterial(b) {
 		return blockPos{}, false
 	}
@@ -618,6 +628,6 @@ func (f *coralHangFeature) place(w *featureWorld, x, y, z int32, r *rand.MT) (bl
 	if r.IntN(2) > 0 {
 		color = 1
 	}
-	w.set(x+v[0], py+v[1], z+v[2], f.coral.wallFans[color][wallFanDirection[dir-2]])
+	w.set(x+v[0], py+v[1], z+v[2], f.coral.wallFans[color][wallFanDirection()[dir-2]])
 	return blockPos{x, py, z}, true
 }

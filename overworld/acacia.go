@@ -47,10 +47,12 @@ type randomSpreadCanopy struct {
 }
 
 // leanX and leanZ are the lean directions: south, west, north, east.
-var (
-	leanX = [4]int32{0, -1, 0, 1}
-	leanZ = [4]int32{1, 0, -1, 0}
-)
+func leanX() [4]int32 {
+	return [4]int32{0, -1, 0, 1}
+}
+func leanZ() [4]int32 {
+	return [4]int32{1, 0, -1, 0}
+}
 
 // acaciaFree is sub_D299C30: a trunk or branch block may go where
 // may_replace allows, or into air, liquids and replaceable plants.
@@ -94,7 +96,7 @@ func (t *treeFeature) acaciaTrunk(w *featureWorld, x, y, z, h int32, r *rand.MT)
 	var trunk []blockPos
 	for k := int32(0); k < h+extra; k++ {
 		if k >= leanStart && steps > 0 {
-			cx, cz = cx+leanX[dir], cz+leanZ[dir]
+			cx, cz = cx+leanX()[dir], cz+leanZ()[dir]
 			steps--
 		}
 		if k < h {
@@ -174,7 +176,7 @@ func (t *treeFeature) acaciaTrunk(w *featureWorld, x, y, z, h int32, r *rand.MT)
 	placed, endY := false, int32(0)
 	for {
 		if k > 0 {
-			bx, bz = bx+leanX[d2], bz+leanZ[d2]
+			bx, bz = bx+leanX()[d2], bz+leanZ()[d2]
 			py := y + k
 			if t.acaciaFree(w, bx, py, bz) {
 				w.set(bx, py, bz, t.log)

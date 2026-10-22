@@ -40,7 +40,7 @@ func (o *Overworld) connectBlocks(c *Chunk, cx, cz int32, near func(cx, cz int32
 		kind := o.joinKind[b]
 		x, y, z := cx*16+int32(i&15), int32(i>>8)+MinY, cz*16+int32(i>>4&15)
 		nid := id
-		for _, side := range joinSides {
+		for _, side := range joinSides() {
 			nb := n.at(x+side.dx, y, z+side.dz)
 			join := o.faceSturdy(nb, side.facing)
 			if kind == joinFence {
@@ -82,11 +82,15 @@ func (n *neighbourChunks) at(x, y, z int32) uint32 {
 // joinSides are the four sides a block joins on, with the face of the
 // neighbour that touches it (the stairs' weirdo_direction of a full back
 // face on that side).
-var joinSides = [4]struct {
+type joinSide struct {
 	name   string
 	dx, dz int32
 	facing int32
-}{{"north", 0, -1, 2}, {"east", 1, 0, 1}, {"south", 0, 1, 3}, {"west", -1, 0, 0}}
+}
+
+func joinSides() [4]joinSide {
+	return [4]joinSide{{"north", 0, -1, 2}, {"east", 1, 0, 1}, {"south", 0, 1, 3}, {"west", -1, 0, 0}}
+}
 
 // faceSturdy reports whether the face of nb that touches a fence or pane is
 // a full face. Stairs have one: their back, on the side weirdo_direction

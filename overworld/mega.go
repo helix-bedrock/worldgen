@@ -103,6 +103,22 @@ func (c *megaCanopy) place(t *treeFeature, w *featureWorld, x, y, z, tw int32, r
 // Decoration side masks (sub_D299270): west, east, north, south.
 type sideMask [4]bool
 
+// Mega tree constants (MegaTreeTrunk, sub_D298DB0).
+const (
+	// megaBranchOffset puts a branch at the middle of the 2x2 trunk and
+	// rounds it to the nearest block.
+	megaBranchOffset = 1.5
+	// clusterGrid is the side of the grid the extra podzol clusters are
+	// drawn on: only its outer ring is used. clusterCenter is the grid's
+	// offset from the trunk.
+	clusterGrid   = 8
+	clusterCenter = 3
+	// clusterColumnTop and clusterColumnDepth bound the podzol column
+	// above and below y.
+	clusterColumnTop   = 2
+	clusterColumnDepth = 3
+)
+
 // megaTrunk is MegaTreeTrunk::place.
 func (t *treeFeature) megaTrunk(w *featureWorld, x, y, z, h int32, r *rand.MT) (blockPos, bool) {
 	m := &t.mega
@@ -145,12 +161,12 @@ func (t *treeFeature) megaTrunk(w *featureWorld, x, y, z, h int32, r *rand.MT) (
 			bx, bz := x+1, z+1
 			if m.branchLen != 0 {
 				base := float32(int32(float32(by-1) - float32(m.branchLen-1)*m.slope))
-				a := (f*3.1415927 + f*3.1415927) * 10430.378
-				cos, sin := sinTable[uint16(int32(a+16384))], sinTable[uint16(int32(a))]
+				a := (f*pi32 + f*pi32) * sinTableRadian
+				cos, sin := sinTable[uint16(int32(a+sinTableQuarter))], sinTable[uint16(int32(a))]
 				for i := int32(0); i < m.branchLen; i++ {
 					fi := float32(i)
-					bx = x + int32(cos*fi+1.5)
-					bz = z + int32(sin*fi+1.5)
+					bx = x + int32(cos*fi+megaBranchOffset)
+					bz = z + int32(sin*fi+megaBranchOffset)
 					w.set(bx, int32(fi*m.slope+base), bz, t.log)
 				}
 			}
@@ -210,10 +226,10 @@ func (t *treeFeature) baseClusters(w *featureWorld, x, y, z, width int32, r *ran
 	t.clusterRing(w, x-1, z+width, y)
 	t.clusterRing(w, x+width, z+width, y)
 	for range t.clusters {
-		v := r.IntN(64)
-		col := v % 8
-		if v>>3 == 7 || v < 8 || col == 0 || col == 7 {
-			t.clusterRing(w, x+col-3, z+v/8-3, y)
+		v := r.IntN(clusterGrid * clusterGrid)
+		col := v % clusterGrid
+		if v>>3 == clusterGrid-1 || v < clusterGrid || col == 0 || col == clusterGrid-1 {
+			t.clusterRing(w, x+col-clusterCenter, z+v/clusterGrid-clusterCenter, y)
 		}
 	}
 }
@@ -224,7 +240,7 @@ func (t *treeFeature) baseClusters(w *featureWorld, x, y, z, width int32, r *ran
 func (t *treeFeature) clusterColumn(w *featureWorld, x, y, z int32) {
 	pod := t.baseBlocks[0]
 	podName := t.o.blockName(pod)
-	for dy := int32(2); dy >= -3; dy-- {
+	for dy := int32(clusterColumnTop); dy >= -clusterColumnDepth; dy-- {
 		b, ok := w.block(x, y+dy, z)
 		if !ok {
 			return

@@ -152,19 +152,24 @@ func (o *Overworld) fillBiomes(chunkX, chunkZ int32, c *Chunk) {
 // zoomCorners are the grid steps to the 8 corners of a cell in the order
 // BDS tries them (z, y, then x outermost), with the block's offset from
 // each corner.
-var zoomCorners = [8]struct {
+type zoomCorner struct {
 	step       int32
 	dx, dy, dz float32
-}{
-	{0, 0, 0, 0}, {zoomY, 0, 0, -1}, {1, 0, -1, 0}, {zoomY + 1, 0, -1, -1},
-	{zoomXZ * zoomY, -1, 0, 0}, {zoomXZ*zoomY + zoomY, -1, 0, -1},
-	{zoomXZ*zoomY + 1, -1, -1, 0}, {zoomXZ*zoomY + zoomY + 1, -1, -1, -1},
+}
+
+func zoomCorners() [8]zoomCorner {
+	return [8]zoomCorner{
+		{0, 0, 0, 0}, {zoomY, 0, 0, -1}, {1, 0, -1, 0}, {zoomY + 1, 0, -1, -1},
+		{zoomXZ * zoomY, -1, 0, 0}, {zoomXZ*zoomY + zoomY, -1, 0, -1},
+		{zoomXZ*zoomY + 1, -1, -1, 0}, {zoomXZ*zoomY + zoomY + 1, -1, -1, -1},
+	}
 }
 
 // uniform reports whether the 8 corners of the cell at base hold one biome.
 func uniform(grid *[zoomXZ * zoomXZ * zoomY]uint16, base int32) bool {
 	b := grid[base]
-	for _, cr := range zoomCorners[1:] {
+	corners := zoomCorners()
+	for _, cr := range corners[1:] {
 		if grid[base+cr.step] != b {
 			return false
 		}
@@ -176,7 +181,7 @@ func uniform(grid *[zoomXZ * zoomXZ * zoomY]uint16, base int32) bool {
 // block; a tie keeps the corner tried first.
 func zoomNearest(offs *[zoomXZ * zoomXZ * zoomY][3]float32, base int32, fx, fy, fz float32) int32 {
 	best, bestD := base, float32(math.MaxFloat32)
-	for i, cr := range zoomCorners {
+	for i, cr := range zoomCorners() {
 		n := base + cr.step
 		o := &offs[n]
 		x := float32(o[0] + float32(fx+cr.dx))

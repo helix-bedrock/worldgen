@@ -212,10 +212,14 @@ type vinesFeature struct {
 
 // vineFaces are the supports for faces 2 to 5 and the vine_direction_bits each
 // gives (the face's opposite, byte_1491886, as a bit, qword_1ADFEF8).
-var vineFaces = [4]struct {
+type vineFace struct {
 	dx, dz int32
 	bits   float64
-}{{0, 1, 1}, {0, -1, 4}, {1, 0, 8}, {-1, 0, 2}}
+}
+
+func vineFaces() [4]vineFace {
+	return [4]vineFace{{0, 1, 1}, {0, -1, 4}, {1, 0, 8}, {-1, 0, 2}}
+}
 
 func (f *vinesFeature) place(w *featureWorld, x, y, z int32, r *rand.MT) (blockPos, bool) {
 	o := w.o
@@ -230,7 +234,7 @@ func (f *vinesFeature) place(w *featureWorld, x, y, z int32, r *rand.MT) (blockP
 			pz = z + drawDiff(r, 3)
 			continue
 		}
-		for _, s := range vineFaces {
+		for _, s := range vineFaces() {
 			// VERIFY: VineBlock's mayPlace for a face is taken as the
 			// single-face vine's support rule.
 			b, _ := w.block(px+s.dx, py, pz+s.dz)

@@ -102,7 +102,9 @@ func (f *mushroomFeature) place(w *featureWorld, x, y, z int32, r *rand.MT) (blo
 }
 
 // mushroomCover are the spots that must be covered, around the mushroom.
-var mushroomCover = [13][2]int32{{0, 0}, {0, -1}, {1, 0}, {0, 1}, {-1, 0}, {1, -1}, {-1, -1}, {1, 1}, {-1, 1}, {0, -2}, {2, 0}, {0, 2}, {-2, 0}}
+func mushroomCover() [13][2]int32 {
+	return [13][2]int32{{0, 0}, {0, -1}, {1, 0}, {0, 1}, {-1, 0}, {1, -1}, {-1, -1}, {1, 1}, {-1, 1}, {0, -2}, {2, 0}, {0, 2}, {-2, 0}}
+}
 
 func (f *mushroomFeature) try(w *featureWorld, x, y, z int32) {
 	if b, ok := w.block(x, y, z); !ok || b != w.o.ids.air {
@@ -113,7 +115,7 @@ func (f *mushroomFeature) try(w *featureWorld, x, y, z int32) {
 		return
 	}
 	if !inList(f.soil, below) {
-		for _, c := range mushroomCover {
+		for _, c := range mushroomCover() {
 			if !covered(w, x+c[0], y, z+c[1]) {
 				return
 			}

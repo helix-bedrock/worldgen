@@ -7,7 +7,6 @@ import (
 	"io/fs"
 	"math"
 	"path"
-	"regexp"
 	"strings"
 
 	"github.com/helix-bedrock/worldgen/biome"
@@ -117,7 +116,7 @@ func (o *Overworld) loadFeatures(fsys fs.FS, dir string) (*featureSet, error) {
 			}
 		}
 	}
-	for id, lt := range legacyTrees {
+	for id, lt := range legacyTrees() {
 		set.byID[id] = &legacyTreeFeature{def: lt, set: set}
 	}
 	set.byID["minecraft:legacy:swamp_foliage_feature"] = &swampFoliageFeature{set: set}
@@ -385,7 +384,7 @@ func (o *Overworld) parseScatter(raw json.RawMessage, set *featureSet) (placer, 
 	}
 	if r.Order != "" {
 		var ok bool
-		if f.order, ok = coordinateOrders[r.Order]; !ok {
+		if f.order, ok = coordinateOrders(r.Order); !ok {
 			return nil, nil
 		}
 	}
@@ -496,13 +495,22 @@ type searchFeature struct {
 // searchOrder is the loop order of each search axis (sub_D305930 and its
 // helpers sub_D3064E0, sub_D306A20): outer, middle and inner axis, each with
 // its step. The outer axis is the search axis.
-var searchOrder = map[string][3][2]int32{
-	"-x": {{0, -1}, {1, 1}, {2, -1}},
-	"+x": {{0, 1}, {1, 1}, {2, 1}},
-	"-y": {{1, -1}, {2, 1}, {0, -1}},
-	"+y": {{1, 1}, {2, 1}, {0, 1}},
-	"-z": {{2, -1}, {1, 1}, {0, 1}},
-	"+z": {{2, 1}, {1, 1}, {0, -1}},
+func searchOrder(axis string) ([3][2]int32, bool) {
+	switch axis {
+	case "-x":
+		return [3][2]int32{{0, -1}, {1, 1}, {2, -1}}, true
+	case "+x":
+		return [3][2]int32{{0, 1}, {1, 1}, {2, 1}}, true
+	case "-y":
+		return [3][2]int32{{1, -1}, {2, 1}, {0, -1}}, true
+	case "+y":
+		return [3][2]int32{{1, 1}, {2, 1}, {0, 1}}, true
+	case "-z":
+		return [3][2]int32{{2, -1}, {1, 1}, {0, 1}}, true
+	case "+z":
+		return [3][2]int32{{2, 1}, {1, 1}, {0, -1}}, true
+	}
+	return [3][2]int32{}, false
 }
 
 // span is the first and last offset of the search along loop axis a (an
@@ -515,9 +523,9 @@ func (f *searchFeature) span(a [2]int32) (int32, int32) {
 }
 
 func (f *searchFeature) place(w *featureWorld, x, y, z int32, r *rand.MT) (blockPos, bool) {
-	order, ok := searchOrder[f.axis]
+	order, ok := searchOrder(f.axis)
 	if !ok {
-		order = searchOrder["+y"]
+		order, _ = searchOrder("+y")
 	}
 	// BDS stages the placements and keeps them only once the required
 	// count is reached; vanilla always requires one, so the first success
@@ -560,7 +568,28 @@ type blockMatcher struct {
 	tags  []string
 }
 
-var anyTagArg = regexp.MustCompile(`'([^']+)'`)
+// quotedArgs returns the non-empty single-quoted strings of a query such as
+// query.any_tag('dirt', 'sand'), in order.
+func quotedArgs(s string) []string {
+	var out []string
+	for {
+		i := strings.IndexByte(s, '\'')
+		if i < 0 {
+			return out
+		}
+		j := strings.IndexByte(s[i+1:], '\'')
+		if j < 0 {
+			return out
+		}
+		if j == 0 {
+			// An empty pair: the second quote may open the next string.
+			s = s[i+1:]
+			continue
+		}
+		out = append(out, s[i+1:i+1+j])
+		s = s[i+1+j+1:]
+	}
+}
 
 // rawBlockDescriptor is the object form of a block descriptor.
 type rawBlockDescriptor struct {
@@ -585,8 +614,8 @@ func parseMatcher(raw []json.RawMessage) blockMatcher {
 		if d.Name != "" {
 			m.names[d.Name] = true
 		}
-		for _, t := range anyTagArg.FindAllStringSubmatch(d.Tags, -1) {
-			m.tags = append(m.tags, strings.TrimPrefix(t[1], "minecraft:"))
+		for _, t := range quotedArgs(d.Tags) {
+			m.tags = append(m.tags, strings.TrimPrefix(t, "minecraft:"))
 		}
 	}
 	return m
@@ -652,7 +681,9 @@ type singleBlockFeature struct {
 // rotationSides maps the direction state 0-3 to the attach side that holds
 // the supporting block, read from BDS cocoa (log at z+ is direction 0, x- 1,
 // z- 2, x+ 3).
-var rotationSides = [4]int{3, 4, 2, 5}
+func rotationSides() [4]int {
+	return [4]int{3, 4, 2, 5}
+}
 
 // rawSingleBlock is the JSON of a minecraft:single_block_feature.
 type rawSingleBlock struct {
@@ -771,18 +802,25 @@ func (o *Overworld) parseSingleBlock(raw json.RawMessage) (placer, error) {
 // soilPlants are the plants whose placement rule wants a dirt-tagged block
 // below (grass, dirt, podzol, moss...).
 // VERIFY: taken from the blocks' vanilla behaviour, not read from BDS.
-var soilPlants = map[string]bool{}
+// It stays a variable because scattered.go indexes it; it is built once and
+// never written after.
+var soilPlants = soilPlantSet()
 
-func init() {
+// soilPlantSet builds soilPlants.
+func soilPlantSet() map[string]bool {
+	set := map[string]bool{}
 	for _, n := range strings.Fields(`large_fern tall_grass short_grass fern sunflower lilac rose_bush peony poppy dandelion
 blue_orchid allium azure_bluet red_tulip orange_tulip white_tulip pink_tulip oxeye_daisy cornflower lily_of_the_valley
 torchflower sweet_berry_bush bush firefly_bush wildflowers pink_petals leaf_litter open_eyeblossom closed_eyeblossom
 cactus_flower short_dry_grass tall_dry_grass red_shrub`) {
-		soilPlants["minecraft:"+n] = true
+		set["minecraft:"+n] = true
 	}
+	return set
 }
 
-var sideOffsets = [6][3]int32{{0, 1, 0}, {0, -1, 0}, {0, 0, -1}, {0, 0, 1}, {-1, 0, 0}, {1, 0, 0}}
+func sideOffsets() [6][3]int32 {
+	return [6][3]int32{{0, 1, 0}, {0, -1, 0}, {0, 0, -1}, {0, 0, 1}, {-1, 0, 0}, {1, 0, 0}}
+}
 
 func (f *singleBlockFeature) place(w *featureWorld, x, y, z int32, r *rand.MT) (blockPos, bool) {
 	// BDS picks the block from its places_block list with one draw, even
@@ -838,7 +876,7 @@ func (f *singleBlockFeature) place(w *featureWorld, x, y, z int32, r *rand.MT) (
 		// and a horizontal side with no list counts as attached
 		// (sub_D30D330). A bee nest so needs leaves right above it.
 		n := 0
-		for i, d := range sideOffsets {
+		for i, d := range sideOffsets() {
 			if !f.hasSide[i] {
 				if i >= 2 {
 					n++
@@ -858,11 +896,11 @@ func (f *singleBlockFeature) place(w *featureWorld, x, y, z int32, r *rand.MT) (
 			return blockPos{}, false
 		}
 	}
-	for d, side := range rotationSides {
+	for d, side := range rotationSides() {
 		if len(f.rotated) != 4 || !f.hasSide[side] {
 			continue
 		}
-		o := sideOffsets[side]
+		o := sideOffsets()[side]
 		if b, ok := w.block(x+o[0], y+o[1], z+o[2]); ok && f.attach[side].match(w.o, b) {
 			block = f.rotated[d]
 			break
@@ -887,102 +925,104 @@ func nextBool(r *rand.MT) bool { return r.Uint32()>>27&1 != 0 }
 // (sub_51D3EA0). Forest and mesa plateau use the leaf-litter variants, as
 // BDS does in new worlds (its constructor flag; BDS forests have leaf
 // litter in the bdsdiff test world).
-var legacyTrees = map[string]legacyTree{
-	"minecraft:legacy:bamboo_jungle_tree_feature": {30, []string{"fancy_oak_tree_feature", "jungle_bush_feature", "mega_jungle_tree_feature", "scatter_tall_grass_around_tree_feature"}, func(r *rand.MT) int {
-		switch {
-		case r.IntN(20) == 0:
-			return 0
-		case r.IntN(20) <= 2:
-			return 1
-		case r.IntN(10) > 6:
-			return 3
-		}
-		return 2
-	}},
-	"minecraft:legacy:birch_forest_tree_feature": {10, []string{"select_birch_tree_feature", "birch_tree_with_beehive_feature"}, func(*rand.MT) int { return 0 }},
-	"minecraft:legacy:birch_forest_mutated_tree_feature": {10, []string{"select_birch_tree_feature", "select_super_birch_tree_feature"}, func(r *rand.MT) int {
-		if r.IntN(5) == 0 {
-			return 0
-		}
-		if nextBool(r) {
-			return 1
-		}
-		return 0
-	}},
-	"minecraft:legacy:extreme_hills_plus_trees_tree_feature": {3, []string{"select_spruce_tree_feature", "fancy_oak_tree_feature", "select_oak_tree_feature"}, func(r *rand.MT) int {
-		if r.IntN(3) > 0 {
-			return 0
-		}
-		if r.IntN(10) != 0 {
-			return 2
-		}
-		return 1
-	}},
-	"minecraft:legacy:flower_forest_tree_feature": {6, []string{"select_birch_tree_feature", "fancy_oak_tree_with_optional_beehive_feature", "oak_tree_with_optional_beehive_feature"}, forestChoice},
-	"minecraft:legacy:meadow_trees_feature": {0.01, []string{"fancy_oak_tree_with_beehive_feature", "super_birch_tree_with_beehive_feature"}, func(r *rand.MT) int {
-		if nextBool(r) {
-			return 0
-		}
-		return 1
-	}},
-	"minecraft:legacy:forest_tree_feature": {10, []string{"select_birch_tree_with_leaf_litter_feature", "fancy_oak_tree_with_leaf_litter_and_optional_beehive", "select_oak_tree_with_leaf_litter_feature"}, forestChoice},
-	"minecraft:legacy:ice_tree_feature":    {0.1, []string{"select_spruce_tree_feature"}, func(*rand.MT) int { return 0 }},
-	"minecraft:legacy:jungle_tree_feature": {50, []string{"fancy_oak_tree_feature", "jungle_bush_feature", "mega_jungle_tree_feature", "select_jungle_tree_feature"}, func(r *rand.MT) int {
-		switch {
-		case r.IntN(10) == 0:
-			return 0
-		case r.IntN(2) == 0:
-			return 1
-		case r.IntN(3) == 0:
-			return 2
-		}
-		return 3
-	}},
-	"minecraft:legacy:jungle_edge_tree_feature": {2, []string{"fancy_oak_tree_with_optional_beehive_feature", "jungle_bush_feature", "select_jungle_tree_feature"}, func(r *rand.MT) int {
-		if r.IntN(10) == 0 {
-			return 0
-		}
-		if r.IntN(2) != 0 {
-			return 2
-		}
-		return 1
-	}},
-	"minecraft:legacy:mesa_plateau_stone_tree_feature": {5, []string{"select_oak_tree_with_leaf_litter_feature"}, func(*rand.MT) int { return 0 }},
-	"minecraft:legacy:plains_tree_feature": {0.05, []string{"fancy_oak_tree_with_optional_beehive_feature", "select_oak_tree_feature", "oak_tree_with_beehive_feature"}, func(r *rand.MT) int {
-		if r.IntN(3) == 0 {
-			return 0
-		}
-		return 1
-	}},
-	"minecraft:legacy:savanna_tree_feature":         {1, []string{"savanna_tree_feature", "select_oak_tree_feature"}, savannaChoice},
-	"minecraft:legacy:savanna_mutated_tree_feature": {2, []string{"savanna_tree_feature", "select_oak_tree_feature"}, savannaChoice},
-	"minecraft:legacy:taiga_tree_feature": {10, []string{"pine_tree_feature", "select_spruce_tree_feature"}, func(r *rand.MT) int {
-		if r.IntN(3) == 0 {
-			return 0
-		}
-		return 1
-	}},
-	"minecraft:legacy:mega_taiga_tree_feature": {10, []string{"mega_spruce_tree_feature", "mega_pine_tree_feature", "pine_tree_feature", "select_spruce_tree_feature"}, func(r *rand.MT) int {
-		if r.IntN(3) != 0 {
-			if r.IntN(3) != 0 {
+func legacyTrees() map[string]legacyTree {
+	return map[string]legacyTree{
+		"minecraft:legacy:bamboo_jungle_tree_feature": {30, []string{"fancy_oak_tree_feature", "jungle_bush_feature", "mega_jungle_tree_feature", "scatter_tall_grass_around_tree_feature"}, func(r *rand.MT) int {
+			switch {
+			case r.IntN(20) == 0:
+				return 0
+			case r.IntN(20) <= 2:
+				return 1
+			case r.IntN(10) > 6:
 				return 3
 			}
 			return 2
-		}
-		if r.IntN(13) != 0 {
-			return 1
-		}
-		return 0
-	}},
-	"minecraft:legacy:redwood_taiga_mutated_tree_feature": {10, []string{"mega_spruce_tree_feature", "pine_tree_feature", "select_spruce_tree_feature"}, func(r *rand.MT) int {
-		if r.IntN(3) != 0 {
-			if r.IntN(3) != 0 {
+		}},
+		"minecraft:legacy:birch_forest_tree_feature": {10, []string{"select_birch_tree_feature", "birch_tree_with_beehive_feature"}, func(*rand.MT) int { return 0 }},
+		"minecraft:legacy:birch_forest_mutated_tree_feature": {10, []string{"select_birch_tree_feature", "select_super_birch_tree_feature"}, func(r *rand.MT) int {
+			if r.IntN(5) == 0 {
+				return 0
+			}
+			if nextBool(r) {
+				return 1
+			}
+			return 0
+		}},
+		"minecraft:legacy:extreme_hills_plus_trees_tree_feature": {3, []string{"select_spruce_tree_feature", "fancy_oak_tree_feature", "select_oak_tree_feature"}, func(r *rand.MT) int {
+			if r.IntN(3) > 0 {
+				return 0
+			}
+			if r.IntN(10) != 0 {
 				return 2
 			}
 			return 1
-		}
-		return 0
-	}},
+		}},
+		"minecraft:legacy:flower_forest_tree_feature": {6, []string{"select_birch_tree_feature", "fancy_oak_tree_with_optional_beehive_feature", "oak_tree_with_optional_beehive_feature"}, forestChoice},
+		"minecraft:legacy:meadow_trees_feature": {0.01, []string{"fancy_oak_tree_with_beehive_feature", "super_birch_tree_with_beehive_feature"}, func(r *rand.MT) int {
+			if nextBool(r) {
+				return 0
+			}
+			return 1
+		}},
+		"minecraft:legacy:forest_tree_feature": {10, []string{"select_birch_tree_with_leaf_litter_feature", "fancy_oak_tree_with_leaf_litter_and_optional_beehive", "select_oak_tree_with_leaf_litter_feature"}, forestChoice},
+		"minecraft:legacy:ice_tree_feature":    {0.1, []string{"select_spruce_tree_feature"}, func(*rand.MT) int { return 0 }},
+		"minecraft:legacy:jungle_tree_feature": {50, []string{"fancy_oak_tree_feature", "jungle_bush_feature", "mega_jungle_tree_feature", "select_jungle_tree_feature"}, func(r *rand.MT) int {
+			switch {
+			case r.IntN(10) == 0:
+				return 0
+			case r.IntN(2) == 0:
+				return 1
+			case r.IntN(3) == 0:
+				return 2
+			}
+			return 3
+		}},
+		"minecraft:legacy:jungle_edge_tree_feature": {2, []string{"fancy_oak_tree_with_optional_beehive_feature", "jungle_bush_feature", "select_jungle_tree_feature"}, func(r *rand.MT) int {
+			if r.IntN(10) == 0 {
+				return 0
+			}
+			if r.IntN(2) != 0 {
+				return 2
+			}
+			return 1
+		}},
+		"minecraft:legacy:mesa_plateau_stone_tree_feature": {5, []string{"select_oak_tree_with_leaf_litter_feature"}, func(*rand.MT) int { return 0 }},
+		"minecraft:legacy:plains_tree_feature": {0.05, []string{"fancy_oak_tree_with_optional_beehive_feature", "select_oak_tree_feature", "oak_tree_with_beehive_feature"}, func(r *rand.MT) int {
+			if r.IntN(3) == 0 {
+				return 0
+			}
+			return 1
+		}},
+		"minecraft:legacy:savanna_tree_feature":         {1, []string{"savanna_tree_feature", "select_oak_tree_feature"}, savannaChoice},
+		"minecraft:legacy:savanna_mutated_tree_feature": {2, []string{"savanna_tree_feature", "select_oak_tree_feature"}, savannaChoice},
+		"minecraft:legacy:taiga_tree_feature": {10, []string{"pine_tree_feature", "select_spruce_tree_feature"}, func(r *rand.MT) int {
+			if r.IntN(3) == 0 {
+				return 0
+			}
+			return 1
+		}},
+		"minecraft:legacy:mega_taiga_tree_feature": {10, []string{"mega_spruce_tree_feature", "mega_pine_tree_feature", "pine_tree_feature", "select_spruce_tree_feature"}, func(r *rand.MT) int {
+			if r.IntN(3) != 0 {
+				if r.IntN(3) != 0 {
+					return 3
+				}
+				return 2
+			}
+			if r.IntN(13) != 0 {
+				return 1
+			}
+			return 0
+		}},
+		"minecraft:legacy:redwood_taiga_mutated_tree_feature": {10, []string{"mega_spruce_tree_feature", "pine_tree_feature", "select_spruce_tree_feature"}, func(r *rand.MT) int {
+			if r.IntN(3) != 0 {
+				if r.IntN(3) != 0 {
+					return 2
+				}
+				return 1
+			}
+			return 0
+		}},
+	}
 }
 
 func forestChoice(r *rand.MT) int {

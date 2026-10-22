@@ -27,14 +27,14 @@ const (
 	SeaLevel = 63
 )
 
-// Chunk is the generator output for one 16x16 column. Blocks holds registry
-// indices (16 bits, which halves the memory of cached chunks; NewOverworld
-// refuses larger registries), index (y-MinY)<<8 | z<<4 | x. Biomes holds one biome ID per
-// block, same index: BDS stores biomes per block (see fillBiomes).
 // BlockEntity is the Bedrock block entity data of one block a structure
 // placed.
 type BlockEntity = structure.BlockEntity
 
+// Chunk is the generator output for one 16x16 column. Blocks holds registry
+// indices (16 bits, which halves the memory of cached chunks; NewOverworld
+// refuses larger registries), index (y-MinY)<<8 | z<<4 | x. Biomes holds one biome ID per
+// block, same index: BDS stores biomes per block (see fillBiomes).
 type Chunk struct {
 	Blocks [16 * 16 * Height]uint16
 	Biomes [16 * 16 * Height]uint16
@@ -209,9 +209,11 @@ type blockIDs struct {
 	veins [2]oreVein
 }
 
-var terracottaColours = [16]string{
-	"white", "orange", "magenta", "light_blue", "yellow", "lime", "pink", "gray",
-	"light_gray", "cyan", "purple", "blue", "brown", "green", "red", "black",
+func terracottaColours() [16]string {
+	return [16]string{
+		"white", "orange", "magenta", "light_blue", "yellow", "lime", "pink", "gray",
+		"light_gray", "cyan", "purple", "blue", "brown", "green", "red", "black",
+	}
 }
 
 // blockSet is a set of block states.
@@ -294,7 +296,7 @@ func NewOverworld(seed int64, reg *blocks.Registry, biomeIDs map[string]uint32, 
 		{Dst: &o.ids.coarseDirt, Name: "minecraft:coarse_dirt"},
 		{Dst: &o.ids.mycelium, Name: "minecraft:mycelium"},
 	}
-	for i, c := range terracottaColours {
+	for i, c := range terracottaColours() {
 		names = append(names, blocks.Want{Dst: &o.ids.terracotta[i], Name: "minecraft:" + c + "_terracotta"})
 	}
 	if err := reg.Resolve(names...); err != nil {
@@ -321,7 +323,7 @@ func NewOverworld(seed int64, reg *blocks.Registry, biomeIDs map[string]uint32, 
 	o.aquiferNoise = newAquiferNoises(world)
 	// BDS sub_498AB80: the blocks cave carvers may cut.
 	o.ids.carvable = blockSet{}
-	for _, n := range carvableBlocks {
+	for _, n := range carvableBlocks() {
 		id, ok := reg.Default("minecraft:" + n)
 		if !ok {
 			return nil, fmt.Errorf("worldgen: block minecraft:%s missing from the block list", n)
@@ -329,7 +331,7 @@ func NewOverworld(seed int64, reg *blocks.Registry, biomeIDs map[string]uint32, 
 		o.ids.carvable[id] = setMember{}
 	}
 	o.ids.canyonCarvable = blockSet{}
-	for _, n := range canyonCarvableBlocks {
+	for _, n := range canyonCarvableBlocks() {
 		id, ok := reg.Default("minecraft:" + n)
 		if !ok {
 			return nil, fmt.Errorf("worldgen: block minecraft:%s missing from the block list", n)
@@ -487,33 +489,37 @@ func (o *Overworld) bedrockFloor(mt *rand.MT, c *Chunk) {
 }
 
 // carvableBlocks are the blocks BDS's cave carvers may cut (sub_498AB80).
-var carvableBlocks = []string{
-	"stone", "dirt", "coarse_dirt", "podzol", "grass_block",
-	"white_glazed_terracotta", "orange_glazed_terracotta", "magenta_glazed_terracotta", "light_blue_glazed_terracotta",
-	"yellow_glazed_terracotta", "lime_glazed_terracotta", "pink_glazed_terracotta", "gray_glazed_terracotta",
-	"silver_glazed_terracotta", "cyan_glazed_terracotta", "purple_glazed_terracotta", "blue_glazed_terracotta",
-	"brown_glazed_terracotta", "green_glazed_terracotta", "red_glazed_terracotta", "black_glazed_terracotta",
-	"sandstone", "chiseled_sandstone", "cut_sandstone", "smooth_sandstone",
-	"red_sandstone", "chiseled_red_sandstone", "cut_red_sandstone", "smooth_red_sandstone",
-	"mycelium", "snow_layer", "packed_ice", "deepslate", "calcite",
-	"sand", "red_sand", "suspicious_sand",
-	"gravel", "dirt_with_roots", "tuff", "iron_ore", "deepslate_iron_ore", "raw_iron_block",
-	"copper_ore", "deepslate_copper_ore", "raw_copper_block",
+func carvableBlocks() []string {
+	return []string{
+		"stone", "dirt", "coarse_dirt", "podzol", "grass_block",
+		"white_glazed_terracotta", "orange_glazed_terracotta", "magenta_glazed_terracotta", "light_blue_glazed_terracotta",
+		"yellow_glazed_terracotta", "lime_glazed_terracotta", "pink_glazed_terracotta", "gray_glazed_terracotta",
+		"silver_glazed_terracotta", "cyan_glazed_terracotta", "purple_glazed_terracotta", "blue_glazed_terracotta",
+		"brown_glazed_terracotta", "green_glazed_terracotta", "red_glazed_terracotta", "black_glazed_terracotta",
+		"sandstone", "chiseled_sandstone", "cut_sandstone", "smooth_sandstone",
+		"red_sandstone", "chiseled_red_sandstone", "cut_red_sandstone", "smooth_red_sandstone",
+		"mycelium", "snow_layer", "packed_ice", "deepslate", "calcite",
+		"sand", "red_sand", "suspicious_sand",
+		"gravel", "dirt_with_roots", "tuff", "iron_ore", "deepslate_iron_ore", "raw_iron_block",
+		"copper_ore", "deepslate_copper_ore", "raw_copper_block",
+	}
 }
 
 // canyonCarvableBlocks are the blocks BDS's canyons may cut (list at
 // 0xF60D710).
-var canyonCarvableBlocks = []string{
-	"stone", "granite", "diorite", "andesite", "tuff", "deepslate", "calcite", "dirt", "coarse_dirt", "mud",
-	"podzol", "mycelium", "grass_block", "dirt_with_roots", "hardened_clay",
-	"white_terracotta", "orange_terracotta", "magenta_terracotta", "light_blue_terracotta", "yellow_terracotta",
-	"lime_terracotta", "pink_terracotta", "gray_terracotta", "light_gray_terracotta", "cyan_terracotta",
-	"purple_terracotta", "blue_terracotta", "brown_terracotta", "green_terracotta", "red_terracotta", "black_terracotta",
-	"sandstone", "chiseled_sandstone", "cut_sandstone", "smooth_sandstone",
-	"red_sandstone", "chiseled_red_sandstone", "cut_red_sandstone", "smooth_red_sandstone",
-	"sand", "red_sand", "suspicious_sand", "iron_ore", "deepslate_iron_ore", "raw_iron_block",
-	"copper_ore", "deepslate_copper_ore", "raw_copper_block", "snow", "snow_layer", "packed_ice", "gravel",
-	"sulfur", "cinnabar",
+func canyonCarvableBlocks() []string {
+	return []string{
+		"stone", "granite", "diorite", "andesite", "tuff", "deepslate", "calcite", "dirt", "coarse_dirt", "mud",
+		"podzol", "mycelium", "grass_block", "dirt_with_roots", "hardened_clay",
+		"white_terracotta", "orange_terracotta", "magenta_terracotta", "light_blue_terracotta", "yellow_terracotta",
+		"lime_terracotta", "pink_terracotta", "gray_terracotta", "light_gray_terracotta", "cyan_terracotta",
+		"purple_terracotta", "blue_terracotta", "brown_terracotta", "green_terracotta", "red_terracotta", "black_terracotta",
+		"sandstone", "chiseled_sandstone", "cut_sandstone", "smooth_sandstone",
+		"red_sandstone", "chiseled_red_sandstone", "cut_red_sandstone", "smooth_red_sandstone",
+		"sand", "red_sand", "suspicious_sand", "iron_ore", "deepslate_iron_ore", "raw_iron_block",
+		"copper_ore", "deepslate_copper_ore", "raw_copper_block", "snow", "snow_layer", "packed_ice", "gravel",
+		"sulfur", "cinnabar",
+	}
 }
 
 // blockName returns the block name of a state.

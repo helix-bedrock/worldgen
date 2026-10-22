@@ -7,6 +7,22 @@ import "github.com/helix-bedrock/worldgen/rand"
 // BDS 1.26.52). BDS lets them flow in block ticks after generation; the
 // compare world has none flowing, so only the source is placed.
 
+// Spring placement constants (sub_49C58B0, sub_51D30F0).
+const (
+	// springRockSides is how many of the five checked sides must be rock:
+	// the fifth is the one open side.
+	springRockSides = 4
+	// waterSpringTries and lavaSpringTries are the attempts per chunk.
+	waterSpringTries = 25
+	lavaSpringTries  = 20
+	// waterSpringRange is the height range of water springs above MinY.
+	waterSpringRange = 256
+	// lavaSpringFloor and lavaSpringRange give the lava spring height:
+	// floor plus a triple nested draw that biases it to the bottom.
+	lavaSpringFloor = 8
+	lavaSpringRange = 240
+)
+
 // springFeature places a liquid source in a wall: rock above and below, the
 // spot itself air or rock, and exactly one open side among the four sides
 // and the block below.
@@ -44,7 +60,7 @@ func (f *springFeature) place(w *featureWorld, x, y, z int32, _ *rand.MT) (block
 			air++
 		}
 	}
-	if rock == 4 && air == 1 {
+	if rock == springRockSides && air == 1 {
 		w.set(x, y, z, f.liquid)
 	}
 	return blockPos{x, y, z}, true
@@ -59,15 +75,15 @@ type legacySpringsFeature struct {
 }
 
 func (f *legacySpringsFeature) place(w *featureWorld, x, y, z int32, r *rand.MT) (blockPos, bool) {
-	for range 25 {
+	for range waterSpringTries {
 		dz := r.IntN(16)
-		dy := MinY + r.IntN(256)
+		dy := MinY + r.IntN(waterSpringRange)
 		dx := r.IntN(16)
 		f.water.place(w, x+dx, y+dy, z+dz, r)
 	}
-	for range 20 {
+	for range lavaSpringTries {
 		dz := r.IntN(16)
-		dy := MinY + 8 + r.IntN(r.IntN(r.IntN(240)))
+		dy := MinY + lavaSpringFloor + r.IntN(r.IntN(r.IntN(lavaSpringRange)))
 		dx := r.IntN(16)
 		px, py, pz := x+dx, y+dy, z+dz
 		b := w.biome(px, py, pz)

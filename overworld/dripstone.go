@@ -27,7 +27,9 @@ type speleothemBlocks struct {
 }
 
 // Dripstone thickness states by BDS's index (sub_4DE8B70).
-var dripstoneThickness = [5]string{"tip", "frustum", "middle", "base", "merge"}
+func dripstoneThickness() [5]string {
+	return [5]string{"tip", "frustum", "middle", "base", "merge"}
+}
 
 const (
 	thickTip = iota
@@ -46,7 +48,7 @@ func (o *Overworld) emptyOrWater(b uint32) bool { return b == o.ids.air || o.wat
 // thickness.
 func (s *speleothemBlocks) tipState(o *Overworld, up bool, thick int) uint32 {
 	b := o.withProp(s.tip, "hanging", !up)
-	return o.withProp(b, "dripstone_thickness", dripstoneThickness[thick])
+	return o.withProp(b, "dripstone_thickness", dripstoneThickness()[thick])
 }
 
 // growTip grows a pointed column of height blocks from (x, y, z), up or
@@ -129,7 +131,7 @@ func (f *pointedFeature) place(w *featureWorld, x, y, z int32, r *rand.MT) (bloc
 		ry = y - 1
 	}
 	f.replaceBase(w, x, ry, z)
-	for _, st := range faceStep {
+	for _, st := range faceStep() {
 		if r.Float() < 0.3 {
 			continue
 		}
@@ -138,13 +140,13 @@ func (f *pointedFeature) place(w *featureWorld, x, y, z int32, r *rand.MT) (bloc
 		if nextBool(r) {
 			continue
 		}
-		d := faceStep[r.IntN(6)]
+		d := faceStep()[r.IntN(6)]
 		p = blockPos{p[0] + d[0], p[1] + d[1], p[2] + d[2]}
 		f.replaceBase(w, p[0], p[1], p[2])
 		if nextBool(r) {
 			continue
 		}
-		d = faceStep[r.IntN(6)]
+		d = faceStep()[r.IntN(6)]
 		p = blockPos{p[0] + d[0], p[1] + d[1], p[2] + d[2]}
 		f.replaceBase(w, p[0], p[1], p[2])
 	}
@@ -387,8 +389,8 @@ func (f *largeFeature) place(w *featureWorld, x, y, z int32, r *rand.MT) (blockP
 	var wd wind
 	if radius >= 4 && top.blunt >= 0.6 && bot.blunt >= 0.6 {
 		speed := lerpRounded(r.Float(), 0, 0.3)
-		a := float32(float32(float32(r.Float()*3.1415927)+0) * 10430.378)
-		wd = wind{on: true, y: y, dx: float32(sinTable[uint16(int32(float32(a+16384)))] * speed), dz: float32(speed * sinTable[uint16(int32(a))])}
+		a := float32(float32(float32(r.Float()*pi32)+0) * sinTableRadian)
+		wd = wind{on: true, y: y, dx: float32(sinTable[uint16(int32(float32(a+sinTableQuarter)))] * speed), dz: float32(speed * sinTable[uint16(int32(a))])}
 	}
 	okTop := f.moveBack(w, &top, &wd)
 	okBot := f.moveBack(w, &bot, &wd)
@@ -448,14 +450,14 @@ func (f *largeFeature) fits(w *featureWorld, x, y, z, radius int32, wd *wind) bo
 	rf := float32(radius)
 	step := float32(6.0 / float64(rf))
 	for a := float32(0); ; {
-		i := float32(a * 10430.378)
+		i := float32(a * sinTableRadian)
 		qz := z + int32(float32(sinTable[uint16(int32(i))]*rf))
-		qx := x + int32(float32(sinTable[uint16(int32(float32(i+16384)))]*rf))
+		qx := x + int32(float32(sinTable[uint16(int32(float32(i+sinTableQuarter)))]*rf))
 		if b, _ := w.block(qx, y, qz); o.openOrLava(b) {
 			return false
 		}
 		a = float32(a + step)
-		if a >= 6.2831855 {
+		if a >= twoPi32 {
 			return true
 		}
 	}

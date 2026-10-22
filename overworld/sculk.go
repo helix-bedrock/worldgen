@@ -13,14 +13,20 @@ import (
 // 3 south (+z), 4 west (-x), 5 east (+x); faceStep holds their steps.
 
 // oppositeFace is the face on the other side of each face.
-var oppositeFace = [6]int{1, 0, 3, 2, 5, 4}
+func oppositeFace() [6]int {
+	return [6]int{1, 0, 3, 2, 5, 4}
+}
 
 // faceBits is each face's bit in multi_face_direction_bits.
-var faceBits = [6]uint8{1, 2, 16, 4, 8, 32}
+func faceBits() [6]uint8 {
+	return [6]uint8{1, 2, 16, 4, 8, 32}
+}
 
 // spreadFaceOrder is the face order BDS walks when it spreads a multiface
 // block from every face (sub_CF69030 callers) or removes faces (sub_CF43F70).
-var spreadFaceOrder = [6]int{1, 0, 2, 3, 4, 5}
+func spreadFaceOrder() [6]int {
+	return [6]int{1, 0, 2, 3, 4, 5}
+}
 
 // shuffledFaces is Direction::allShuffled (sub_B4AAAA0): five raw draws
 // insert faces 1 to 5 into [0].
@@ -78,7 +84,7 @@ func (m *multifaceBlock) is(b uint32) bool {
 // hasFace is MultifaceBlock::hasFace (sub_CF66420); false for other blocks.
 func (m *multifaceBlock) hasFace(b uint32, face int) bool {
 	bits, ok := m.bits[b]
-	return ok && bits&faceBits[face] != 0
+	return ok && bits&faceBits()[face] != 0
 }
 
 // sculkBlocks are the states the sculk features place and test.
@@ -92,16 +98,18 @@ type sculkBlocks struct {
 }
 
 // sculkReplaceableWorldGen is sub_CF48280's list, in order.
-var sculkReplaceableWorldGen = []string{
-	"stone", "granite", "diorite", "andesite", "tuff", "deepslate", "grass_block", "podzol", "dirt", "coarse_dirt",
-	"mycelium", "dirt_with_roots", "moss_block", "pale_moss_block", "hardened_clay", "white_terracotta",
-	"orange_terracotta", "magenta_terracotta", "light_blue_terracotta", "yellow_terracotta", "lime_terracotta",
-	"pink_terracotta", "gray_terracotta", "light_gray_terracotta", "cyan_terracotta", "purple_terracotta",
-	"blue_terracotta", "brown_terracotta", "green_terracotta", "red_terracotta", "black_terracotta",
-	"crimson_nylium", "warped_nylium", "netherrack", "basalt", "blackstone", "sand", "red_sand", "gravel",
-	"soul_sand", "soul_soil", "calcite", "smooth_basalt", "clay", "dripstone_block", "end_stone", "sandstone",
-	"red_sandstone", "mud", "muddy_mangrove_roots", "deepslate_bricks", "deepslate_tiles", "cobbled_deepslate",
-	"cracked_deepslate_bricks", "cracked_deepslate_tiles", "polished_deepslate", "sulfur", "cinnabar",
+func sculkReplaceableWorldGen() []string {
+	return []string{
+		"stone", "granite", "diorite", "andesite", "tuff", "deepslate", "grass_block", "podzol", "dirt", "coarse_dirt",
+		"mycelium", "dirt_with_roots", "moss_block", "pale_moss_block", "hardened_clay", "white_terracotta",
+		"orange_terracotta", "magenta_terracotta", "light_blue_terracotta", "yellow_terracotta", "lime_terracotta",
+		"pink_terracotta", "gray_terracotta", "light_gray_terracotta", "cyan_terracotta", "purple_terracotta",
+		"blue_terracotta", "brown_terracotta", "green_terracotta", "red_terracotta", "black_terracotta",
+		"crimson_nylium", "warped_nylium", "netherrack", "basalt", "blackstone", "sand", "red_sand", "gravel",
+		"soul_sand", "soul_soil", "calcite", "smooth_basalt", "clay", "dripstone_block", "end_stone", "sandstone",
+		"red_sandstone", "mud", "muddy_mangrove_roots", "deepslate_bricks", "deepslate_tiles", "cobbled_deepslate",
+		"cracked_deepslate_bricks", "cracked_deepslate_tiles", "polished_deepslate", "sulfur", "cinnabar",
+	}
 }
 
 func (o *Overworld) newSculkBlocks() *sculkBlocks {
@@ -109,7 +117,7 @@ func (o *Overworld) newSculkBlocks() *sculkBlocks {
 		shrieker: o.blockID("minecraft:sculk_shrieker"), movingBlock: o.blockID("minecraft:moving_block"), vein: o.newMultifaceBlock("minecraft:sculk_vein"),
 		replace: map[uint32]bool{}}
 	s.shriekerSummon = o.withProp(s.shrieker, "can_summon", true)
-	for _, n := range sculkReplaceableWorldGen {
+	for _, n := range sculkReplaceableWorldGen() {
 		if b, ok := o.reg.Default("minecraft:" + n); ok {
 			s.replace[b] = true
 		}
@@ -151,7 +159,7 @@ func (o *Overworld) canSpreadInto(w *featureWorld, sb *sculkBlocks, m *multiface
 		return o.multifaceReplaceable(m, b)
 	}
 	// SculkVeinSpreaderConfig (sub_CF4B610).
-	st := faceStep[face]
+	st := faceStep()[face]
 	nb, _ := w.block(x+st[0], y+st[1], z+st[2])
 	if nb == sb.catalyst || nb == sb.movingBlock || nb == sb.sculk {
 		return false
@@ -164,17 +172,17 @@ func (o *Overworld) canSpreadInto(w *featureWorld, sb *sculkBlocks, m *multiface
 func (o *Overworld) placementState(w *featureWorld, m *multifaceBlock, cur uint32, x, y, z int32, face int) uint32 {
 	var bits uint8
 	if b, ok := m.bits[cur]; ok {
-		if b&faceBits[face] != 0 {
+		if b&faceBits()[face] != 0 {
 			return cur
 		}
 		bits = b
 	}
-	st := faceStep[face]
+	st := faceStep()[face]
 	nb, _ := w.block(x+st[0], y+st[1], z+st[2])
-	if !o.sturdyFace(nb, oppositeFace[face]) {
+	if !o.sturdyFace(nb, oppositeFace()[face]) {
 		return cur
 	}
-	return m.states[bits|faceBits[face]]
+	return m.states[bits|faceBits()[face]]
 }
 
 // spreadPos is where a multiface block spreads to and the face it takes.
@@ -189,17 +197,17 @@ type spreadPos struct {
 func (o *Overworld) spreadTarget(w *featureWorld, sb *sculkBlocks, m *multifaceBlock, state uint32, x, y, z int32,
 	face, dir int, samePosOnly bool) (spreadPos, bool) {
 	other := m.vein && !m.is(state)
-	if !other && !m.hasFace(state, face) || dir == face || dir == oppositeFace[face] {
+	if !other && !m.hasFace(state, face) || dir == face || dir == oppositeFace()[face] {
 		return spreadPos{}, false
 	}
 	if !other && m.hasFace(state, dir) {
 		return spreadPos{}, false
 	}
-	d, f := faceStep[dir], faceStep[face]
+	d, f := faceStep()[dir], faceStep()[face]
 	cands := [3]spreadPos{
 		{x, y, z, dir},
 		{x + d[0], y + d[1], z + d[2], face},
-		{x + d[0] + f[0], y + d[1] + f[1], z + d[2] + f[2], oppositeFace[dir]},
+		{x + d[0] + f[0], y + d[1] + f[1], z + d[2] + f[2], oppositeFace()[dir]},
 	}
 	n := 3
 	if samePosOnly {
@@ -232,8 +240,8 @@ func (o *Overworld) spreadTo(w *featureWorld, m *multifaceBlock, p spreadPos) bo
 // (sub_CF69030 for each face) and reports whether anything was placed.
 func (o *Overworld) spreadAll(w *featureWorld, sb *sculkBlocks, m *multifaceBlock, state uint32, x, y, z int32, samePosOnly bool) bool {
 	n := 0
-	for _, face := range spreadFaceOrder {
-		for _, dir := range spreadFaceOrder {
+	for _, face := range spreadFaceOrder() {
+		for _, dir := range spreadFaceOrder() {
 			if p, ok := o.spreadTarget(w, sb, m, state, x, y, z, face, dir, samePosOnly); ok && o.spreadTo(w, m, p) {
 				n++
 			}
@@ -245,7 +253,7 @@ func (o *Overworld) spreadAll(w *featureWorld, sb *sculkBlocks, m *multifaceBloc
 // removeVeinFace is MultifaceBlock::removeFace (sub_CF67AA0) without a
 // level: the vein loses a face, or turns to air with none left.
 func (o *Overworld) removeVeinFace(w *featureWorld, sb *sculkBlocks, cur uint32, x, y, z int32, face int) {
-	bits := sb.vein.bits[cur] &^ faceBits[face]
+	bits := sb.vein.bits[cur] &^ faceBits()[face]
 	if bits != 0 {
 		w.set(x, y, z, sb.vein.states[bits])
 		return
@@ -256,12 +264,12 @@ func (o *Overworld) removeVeinFace(w *featureWorld, sb *sculkBlocks, cur uint32,
 // veinDischarged is SculkVeinBlock's onDischarged (sub_CF43F70): faces
 // resting on sculk are removed.
 func (o *Overworld) veinDischarged(w *featureWorld, sb *sculkBlocks, x, y, z int32) {
-	for _, face := range spreadFaceOrder {
+	for _, face := range spreadFaceOrder() {
 		cur, _ := w.block(x, y, z)
 		if !sb.vein.hasFace(cur, face) {
 			continue
 		}
-		st := faceStep[face]
+		st := faceStep()[face]
 		if nb, _ := w.block(x+st[0], y+st[1], z+st[2]); nb == sb.sculk {
 			o.removeVeinFace(w, sb, cur, x, y, z, face)
 		}
@@ -291,9 +299,11 @@ type sculkSpreader struct {
 
 // sculkNeighbours are the 18 non-corner neighbour offsets in BDS's order
 // (qword_1C7B808) before shuffling.
-var sculkNeighbours = [18][3]int32{
-	{-1, -1, 0}, {0, -1, -1}, {0, -1, 0}, {0, -1, 1}, {1, -1, 0}, {-1, 0, -1}, {-1, 0, 0}, {-1, 0, 1}, {0, 0, -1},
-	{0, 0, 1}, {1, 0, -1}, {1, 0, 0}, {1, 0, 1}, {-1, 1, 0}, {0, 1, -1}, {0, 1, 0}, {0, 1, 1}, {1, 1, 0},
+func sculkNeighbours() [18][3]int32 {
+	return [18][3]int32{
+		{-1, -1, 0}, {0, -1, -1}, {0, -1, 0}, {0, -1, 1}, {1, -1, 0}, {-1, 0, -1}, {-1, 0, 0}, {-1, 0, 1}, {0, 0, -1},
+		{0, 0, 1}, {1, 0, -1}, {1, 0, 0}, {1, 0, 1}, {-1, 1, 0}, {0, 1, -1}, {0, 1, 0}, {0, 1, 1}, {1, 1, 0},
+	}
 }
 
 // sculkKind is the behaviour a cursor's block has.
@@ -402,7 +412,7 @@ func (o *Overworld) sculkMove(w *featureWorld, sb *sculkBlocks, x, y, z int32, o
 	var mx, my, mz int32
 	found := false
 	for _, i := range order {
-		d := sculkNeighbours[i]
+		d := sculkNeighbours()[i]
 		nx, ny, nz := x+d[0], y+d[1], z+d[2]
 		b, _ := w.block(nx, ny, nz)
 		kind := sb.kind(b)
@@ -433,9 +443,9 @@ func (o *Overworld) sculkUnobstructed(w *featureWorld, x, y, z int32, d [3]int32
 		a, b = signFace(d[0], 4, 5), signFace(d[1], 0, 1)
 	}
 	for _, f := range [2]int{a, b} {
-		st := faceStep[f]
+		st := faceStep()[f]
 		nb, _ := w.block(x+st[0], y+st[1], z+st[2])
-		if !o.sturdyFace(nb, oppositeFace[f]) {
+		if !o.sturdyFace(nb, oppositeFace()[f]) {
 			return true
 		}
 	}
@@ -452,11 +462,11 @@ func signFace(v int32, neg, pos int) int {
 // veinOnReplaceable reports whether a vein has a face on a block the
 // spreader may replace, checking faces up, down, north, south, west, east.
 func (o *Overworld) veinOnReplaceable(w *featureWorld, sb *sculkBlocks, b uint32, x, y, z int32) bool {
-	for _, face := range spreadFaceOrder {
+	for _, face := range spreadFaceOrder() {
 		if !sb.vein.hasFace(b, face) {
 			continue
 		}
-		st := faceStep[face]
+		st := faceStep()[face]
 		if nb, _ := w.block(x+st[0], y+st[1], z+st[2]); sb.replace[nb] {
 			return true
 		}
@@ -572,18 +582,18 @@ func (o *Overworld) veinUseCharge(w *featureWorld, sb *sculkBlocks, sp *sculkSpr
 		if !sb.vein.hasFace(cur, d) {
 			continue
 		}
-		st := faceStep[d]
+		st := faceStep()[d]
 		nx, ny, nz := c.x+st[0], c.y+st[1], c.z+st[2]
 		if nb, _ := w.block(nx, ny, nz); !sb.replace[nb] {
 			continue
 		}
 		w.set(nx, ny, nz, sb.sculk)
-		opp := oppositeFace[d]
-		for _, f := range spreadFaceOrder {
+		opp := oppositeFace()[d]
+		for _, f := range spreadFaceOrder() {
 			if f == opp {
 				continue
 			}
-			s := faceStep[f]
+			s := faceStep()[f]
 			o.veinDischarged(w, sb, nx+s[0], ny+s[1], nz+s[2])
 		}
 		o.spreadAll(w, sb, sb.vein, sb.sculk, nx, ny, nz, false)
@@ -627,7 +637,7 @@ func (o *Overworld) parseSculkPatch(raw json.RawMessage) (placer, error) {
 		return nil, nil
 	}
 	f := &sculkPatchFeature{sb: sb, on: parseMatcher(r.On), centralChance: r.CentralChance, cursors: r.Cursors,
-		charge: r.Charge, attempts: r.Attempts, growthRounds: r.Growth, spreadRounds: r.Spread, extra: parseIntRange(r.Extra, 0)}
+		charge: r.Charge, attempts: r.Attempts, growthRounds: r.Growth, spreadRounds: r.Spread, extra: parseIntRange(r.Extra)}
 	if r.Central != "" {
 		f.central, f.hasCentral = o.reg.Default(r.Central)
 	}
@@ -647,8 +657,8 @@ func (f *sculkPatchFeature) place(w *featureWorld, x, y, z int32, r *rand.MT) (b
 			return blockPos{}, false
 		}
 		found := false
-		for _, face := range spreadFaceOrder {
-			st := faceStep[face]
+		for _, face := range spreadFaceOrder() {
+			st := faceStep()[face]
 			nb, _ := w.block(x+st[0], y+st[1], z+st[2])
 			if f.on.empty() && o.solidBlock(nb) || !f.on.empty() && f.on.match(o, nb) {
 				found = true
@@ -768,7 +778,7 @@ func (f *multifaceFeature) place(w *featureWorld, x, y, z int32, r *rand.MT) (bl
 	for _, d := range dirs[:n] {
 		// BDS steps from the origin every time, so the search range only
 		// repeats the same test.
-		st := faceStep[d]
+		st := faceStep()[d]
 		px, py, pz := x+st[0], y+st[1], z+st[2]
 		nb, _ := w.block(px, py, pz)
 		if !f.airOrWater(o, nb) && !f.m.is(nb) {
@@ -790,7 +800,7 @@ func (f *multifaceFeature) placeIfValid(w *featureWorld, x, y, z int32, r *rand.
 	cur, _ := w.block(x, y, z)
 	face := -1
 	for _, d := range dirs {
-		st := faceStep[d]
+		st := faceStep()[d]
 		if nb, _ := w.block(x+st[0], y+st[1], z+st[2]); f.on.match(o, nb) {
 			face = d
 			break

@@ -10,8 +10,39 @@ import "github.com/helix-bedrock/worldgen/rand"
 // numpad (1 = -x -z corner, 5 = top, 9 = +x +z corner), 0 is the inside and 10 is the
 // stem.
 
+// huge_mushroom_bits values the placer uses.
+const (
+	capInside   = 0
+	capCornerNW = 1
+	capCornerNE = 3
+	capTop      = 5
+	capCornerSW = 7
+	capCornerSE = 9
+	capStem     = 10
+	// capRowStep is the bits step from one z row of the numpad to the next.
+	capRowStep = 3
+	// mushroomBitsCount is the number of huge_mushroom_bits values.
+	mushroomBitsCount = 11
+)
+
+// Huge mushroom shape constants (sub_D2E8090).
+const (
+	// mushroomMinHeight and mushroomHeightRange give the stem height,
+	// doubled with chance 1 in mushroomTallChance.
+	mushroomMinHeight   = 4
+	mushroomHeightRange = 3
+	mushroomTallChance  = 12
+	// mushroomCapRadius is the brown cap's radius and the width of the
+	// space checked from 4 blocks up.
+	mushroomCapRadius = 3
+	// mushroomDomeDrop is how far the red dome reaches below the top, and
+	// mushroomDomeRadius its radius below the top layer.
+	mushroomDomeDrop   = 3
+	mushroomDomeRadius = 2
+)
+
 type hugeMushroomFeature struct {
-	brown, red, stem [11]uint32 // by huge_mushroom_bits
+	brown, red, stem [mushroomBitsCount]uint32 // by huge_mushroom_bits
 	water            uint32
 	plants           [2]uint32 // small brown and red mushrooms: a huge one may grow from them
 	soil             []uint32
@@ -19,7 +50,7 @@ type hugeMushroomFeature struct {
 
 func (o *Overworld) newHugeMushroom() *hugeMushroomFeature {
 	f := &hugeMushroomFeature{water: o.ids.water}
-	for i := range 11 {
+	for i := range mushroomBitsCount {
 		f.brown[i], _ = o.reg.Lookup("minecraft:brown_mushroom_block", map[string]any{"huge_mushroom_bits": int32(i)})
 		f.red[i], _ = o.reg.Lookup("minecraft:red_mushroom_block", map[string]any{"huge_mushroom_bits": int32(i)})
 		f.stem[i], _ = o.reg.Lookup("minecraft:mushroom_stem", map[string]any{"huge_mushroom_bits": int32(i)})
@@ -38,8 +69,8 @@ func (o *Overworld) newHugeMushroom() *hugeMushroomFeature {
 
 func (f *hugeMushroomFeature) place(w *featureWorld, x, y, z int32, r *rand.MT) (blockPos, bool) {
 	typ := r.IntN(2) // 0 brown (flat cap), 1 red (dome)
-	h := r.IntN(3) + 4
-	if r.IntN(12) == 0 {
+	h := r.IntN(mushroomHeightRange) + mushroomMinHeight
+	if r.IntN(mushroomTallChance) == 0 {
 		h *= 2
 	}
 	if y <= MinY || y+h+1 >= MaxY {
@@ -49,8 +80,8 @@ func (f *hugeMushroomFeature) place(w *featureWorld, x, y, z int32, r *rand.MT) 
 	// origin may also hold a small mushroom.
 	for cy := y; cy <= y+h+1; cy++ {
 		rad := int32(0)
-		if cy > y+3 {
-			rad = 3
+		if cy > y+mushroomCapRadius {
+			rad = mushroomCapRadius
 		}
 		for cx := x - rad; cx <= x+rad; cx++ {
 			for cz := z - rad; cz <= z+rad; cz++ {
@@ -95,20 +126,20 @@ func (f *hugeMushroomFeature) place(w *featureWorld, x, y, z int32, r *rand.MT) 
 	}
 	start := top
 	if typ == 1 {
-		start = top - 3
+		start = top - mushroomDomeDrop
 	}
 	for cy := start; cy <= top; cy++ {
-		rad := int32(3)
+		rad := int32(mushroomCapRadius)
 		if typ == 1 {
 			rad = 1
 			if cy < top {
-				rad = 2
+				rad = mushroomDomeRadius
 			}
 		}
 		x0, x1, z0, z1 := x-rad, x+rad, z-rad, z+rad
 		for cx := x0; cx <= x1; cx++ {
 			for cz := z0; cz <= z1; cz++ {
-				bits := int32(5)
+				bits := int32(capTop)
 				if cx == x0 {
 					bits--
 				}
@@ -116,10 +147,10 @@ func (f *hugeMushroomFeature) place(w *featureWorld, x, y, z int32, r *rand.MT) 
 					bits++
 				}
 				if cz == z0 {
-					bits -= 3
+					bits -= capRowStep
 				}
 				if cz == z1 {
-					bits += 3
+					bits += capRowStep
 				}
 				if typ == 0 || cy < top {
 					if (cx == x0 || cx == x1) && (cz == z0 || cz == z1) {
@@ -127,19 +158,19 @@ func (f *hugeMushroomFeature) place(w *featureWorld, x, y, z int32, r *rand.MT) 
 					}
 					switch {
 					case cx == x-(rad-1) && cz == z0, cx == x0 && cz == z-(rad-1):
-						bits = 1
+						bits = capCornerNW
 					case cx == x+(rad-1) && cz == z0, cx == x1 && cz == z-(rad-1):
-						bits = 3
+						bits = capCornerNE
 					case cx == x-(rad-1) && cz == z1, cx == x0 && cz == z+(rad-1):
-						bits = 7
+						bits = capCornerSW
 					case cx == x+(rad-1) && cz == z1, cx == x1 && cz == z+(rad-1):
-						bits = 9
+						bits = capCornerSE
 					}
 				}
-				if bits == 5 && cy < top {
-					bits = 0
+				if bits == capTop && cy < top {
+					bits = capInside
 				}
-				if bits == 0 && base < top-1 {
+				if bits == capInside && base < top-1 {
 					continue
 				}
 				if b, ok := w.block(cx, cy, cz); ok && !w.o.solidMaterial(b) {
@@ -150,7 +181,7 @@ func (f *hugeMushroomFeature) place(w *featureWorld, x, y, z int32, r *rand.MT) 
 	}
 	for i := range h {
 		if b, ok := w.block(x, base+i, z); ok && !w.o.solidMaterial(b) {
-			w.set(x, base+i, z, f.stem[10])
+			w.set(x, base+i, z, f.stem[capStem])
 		}
 	}
 	return blockPos{x, y, z}, true

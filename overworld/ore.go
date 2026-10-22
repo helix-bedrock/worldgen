@@ -60,17 +60,28 @@ func (o *Overworld) parseOre(raw json.RawMessage) (*oreFeature, string, error) {
 
 // upgradedBlocks maps old block-with-state names in the vanilla data to the
 // split blocks of 1.26, as BDS upgrades them on load.
-var upgradedBlocks = map[string]string{
-	"minecraft:stone/granite": "minecraft:granite", "minecraft:stone/diorite": "minecraft:diorite",
-	"minecraft:stone/andesite": "minecraft:andesite", "minecraft:dirt/coarse": "minecraft:coarse_dirt",
-	"minecraft:tallgrass/tall": blockShortGrass, "minecraft:tallgrass/default": blockShortGrass,
-	"minecraft:tallgrass/fern": blockFern,
+func upgradedBlocks(name string) (string, bool) {
+	switch name {
+	case "minecraft:stone/granite":
+		return "minecraft:granite", true
+	case "minecraft:stone/diorite":
+		return "minecraft:diorite", true
+	case "minecraft:stone/andesite":
+		return "minecraft:andesite", true
+	case "minecraft:dirt/coarse":
+		return "minecraft:coarse_dirt", true
+	case "minecraft:tallgrass/tall", "minecraft:tallgrass/default":
+		return blockShortGrass, true
+	case "minecraft:tallgrass/fern":
+		return blockFern, true
+	}
+	return "", false
 }
 
 func upgradedName(b biome.Block) string {
 	for _, v := range b.States {
 		if s, ok := v.(string); ok {
-			if n, ok := upgradedBlocks[b.Name+"/"+s]; ok {
+			if n, ok := upgradedBlocks(b.Name + "/" + s); ok {
 				return n
 			}
 		}
@@ -157,7 +168,9 @@ func (w *featureWorld) airNextTo(x, y, z int32) bool {
 
 // legacyDirections names the old integer direction state (0 south, 1 west,
 // 2 north, 3 east) as minecraft:cardinal_direction, which replaced it.
-var legacyDirections = [4]string{"south", "west", "north", "east"}
+func legacyDirections() [4]string {
+	return [4]string{"south", "west", "north", "east"}
+}
 
 // upgradedStates rewrites old states data files still use (the integer
 // direction of dripleaves) to their current form.
@@ -171,6 +184,6 @@ func upgradedStates(st map[string]any) (map[string]any, bool) {
 		out[k] = v
 	}
 	delete(out, "direction")
-	out[stateCardinalDirection] = legacyDirections[int(d)]
+	out[stateCardinalDirection] = legacyDirections()[int(d)]
 	return out, true
 }

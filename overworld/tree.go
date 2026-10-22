@@ -138,10 +138,14 @@ func (o *Overworld) parseDecoration(raw *rawDecoration) (decoration, error) {
 
 // vineSides are the four sides decorations look at, in BDS's order (x-1,
 // x+1, z-1, z+1), with the vine_direction_bits that face the block.
-var vineSides = [4]struct {
+type vineSide struct {
 	dx, dz int32
 	bits   int32
-}{{-1, 0, 8}, {1, 0, 2}, {0, -1, 1}, {0, 1, 4}}
+}
+
+func vineSides() [4]vineSide {
+	return [4]vineSide{{-1, 0, 8}, {1, 0, 2}, {0, -1, 1}, {0, 1, 4}}
+}
 
 // apply rolls each side and hangs a column of the decoration block into
 // air (sub_D299270 / sub_D299070).
@@ -155,7 +159,7 @@ func (d *decoration) applyMask(w *featureWorld, x, y, z int32, r *rand.MT, m sid
 	if !d.set {
 		return
 	}
-	for i, s := range vineSides {
+	for i, s := range vineSides() {
 		if !m[i] {
 			continue
 		}

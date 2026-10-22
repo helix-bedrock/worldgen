@@ -8,14 +8,28 @@ import "github.com/helix-bedrock/worldgen/rand"
 // (place sub_4987380) of mossy cobblestone with start radius 0, registered in
 // sub_4E2BB50.
 
+// Forest rock constants (sub_51D2470, sub_4987380).
+const (
+	// forestRockMaxCount bounds the rocks per chunk (zero to two).
+	forestRockMaxCount = 3
+	// blobFloorGap keeps the blob above the bottom of the world.
+	blobFloorGap = 3
+	// blobBalls is the number of balls in one blob.
+	blobBalls = 3
+	// blobRadiusScale and blobRadiusBias turn the three radii into the
+	// ball's radius: their mean plus a half.
+	blobRadiusScale = 0.333
+	blobRadiusBias  = 0.5
+)
+
 type legacyForestRockFeature struct {
 	rock featureRef
 }
 
 func (f *legacyForestRockFeature) place(w *featureWorld, x, y, z int32, r *rand.MT) (blockPos, bool) {
-	for n := r.IntN(3); n > 0; n-- {
-		dz := r.IntN(16)
-		dx := r.IntN(16)
+	for n := r.IntN(forestRockMaxCount); n > 0; n-- {
+		dz := r.IntN(chunkEdge)
+		dx := r.IntN(chunkEdge)
 		px, pz := x+dx, z+dz
 		f.rock.place(w, px, w.heightmap(px, pz), pz, r)
 	}
@@ -36,22 +50,22 @@ func (f *blockBlobFeature) ground(w *featureWorld, b uint32) bool {
 }
 
 func (f *blockBlobFeature) place(w *featureWorld, x, y, z int32, r *rand.MT) (blockPos, bool) {
-	for y > MinY+3 {
+	for y > MinY+blobFloorGap {
 		b, ok := w.block(x, y-1, z)
 		if ok && b != w.o.ids.air && f.ground(w, b) {
 			break
 		}
 		y--
 	}
-	if y <= MinY+3 || f.radius < 0 {
-		return blockPos{}, y > MinY+3
+	if y <= MinY+blobFloorGap || f.radius < 0 {
+		return blockPos{}, y > MinY+blobFloorGap
 	}
 	cx, cy, cz := x, y, z
-	for range 3 {
+	for range blobBalls {
 		rx := f.radius + r.IntN(2)
 		ry := f.radius + r.IntN(2)
 		rz := f.radius + r.IntN(2)
-		d := float32(rx+ry+rz)*0.333 + 0.5
+		d := float32(rx+ry+rz)*blobRadiusScale + blobRadiusBias
 		dd := d * d
 		for bx := cx - rx; bx <= cx+rx; bx++ {
 			for by := cy - ry; by <= cy+ry; by++ {
