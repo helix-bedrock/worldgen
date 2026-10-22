@@ -1,10 +1,6 @@
-# worldgen — Bedrock world generation in Go, built from Bedrock's own code
-
----
-
 <div align="center">
 
-<h3>worldgen</h3>
+<h1>worldgen</h1>
 
 <p>
   <b>Vanilla Minecraft: Bedrock Edition world generation</b><br>
