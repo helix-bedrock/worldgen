@@ -26,8 +26,23 @@ const (
 	treasureSeparation = 2
 )
 
-// treasureBiomes are the biomes all around a buried treasure (radius 3).
-var treasureBiomes = []string{"beach", "cold_beach", "stone_beach", "mushroom_island_shore"}
+// Buried treasure chest placement (sub_4E3FA50).
+const (
+	// treasureBiomeReach is the radius of the start biome test, in blocks.
+	treasureBiomeReach = 3
+	// treasureMinDepth is the least the chest starts below the top solid
+	// block.
+	treasureMinDepth = 4
+	// treasureExtraDepth bounds the random depth added to treasureMinDepth.
+	treasureExtraDepth = 2
+	// treasureFloorY is the lowest y the chest moves down to.
+	treasureFloorY = 6
+)
+
+// treasureBiomes are the biomes all around a buried treasure.
+func treasureBiomes() []string {
+	return []string{"beach", "cold_beach", "stone_beach", "mushroom_island_shore"}
+}
 
 // isTreasureChunk reports whether a buried treasure starts in chunk
 // (cx, cz).
@@ -36,7 +51,7 @@ func (o *Overworld) isTreasureChunk(cx, cz int32) bool {
 	if x != cx || z != cz {
 		return false
 	}
-	return o.biomesOnly(cx*16+8, o.structureY(cx, cz, 1), cz*16+8, 3, o.treasureBiome)
+	return o.biomesOnly(cx*16+8, o.structureY(cx, cz, noSurfaceY), cz*16+8, treasureBiomeReach, o.treasureBiome)
 }
 
 // treasurePick is the chunk a buried treasure region picks.
@@ -54,12 +69,12 @@ func (o *Overworld) treasurePick(rx, rz int32) (int32, int32) {
 // drawing from r.
 func (o *Overworld) treasureSpot(cx, cz int32, c *Chunk, raw *PackedChunk, r *rand.MT) [3]int32 {
 	x, z := cx*16+8, cz*16+8
-	y := o.topSolid(raw, x, z, false) - r.IntN(2) - 4
+	y := o.topSolid(raw, x, z, false) - r.IntN(treasureExtraDepth) - treasureMinDepth
 	for !(o.treasureSolid(c, x, y+1, z) && o.treasureSolid(c, x, y, z-1) && o.treasureSolid(c, x+1, y, z) &&
-		o.treasureSolid(c, x, y, z+1) && o.treasureSolid(c, x-1, y, z)) && y >= 6 {
+		o.treasureSolid(c, x, y, z+1) && o.treasureSolid(c, x-1, y, z)) && y >= treasureFloorY {
 		y--
 	}
-	for !o.treasureSolid(c, x, y-1, z) && y >= 6 {
+	for !o.treasureSolid(c, x, y-1, z) && y >= treasureFloorY {
 		y--
 	}
 	return [3]int32{x, y, z}

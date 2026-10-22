@@ -14,8 +14,8 @@ import (
 // read is still two array lookups. It is immutable once made, so it may be
 // read from many goroutines.
 type PackedChunk struct {
-	subs   [Height / 16]packedSub
-	biomes [Height / 16]packedSub
+	subs   [Height / subChunkHeight]packedSub
+	biomes [Height / subChunkHeight]packedSub
 	// biomeList holds the distinct biomes in BDS's order (see chunkBiomes).
 	biomeList []uint32
 	// water and blockEntities are those of structures placed in the
@@ -33,7 +33,7 @@ type packedSub struct {
 
 // at returns the state at Chunk index i.
 func (p *PackedChunk) at(i int) uint32 {
-	return uint32(p.subs[i>>12].at(i))
+	return uint32(p.subs[i>>subChunkShift].at(i))
 }
 
 // Block returns the state index at local (x, z) and world y.
@@ -44,16 +44,16 @@ func (p *PackedChunk) Block(x, y, z int) uint32 {
 // Biome returns the biome ID at local (x, z) and world y.
 func (p *PackedChunk) Biome(x, y, z int) uint32 {
 	i := (y-MinY)<<8 | z<<4 | x
-	return uint32(p.biomes[i>>12].at(i))
+	return uint32(p.biomes[i>>subChunkShift].at(i))
 }
 
 // at returns the value at Chunk index i of a sub-chunk.
 func (s *packedSub) at(i int) uint16 {
 	if s.idx != nil {
-		return s.palette[s.idx[i&4095]]
+		return s.palette[s.idx[i&(subChunkBlocks-1)]]
 	}
 	if s.wide != nil {
-		return s.wide[i&4095]
+		return s.wide[i&(subChunkBlocks-1)]
 	}
 	return s.one
 }
@@ -77,11 +77,15 @@ func Pack(c *Chunk) *PackedChunk {
 }
 
 // packSubs packs src (Chunk index order) into one packedSub per sub-chunk.
-func packSubs(subs *[Height / 16]packedSub, src []uint16) {
-	var single [Height / 16]bool
+// bytePaletteSize is the most states a sub-chunk palette indexed by one byte
+// can hold.
+const bytePaletteSize = 256
+
+func packSubs(subs *[Height / subChunkHeight]packedSub, src []uint16) {
+	var single [Height / subChunkHeight]bool
 	mixed := 0
 	for s := range subs {
-		vals := src[s<<12 : (s+1)<<12]
+		vals := src[s<<subChunkShift : (s+1)<<subChunkShift]
 		single[s] = true
 		for _, b := range vals {
 			if b != vals[0] {
@@ -92,15 +96,15 @@ func packSubs(subs *[Height / 16]packedSub, src []uint16) {
 		}
 	}
 	// The index arrays of all sub-chunks share one allocation.
-	slab := make([]uint8, mixed<<12)
-	var pal [256]uint16
+	slab := make([]uint8, mixed<<subChunkShift)
+	var pal [bytePaletteSize]uint16
 	for s := range subs {
-		vals := src[s<<12 : (s+1)<<12]
+		vals := src[s<<subChunkShift : (s+1)<<subChunkShift]
 		if single[s] {
 			subs[s].one = vals[0]
 			continue
 		}
-		idx := slab[:4096:4096]
+		idx := slab[:subChunkBlocks:subChunkBlocks]
 		pal[0] = vals[0]
 		n, last, lastIdx := 1, vals[0], uint8(0)
 		ok := true
@@ -126,17 +130,17 @@ func packSubs(subs *[Height / 16]packedSub, src []uint16) {
 			subs[s].wide = append([]uint16(nil), vals...)
 			continue
 		}
-		slab = slab[4096:]
+		slab = slab[subChunkBlocks:]
 		subs[s].palette = append([]uint16(nil), pal[:n]...)
 		subs[s].idx = idx
 	}
 }
 
 // unpackSubs writes packed sub-chunks back into dst (Chunk index order).
-func unpackSubs(subs *[Height / 16]packedSub, dst []uint16) {
+func unpackSubs(subs *[Height / subChunkHeight]packedSub, dst []uint16) {
 	for s := range subs {
 		sub := &subs[s]
-		d := dst[s<<12 : (s+1)<<12]
+		d := dst[s<<subChunkShift : (s+1)<<subChunkShift]
 		switch {
 		case sub.idx != nil:
 			for j, k := range sub.idx {

@@ -124,7 +124,7 @@ func (o *Overworld) mesaSurface(c *Chunk, mt *rand.MT, col *surfaceColumn, b *bi
 
 	noise3 := float32(float64(col.noise) / 3)
 	rnd := mt.Float()
-	cs := float32(math.Cos(float64(3.1415927 * noise3)))
+	cs := float32(math.Cos(float64(pi32 * noise3)))
 	top := int32(fillHeight - 1)
 	start := col.start
 

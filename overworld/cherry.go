@@ -86,7 +86,13 @@ func (c *cherryTrunk) height(r *rand.MT) int32 {
 }
 
 // Branch directions by index: +z, -x, -z, +x.
-var cherryDX, cherryDZ = [4]int32{0, -1, 0, 1}, [4]int32{1, 0, -1, 0}
+func cherryDX() [4]int32 {
+	return [4]int32{0, -1, 0, 1}
+}
+
+func cherryDZ() [4]int32 {
+	return [4]int32{1, 0, -1, 0}
+}
 
 func (t *treeFeature) cherryTrunk(w *featureWorld, x, y, z, h int32, r *rand.MT) (blockPos, bool) {
 	c := &t.cherry
@@ -140,7 +146,7 @@ func (t *treeFeature) cherryTrunk(w *featureWorld, x, y, z, h int32, r *rand.MT)
 	if kind == 2 {
 		tops = append(tops, blockPos{x, y + trunkLen, z})
 	}
-	dx, dz := cherryDX[dir], cherryDZ[dir]
+	dx, dz := cherryDX()[dir], cherryDZ()[dir]
 	tops = append(tops, t.cherryBranch(w, x, y, z, h, dx, dz, first, first < trunkLen-1, sideLog, r))
 	if kind > 0 {
 		tops = append(tops, t.cherryBranch(w, x, y, z, h, -dx, -dz, second, second < trunkLen-1, sideLog, r))
@@ -247,9 +253,9 @@ func (t *treeFeature) cherryHanging(w *featureWorld, c *cherryCanopy, p blockPos
 	// The perpendicular side of each direction (byte_1ADA5B7).
 	perp := [4]int{3, 0, 1, 2}
 	for d := range 4 {
-		ox, oz := p[0]+rng*cherryDX[perp[d]], p[2]+rng*cherryDZ[perp[d]]
+		ox, oz := p[0]+rng*cherryDX()[perp[d]], p[2]+rng*cherryDZ()[perp[d]]
 		for k := -rng; k < rng; k++ {
-			x, z := ox+cherryDX[d]*k, oz+cherryDZ[d]*k
+			x, z := ox+cherryDX()[d]*k, oz+cherryDZ()[d]*k
 			if b, ok := w.block(x, p[1]+ly, z); !ok || b != c.leaf {
 				continue
 			}

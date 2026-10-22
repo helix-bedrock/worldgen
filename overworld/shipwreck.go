@@ -40,28 +40,79 @@ const (
 )
 
 // shipBiomes are the biomes a shipwreck starts in (sub_4E9C480).
-var shipBiomes = []string{"beach", "cold_beach", "mushroom_island_shore", "ocean", "deep_ocean", "cold_ocean",
-	"deep_cold_ocean", "lukewarm_ocean", "deep_lukewarm_ocean", "frozen_ocean", "deep_frozen_ocean", "warm_ocean"}
+func shipBiomes() []string {
+	return []string{"beach", "cold_beach", "mushroom_island_shore", "ocean", "deep_ocean", "cold_ocean",
+		"deep_cold_ocean", "lukewarm_ocean", "deep_lukewarm_ocean", "frozen_ocean", "deep_frozen_ocean", "warm_ocean"}
+}
 
 // shipBeaches are the biomes that make a beached ship (mask 0x4018000).
-var shipBeaches = []string{"beach", "cold_beach", "mushroom_island_shore"}
+func shipBeaches() []string { return []string{"beach", "cold_beach", "mushroom_island_shore"} }
 
 // shipTemplates in BDS's order (sub_4E9B6C0); beached ships draw from the
-// first 14, which leaves out the upside-down ones.
-var shipTemplates = []string{"swwithmast", "swwithmastdegraded",
-	"swsidewaysfull", "swsidewaysfronthalf", "swsidewaysbackhalf",
-	"swsidewaysfulldegraded", "swsidewaysfronthalfdegraded", "swsidewaysbackhalfdegraded",
-	"swrightsideupfull", "swrightsideupfronthalf", "swrightsideupbackhalf",
-	"swrightsideupfulldegraded", "swrightsideupfronthalfdegraded", "swrightsideupbackhalfdegraded",
-	"swupsidedownfull", "swupsidedownfronthalf", "swupsidedownbackhalf",
-	"swupsidedownfulldegraded", "swupsidedownfronthalfdegraded", "swupsidedownbackhalfdegraded"}
+// first shipUprightTemplates, which leaves out the upside-down ones.
+func shipTemplates() [20]string {
+	return [...]string{"swwithmast", "swwithmastdegraded",
+		"swsidewaysfull", "swsidewaysfronthalf", "swsidewaysbackhalf",
+		"swsidewaysfulldegraded", "swsidewaysfronthalfdegraded", "swsidewaysbackhalfdegraded",
+		"swrightsideupfull", "swrightsideupfronthalf", "swrightsideupbackhalf",
+		"swrightsideupfulldegraded", "swrightsideupfronthalfdegraded", "swrightsideupbackhalfdegraded",
+		"swupsidedownfull", "swupsidedownfronthalf", "swupsidedownbackhalf",
+		"swupsidedownfulldegraded", "swupsidedownfronthalfdegraded", "swupsidedownbackhalfdegraded"}
+}
+
+// Bedrock's legacy wood types by index.
+const (
+	woodOak     = 0
+	woodSpruce  = 1
+	woodBirch   = 2
+	woodJungle  = 3
+	woodAcacia  = 4
+	woodDarkOak = 5
+)
 
 // woodNames are Bedrock's legacy wood types by index.
-var woodNames = [6]string{"oak", "spruce", "birch", "jungle", "acacia", "dark_oak"}
+func woodNames() [6]string {
+	return [...]string{woodOak: "oak", woodSpruce: "spruce", woodBirch: "birch", woodJungle: "jungle",
+		woodAcacia: "acacia", woodDarkOak: "dark_oak"}
+}
 
 // shipWoods are the wood pairs a ship draws from: what its oak and its dark
 // oak become (qword_1523D20).
-var shipWoods = [9][2]uint8{{0, 1}, {3, 1}, {5, 3}, {5, 1}, {1, 0}, {1, 3}, {1, 5}, {0, 2}, {1, 4}}
+func shipWoods() [9][2]uint8 {
+	return [...][2]uint8{{woodOak, woodSpruce}, {woodJungle, woodSpruce}, {woodDarkOak, woodJungle},
+		{woodDarkOak, woodSpruce}, {woodSpruce, woodOak}, {woodSpruce, woodJungle}, {woodSpruce, woodDarkOak},
+		{woodOak, woodBirch}, {woodSpruce, woodAcacia}}
+}
+
+// Shipwreck layout (sub_4E9D1F0, sub_4E9D4A0, sub_4E9D850).
+const (
+	// shipBeachReach and shipOceanReach are the radius, in blocks, of the
+	// same-biome test around a beached and an ocean start.
+	shipBeachReach = 10
+	shipOceanReach = 20
+	// shipMonumentGap is how many chunks around a start must hold no
+	// monument start (from -shipMonumentGap to shipMonumentGap-1).
+	shipMonumentGap = 5
+	// shipOceanBoxDrop is how far below sea level the start puts an ocean
+	// ship's piece box.
+	shipOceanBoxDrop = 33
+	// shipUprightTemplates is how many templates come before the
+	// upside-down ones.
+	shipUprightTemplates = 14
+	// shipUprightDrop and shipUpsideDownDrop are how far the ship sits
+	// below its footprint's average floor.
+	shipUprightDrop    = 2
+	shipUpsideDownDrop = 4
+	// shipMidQuarters is how many quarters of the footprint the middle
+	// part ends at (it starts at one quarter).
+	shipMidQuarters = 3
+	// shipChestRolls and shipChestKeep: a supply or treasure chest stays
+	// when nextInt(shipChestRolls) is at least shipChestKeep.
+	shipChestRolls = 10
+	shipChestKeep  = 5
+	// shipReachChunks is how far, in chunks, a ship reaches from its start.
+	shipReachChunks = 2
+)
 
 // shipwreck is a laid-out ship.
 type shipwreck struct {
@@ -96,21 +147,21 @@ func (o *Overworld) isShipChunk(cx, cz int32) bool {
 	if x != cx || z != cz {
 		return false
 	}
-	y := o.structureY(cx, cz, 1)
+	y := o.structureY(cx, cz, noSurfaceY)
 	b := o.BiomeAt(cx*16+8, y, cz*16+8)
 	if int(b) >= len(o.shipBiome) || !o.shipBiome[b] {
 		return false
 	}
-	r := int32(20)
+	r := int32(shipOceanReach)
 	if o.shipBeach[b] {
-		r = 10
+		r = shipBeachReach
 	}
 	same := make([]bool, len(o.shipBiome))
 	same[b] = true
 	if !o.biomesOnly(cx*16+8, y, cz*16+8, r, same) {
 		return false
 	}
-	return !o.monumentNear(cx-5, cz-5, cx+4, cz+4)
+	return !o.monumentNear(cx-shipMonumentGap, cz-shipMonumentGap, cx+shipMonumentGap-1, cz+shipMonumentGap-1)
 }
 
 // shipAt lays out the shipwreck starting in chunk (sx, sz), nil if none
@@ -135,7 +186,7 @@ func (o *Overworld) layShip(sx, sz int32) *shipwreck {
 	// The start puts the piece box at sea level - 33 (sea level - 1 when
 	// the middle is a beach); the piece reads the biome at its corner one
 	// above that.
-	by := int32(SeaLevel - 33)
+	by := int32(SeaLevel - shipOceanBoxDrop)
 	if b := o.BiomeAt(x0+8, SeaLevel, z0+8); int(b) < len(o.shipBeach) && o.shipBeach[b] {
 		by = SeaLevel - 1
 	}
@@ -143,13 +194,13 @@ func (o *Overworld) layShip(sx, sz int32) *shipwreck {
 	s := &shipwreck{beached: int(b) < len(o.shipBeach) && o.shipBeach[b]}
 	var r rand.MT
 	r.Seed(populationSeed(o.seed, sx, sz))
-	s.rot = int(r.IntN(4))
-	idx := r.IntN(20)
+	s.rot = int(r.IntN(structRotations))
+	idx := r.IntN(int32(len(shipTemplates())))
 	if s.beached {
-		idx = r.IntN(14)
+		idx = r.IntN(shipUprightTemplates)
 	}
-	s.path = "shipwreck/" + shipTemplates[idx]
-	s.woods = shipWoods[r.IntN(9)]
+	s.path = "shipwreck/" + shipTemplates()[idx]
+	s.woods = shipWoods()[r.IntN(int32(len(shipWoods())))]
 	jt := o.st.Template(s.path)
 	if jt == nil {
 		return nil
@@ -157,23 +208,23 @@ func (o *Overworld) layShip(sx, sz int32) *shipwreck {
 	// The middle half of the rotated footprint, measured from the corner
 	// the template turns about (C division, as BDS's).
 	w, d := jt.Template.Size[0], jt.Template.Size[2]
-	if s.rot == 1 || s.rot == 3 {
+	if s.rot == rot90 || s.rot == rot270 {
 		w, d = d, w
 	}
 	var ox, oz int32
-	xa, xb := w/4, 3*w/4
-	za, zb := d/4, 3*d/4
-	if s.rot == 1 || s.rot == 2 {
-		ox, xa, xb = 15, -3*w/4, w/-4
+	xa, xb := w/4, shipMidQuarters*w/4
+	za, zb := d/4, shipMidQuarters*d/4
+	if s.rot == rot90 || s.rot == rot180 {
+		ox, xa, xb = chunkLastBlock, -shipMidQuarters*w/4, w/-4
 	}
-	if s.rot == 2 || s.rot == 3 {
-		oz, za, zb = 15, -3*d/4, d/-4
+	if s.rot == rot180 || s.rot == rot270 {
+		oz, za, zb = chunkLastBlock, -shipMidQuarters*d/4, d/-4
 	}
 	s.x, s.z = x0+ox, z0+oz
 	s.mid = structure.NewBox(s.x+min(xa, xb), 0, s.z+min(za, zb), s.x+max(xa, xb), 0, s.z+max(za, zb))
-	s.deep = 2
-	if idx >= 14 {
-		s.deep = 4
+	s.deep = shipUprightDrop
+	if idx >= shipUprightTemplates {
+		s.deep = shipUpsideDownDrop
 	}
 	e := structure.RotatePos([3]int32{jt.Template.Size[0] - 1, 0, jt.Template.Size[2] - 1}, s.rot)
 	s.area = structure.NewBox(min(s.x, s.x+e[0]), MinY, min(s.z, s.z+e[2]), max(s.x, s.x+e[0]), MaxY-1, max(s.z, s.z+e[2]))
@@ -182,7 +233,7 @@ func (o *Overworld) layShip(sx, sz int32) *shipwreck {
 		m, _ := tb.NBT["metadata"].(string)
 		switch m {
 		case "treasureChest", "supplyChest":
-			keep := r.IntN(10) >= 5
+			keep := r.IntN(shipChestRolls) >= shipChestKeep
 			s.keep = append(s.keep, keep)
 			if keep {
 				s.seeds = append(s.seeds, int32(r.Uint32()>>1))
@@ -217,10 +268,10 @@ func (o *Overworld) shipY(s *shipwreck, raw func(cx, cz int32) *PackedChunk) int
 // Ships reach at most 2 chunks from their start.
 func (o *Overworld) shipsReach(cx, cz int32, f func(s *shipwreck)) {
 	chunk := structure.NewBox(cx*16, MinY, cz*16, cx*16+15, MaxY-1, cz*16+15)
-	for rx := structure.Region(cx-2, shipSpacing); rx <= structure.Region(cx+2, shipSpacing); rx++ {
-		for rz := structure.Region(cz-2, shipSpacing); rz <= structure.Region(cz+2, shipSpacing); rz++ {
+	for rx := structure.Region(cx-shipReachChunks, shipSpacing); rx <= structure.Region(cx+shipReachChunks, shipSpacing); rx++ {
+		for rz := structure.Region(cz-shipReachChunks, shipSpacing); rz <= structure.Region(cz+shipReachChunks, shipSpacing); rz++ {
 			sx, sz := o.shipPick(rx, rz)
-			if sx < cx-2 || sx > cx+2 || sz < cz-2 || sz > cz+2 {
+			if sx < cx-shipReachChunks || sx > cx+shipReachChunks || sz < cz-shipReachChunks || sz > cz+shipReachChunks {
 				continue
 			}
 			if s := o.shipAt(sx, sz); s != nil && s.area.Intersects(chunk) {
@@ -290,7 +341,7 @@ func (b *scBuild) ship(s *shipwreck, y int32) {
 		b.dropEntity(pos)
 		if o.holdsLiquid[name] && (below || cs.Water) {
 			i := (pos[1]-MinY)<<8 | (pos[2]&15)<<4 | pos[0]&15
-			b.c.Water[i>>6] |= 1 << (i & 63)
+			b.c.Water[i>>waterWordShift] |= 1 << (i & waterBitMask)
 		}
 		if d := o.st.BlockEntityFor(id, st.Name, pos[0], pos[1], pos[2]); d != nil {
 			b.c.BlockEntities = append(b.c.BlockEntities, structure.BlockEntity{X: pos[0], Y: pos[1], Z: pos[2], Data: d})
@@ -367,19 +418,19 @@ func (o *Overworld) shipWood(id uint32, woods [2]uint8) uint32 {
 	if strings.Contains(name, "dark_oak") {
 		wood = int(woods[1])
 	}
-	w := woodNames[wood]
+	w := woodNames()[wood]
 	var to string
 	switch family {
 	case "stairs":
 		to = w + "_stairs"
 	case "door":
 		to = w + "_door"
-		if wood == 0 {
+		if wood == woodOak {
 			to = "wooden_door"
 		}
 	case "trapdoor":
 		to = w + "_trapdoor"
-		if wood == 0 {
+		if wood == woodOak {
 			to = "trapdoor"
 		}
 	case "stripped":

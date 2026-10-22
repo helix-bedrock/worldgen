@@ -112,11 +112,11 @@ func (t *treeFeature) fancyTrunk(w *featureWorld, x, y, z, h int32, r *rand.MT) 
 		for range clusters {
 			a := r.Float()
 			b := r.Float()
-			angle := (b + b) * 3.1415927 * 10430.378
+			angle := (b + b) * pi32 * sinTableRadian
 			reach := (a + 0.328) * (f.widthScale * radius)
 			fx := x + int32(sinTable[uint16(int32(angle))]*reach+0.5)
 			fy := y + layer - 1
-			fz := z + int32(reach*sinTable[uint16(int32(angle+16384))]+0.5)
+			fz := z + int32(reach*sinTable[uint16(int32(angle+sinTableQuarter))]+0.5)
 			if !t.fancyLine(w, fx, fy, fz, fx, fy+leafSpan, fz) {
 				continue
 			}

@@ -61,51 +61,152 @@ type ruinBiome struct {
 	large, cluster float32
 }
 
-// ruinBiomes are the biomes ocean ruins start in (sub_4E7CB90) with their
-// settings (sub_4951300).
-var ruinBiomes = map[string]ruinBiome{
-	"ocean":               {true, false, 0.3, 0.25},
-	"deep_ocean":          {true, false, 0.5, 0.4},
-	"cold_ocean":          {true, false, 0.3, 0.25},
-	"deep_cold_ocean":     {true, false, 0.5, 0.4},
-	"frozen_ocean":        {true, false, 0.3, 0.25},
-	"deep_frozen_ocean":   {true, false, 0.5, 0.4},
-	"warm_ocean":          {true, true, 0.3, 0.5},
-	"deep_warm_ocean":     {true, true, 0.3, 0.5},
-	"lukewarm_ocean":      {true, true, 0.3, 0.5},
-	"deep_lukewarm_ocean": {true, true, 0.3, 0.5},
-}
-
-// monumentDeep are the biomes a monument's middle must be in (radius 16);
-// monumentWater those all around it (radius 29) (sub_4E5D570).
-var (
-	monumentDeep  = []string{"deep_ocean", "deep_cold_ocean", "deep_lukewarm_ocean", "deep_warm_ocean", "deep_frozen_ocean"}
-	monumentWater = []string{"ocean", "deep_ocean", "cold_ocean", "deep_cold_ocean", "frozen_ocean", "deep_frozen_ocean",
-		"lukewarm_ocean", "deep_lukewarm_ocean", "warm_ocean", "deep_warm_ocean", "frozen_river", "river"}
+// Ocean ruin start chances by biome kind (sub_4951300).
+const (
+	// ruinLargeShallow is a shallow or warm ocean's large ruin chance.
+	ruinLargeShallow = 0.3
+	// ruinLargeDeep is a deep cold or plain ocean's large ruin chance.
+	ruinLargeDeep = 0.5
+	// ruinClusterShallow is a shallow cold or plain ocean's cluster chance.
+	ruinClusterShallow = 0.25
+	// ruinClusterDeep is a deep cold or plain ocean's cluster chance.
+	ruinClusterDeep = 0.4
+	// ruinClusterWarm is a warm or lukewarm ocean's cluster chance.
+	ruinClusterWarm = 0.5
 )
 
-// Ruin templates in BDS's table order (0xEE8E160); the index is drawn.
-var (
-	ruinWarmSmall = []string{"ruin_warm1", "ruin_warm2", "ruin_warm3", "ruin_warm4", "ruin_warm5", "ruin_warm6",
+// ruinBiomes are the biomes ocean ruins start in (sub_4E7CB90) with their
+// settings (sub_4951300). It is only read when the generator is built.
+func ruinBiomes() map[string]ruinBiome {
+	shallow := ruinBiome{true, false, ruinLargeShallow, ruinClusterShallow}
+	deep := ruinBiome{true, false, ruinLargeDeep, ruinClusterDeep}
+	warm := ruinBiome{true, true, ruinLargeShallow, ruinClusterWarm}
+	return map[string]ruinBiome{
+		"ocean":               shallow,
+		"deep_ocean":          deep,
+		"cold_ocean":          shallow,
+		"deep_cold_ocean":     deep,
+		"frozen_ocean":        shallow,
+		"deep_frozen_ocean":   deep,
+		"warm_ocean":          warm,
+		"deep_warm_ocean":     warm,
+		"lukewarm_ocean":      warm,
+		"deep_lukewarm_ocean": warm,
+	}
+}
+
+// monumentDeepBiomes are the biomes a monument's middle must be in
+// (sub_4E5D570).
+func monumentDeepBiomes() []string {
+	return []string{"deep_ocean", "deep_cold_ocean", "deep_lukewarm_ocean", "deep_warm_ocean", "deep_frozen_ocean"}
+}
+
+// monumentWaterBiomes are the biomes all around a monument (sub_4E5D570).
+func monumentWaterBiomes() []string {
+	return []string{"ocean", "deep_ocean", "cold_ocean", "deep_cold_ocean", "frozen_ocean", "deep_frozen_ocean",
+		"lukewarm_ocean", "deep_lukewarm_ocean", "warm_ocean", "deep_warm_ocean", "frozen_river", "river"}
+}
+
+// Monument biome test radii in blocks (sub_4E5D570).
+const (
+	monumentDeepReach  = 16
+	monumentWaterReach = 29
+)
+
+// ruinWarmSmall, ruinWarmBig, ruinColdSmall and ruinColdBig are the ruin
+// templates in BDS's table order (0xEE8E160); the index is drawn.
+func ruinWarmSmall() [8]string {
+	return [...]string{"ruin_warm1", "ruin_warm2", "ruin_warm3", "ruin_warm4", "ruin_warm5", "ruin_warm6",
 		"ruin_warm7", "ruin_warm8"}
-	ruinWarmBig   = []string{"big_ruin_warm4", "big_ruin_warm5", "big_ruin_warm6", "big_ruin_warm7"}
-	ruinColdSmall = []string{"ruin4", "ruin1_%s", "ruin2_%s", "ruin3_%s", "ruin4_%s", "ruin5_%s", "ruin6_%s",
+}
+
+func ruinWarmBig() [4]string {
+	return [...]string{"big_ruin_warm4", "big_ruin_warm5", "big_ruin_warm6", "big_ruin_warm7"}
+}
+
+func ruinColdSmall() []string {
+	return []string{"ruin4", "ruin1_%s", "ruin2_%s", "ruin3_%s", "ruin4_%s", "ruin5_%s", "ruin6_%s",
 		"ruin7_%s", "ruin8_%s"}
-	ruinColdBig = []string{"big_ruin1_%s", "big_ruin2_%s", "big_ruin3_%s", "big_ruin8_%s"}
+}
+
+func ruinColdBig() []string {
+	return []string{"big_ruin1_%s", "big_ruin2_%s", "big_ruin3_%s", "big_ruin8_%s"}
+}
+
+// Ruin piece sizes: the main piece's box reaches ruinMainSize blocks on
+// each axis; a cluster piece's box reaches ruinClusterLong by
+// ruinClusterShort.
+const (
+	ruinMainSize     = 15
+	ruinClusterLong  = 6
+	ruinClusterShort = 5
 )
 
 // Rotated offsets by rotation 0..3: the main piece's corner inside the start
-// chunk (dword_13ED8BC, dword_15411CC), its 15x15 box (dword_15411FC,
-// qword_15411F0) and a cluster piece's 5x6 box (dword_15411E4,
-// qword_15411D8).
-var (
-	ruinCornerX  = [4]int32{0, 15, 15, 0}
-	ruinCornerZ  = [4]int32{0, 0, 15, 15}
-	ruinMainX    = [4]int32{15, -15, -15, 15}
-	ruinMainZ    = [4]int32{15, 15, -15, -15}
-	ruinClusterX = [4]int32{5, -6, -5, 6}
-	ruinClusterZ = [4]int32{6, 5, -6, -5}
+// chunk (dword_13ED8BC, dword_15411CC), its box (dword_15411FC,
+// qword_15411F0) and a cluster piece's box (dword_15411E4, qword_15411D8).
+func ruinCornerX() [structRotations]int32 { return [...]int32{0, ruinMainSize, ruinMainSize, 0} }
+
+func ruinCornerZ() [structRotations]int32 { return [...]int32{0, 0, ruinMainSize, ruinMainSize} }
+
+func ruinMainX() [structRotations]int32 {
+	return [...]int32{ruinMainSize, -ruinMainSize, -ruinMainSize, ruinMainSize}
+}
+
+func ruinMainZ() [structRotations]int32 {
+	return [...]int32{ruinMainSize, ruinMainSize, -ruinMainSize, -ruinMainSize}
+}
+
+func ruinClusterX() [structRotations]int32 {
+	return [...]int32{ruinClusterShort, -ruinClusterLong, -ruinClusterShort, ruinClusterLong}
+}
+
+func ruinClusterZ() [structRotations]int32 {
+	return [...]int32{ruinClusterLong, ruinClusterShort, -ruinClusterLong, -ruinClusterShort}
+}
+
+// Ocean ruin layout (sub_4E7D890, sub_4E7ECF0, sub_4E80060).
+const (
+	// ruinMonumentGap is how many chunks around a ruin start must hold no
+	// monument start (the box runs from -ruinMonumentGap to
+	// ruinMonumentGap-1).
+	ruinMonumentGap = 5
+	// ruinSmallIntegrity and ruinBigIntegrity are the main piece's
+	// integrity; cluster pieces are small.
+	ruinSmallIntegrity = 0.8
+	ruinBigIntegrity   = 0.9
+	// ruinCrackedIntegrity and ruinMossyIntegrity are a cold ruin's upper
+	// layers' integrity.
+	ruinCrackedIntegrity = 0.7
+	ruinMossyIntegrity   = 0.5
+	// ruinClusterMin is the fewest cluster pieces tried; ruinClusterExtra
+	// bounds how many more are drawn.
+	ruinClusterMin   = 4
+	ruinClusterExtra = 4
+	// ruinReachChunks is how far, in chunks, a ruin's pieces reach from its
+	// start chunk.
+	ruinReachChunks = 3
+	// ruinDeepDrop is how much deeper than the corner height a column's
+	// floor must be to count as deep.
+	ruinDeepDrop = 3
+	// ruinDeepMargin is how many fewer deep columns than the box's width
+	// still lower the piece.
+	ruinDeepMargin = 2
+	// ruinNoFloor starts the lowest floor search above any world height.
+	ruinNoFloor = 512
+	// ruinChestFacing is the chest's minecraft:cardinal_direction index
+	// (east).
+	ruinChestFacing = 3
 )
+
+// ruinClusterSpots are the cluster spots (Java's addClusterRuins): x
+// range, x offset, z range and z offset from the main piece's low corner.
+func ruinClusterSpots() [8][4]int32 {
+	return [...][4]int32{
+		{7, -15, 6, 17}, {7, -15, 6, 1}, {7, -15, 4, -12}, {6, 1, 6, 17},
+		{6, 1, 2, -12}, {6, 17, 5, 19}, {6, 17, 6, 1}, {6, 17, 4, -12},
+	}
+}
 
 // ruinPiece is one template of a ruin.
 type ruinPiece struct {
@@ -119,16 +220,16 @@ type ruinPiece struct {
 // initOceanStructures fills the per-biome ocean structure tables.
 func (o *Overworld) initOceanStructures(biomeIDs map[string]uint32, n uint32) error {
 	o.ruinBiome = make([]ruinBiome, n)
-	for name, rb := range ruinBiomes {
+	for name, rb := range ruinBiomes() {
 		if id, ok := biomeIDs[name]; ok {
 			o.ruinBiome[id] = rb
 		}
 	}
-	o.monumentDeep, o.monumentWater = biomeMask(biomeIDs, n, monumentDeep), biomeMask(biomeIDs, n, monumentWater)
-	o.shipBiome, o.shipBeach = biomeMask(biomeIDs, n, shipBiomes), biomeMask(biomeIDs, n, shipBeaches)
-	o.treasureBiome = biomeMask(biomeIDs, n, treasureBiomes)
-	o.outpostBiome = biomeMask(biomeIDs, n, outpostBiomes)
-	o.mansionBiome = biomeMask(biomeIDs, n, mansionBiomes)
+	o.monumentDeep, o.monumentWater = biomeMask(biomeIDs, n, monumentDeepBiomes()), biomeMask(biomeIDs, n, monumentWaterBiomes())
+	o.shipBiome, o.shipBeach = biomeMask(biomeIDs, n, shipBiomes()), biomeMask(biomeIDs, n, shipBeaches())
+	o.treasureBiome = biomeMask(biomeIDs, n, treasureBiomes())
+	o.outpostBiome = biomeMask(biomeIDs, n, outpostBiomes())
+	o.mansionBiome = biomeMask(biomeIDs, n, mansionBiomes())
 	h, err := structure.LoadLiquidHolders()
 	if err != nil {
 		return err
@@ -161,7 +262,7 @@ func (o *Overworld) loadTopSupport() error {
 // structureY is the y a structure test reads the biome at: the preliminary
 // surface of the chunk's corner column, or none if there is none.
 func (o *Overworld) structureY(cx, cz, none int32) int32 {
-	if y := prelimSurface(o.column(cx*4, cz*4)); y != noSurface {
+	if y := prelimSurface(o.column(cx*quartsPerChunk, cz*quartsPerChunk)); y != noSurface {
 		return y
 	}
 	return none
@@ -185,9 +286,9 @@ func (o *Overworld) isMonumentChunk(cx, cz int32) bool {
 	if x != cx || z != cz {
 		return false
 	}
-	y := o.structureY(cx, cz, 1)
-	return o.biomesOnly(cx*16+8, y, cz*16+8, 16, o.monumentDeep) &&
-		o.biomesOnly(cx*16+8, y, cz*16+8, 29, o.monumentWater)
+	y := o.structureY(cx, cz, noSurfaceY)
+	return o.biomesOnly(cx*16+8, y, cz*16+8, monumentDeepReach, o.monumentDeep) &&
+		o.biomesOnly(cx*16+8, y, cz*16+8, monumentWaterReach, o.monumentWater)
 }
 
 // monumentNear reports whether a monument starts in chunks cx0..cx1,
@@ -220,11 +321,11 @@ func (o *Overworld) ruinAt(cx, cz int32) ruinBiome {
 	if x != cx || z != cz {
 		return ruinBiome{}
 	}
-	b := o.BiomeAt(cx*16+8, o.structureY(cx, cz, 1), cz*16+8)
+	b := o.BiomeAt(cx*16+8, o.structureY(cx, cz, noSurfaceY), cz*16+8)
 	if int(b) >= len(o.ruinBiome) || !o.ruinBiome[b].ok {
 		return ruinBiome{}
 	}
-	if o.monumentNear(cx-5, cz-5, cx+4, cz+4) {
+	if o.monumentNear(cx-ruinMonumentGap, cz-ruinMonumentGap, cx+ruinMonumentGap-1, cz+ruinMonumentGap-1) {
 		return ruinBiome{}
 	}
 	// The start reads its settings at the same spot, at 0 when the column
@@ -241,38 +342,36 @@ func (o *Overworld) ruinAt(cx, cz int32) ruinBiome {
 func (o *Overworld) ruinPieces(cx, cz int32, cfg ruinBiome) []ruinPiece {
 	var r rand.MT
 	r.Seed(populationSeed(o.seed, cx, cz))
-	rot := int(r.IntN(4))
-	x0, z0 := cx*16+ruinCornerX[rot], cz*16+ruinCornerZ[rot]
+	rot := int(r.IntN(structRotations))
+	x0, z0 := cx*16+ruinCornerX()[rot], cz*16+ruinCornerZ()[rot]
 	f := r.Float()
 	big := cfg.large >= f
-	integrity := float32(0.8)
+	integrity := float32(ruinSmallIntegrity)
 	if big {
-		integrity = 0.9
+		integrity = ruinBigIntegrity
 	}
 	pieces := addRuin(nil, &r, x0, z0, rot, integrity, big, cfg.warm)
 	if !big || cfg.cluster < r.Float() {
 		return pieces
 	}
-	minX, maxX := min(x0, x0+ruinMainX[rot]), max(x0, x0+ruinMainX[rot])
-	minZ, maxZ := min(z0, z0+ruinMainZ[rot]), max(z0, z0+ruinMainZ[rot])
+	minX, maxX := min(x0, x0+ruinMainX()[rot]), max(x0, x0+ruinMainX()[rot])
+	minZ, maxZ := min(z0, z0+ruinMainZ()[rot]), max(z0, z0+ruinMainZ()[rot])
 	// The cluster spots (Java's addClusterRuins), each drawn x then z.
-	spots := make([][2]int32, 0, 8)
-	for _, s := range [...][4]int32{
-		{7, -15, 6, 17}, {7, -15, 6, 1}, {7, -15, 4, -12}, {6, 1, 6, 17},
-		{6, 1, 2, -12}, {6, 17, 5, 19}, {6, 17, 6, 1}, {6, 17, 4, -12},
-	} {
+	table := ruinClusterSpots()
+	spots := make([][2]int32, 0, len(table))
+	for _, s := range table {
 		dx := r.IntN(s[0])
 		dz := r.IntN(s[2])
 		spots = append(spots, [2]int32{minX + s[1] + dx, minZ + s[3] + dz})
 	}
-	for range r.IntN(4) + 4 {
+	for range r.IntN(ruinClusterExtra) + ruinClusterMin {
 		i := r.IntN(int32(len(spots)))
 		p := spots[i]
 		spots = slices.Delete(spots, int(i), int(i)+1)
-		crot := int(r.IntN(4))
-		ex, ez := p[0]+ruinClusterX[crot], p[1]+ruinClusterZ[crot]
+		crot := int(r.IntN(structRotations))
+		ex, ez := p[0]+ruinClusterX()[crot], p[1]+ruinClusterZ()[crot]
 		if min(p[1], ez) > maxZ || max(p[0], ex) < minX || min(p[0], ex) > maxX || max(p[1], ez) < minZ {
-			pieces = addRuin(pieces, &r, p[0], p[1], crot, 0.8, false, cfg.warm)
+			pieces = addRuin(pieces, &r, p[0], p[1], crot, ruinSmallIntegrity, false, cfg.warm)
 		}
 	}
 	return pieces
@@ -282,21 +381,21 @@ func (o *Overworld) ruinPieces(cx, cz int32, cfg ruinBiome) []ruinPiece {
 // one in three layers (brick, cracked at 0.7, mossy at 0.5).
 func addRuin(pieces []ruinPiece, r *rand.MT, x, z int32, rot int, integrity float32, big, warm bool) []ruinPiece {
 	if warm {
-		path := ruinWarmSmall[r.IntN(8)]
+		path := ruinWarmSmall()[r.IntN(int32(len(ruinWarmSmall())))]
 		if big {
-			path = ruinWarmBig[r.IntN(4)]
+			path = ruinWarmBig()[r.IntN(int32(len(ruinWarmBig())))]
 		}
 		return append(pieces, ruinPiece{"ruin/" + path, x, z, rot, integrity, big, warm})
 	}
-	group := ruinColdSmall
+	group := ruinColdSmall()
 	if big {
-		group = ruinColdBig
+		group = ruinColdBig()
 	}
 	name := group[r.IntN(int32(len(group)))]
 	return append(pieces,
 		ruinLayer(name, "brick", x, z, rot, integrity, big, warm),
-		ruinLayer(name, "cracked", x, z, rot, 0.7, big, warm),
-		ruinLayer(name, "mossy", x, z, rot, 0.5, big, warm))
+		ruinLayer(name, "cracked", x, z, rot, ruinCrackedIntegrity, big, warm),
+		ruinLayer(name, "mossy", x, z, rot, ruinMossyIntegrity, big, warm))
 }
 
 // ruinStart returns the pieces of the ruin starting in chunk (sx, sz), nil
@@ -329,10 +428,10 @@ func (o *Overworld) ruinBox(p ruinPiece) (structure.Box, *structure.JigsawTempla
 // with its pieces. Pieces reach at most 3 chunks from the start.
 func (o *Overworld) ruinsReach(cx, cz int32, f func(sx, sz int32, pieces []ruinPiece)) {
 	chunk := structure.NewBox(cx*16, MinY, cz*16, cx*16+15, MaxY-1, cz*16+15)
-	for rx := structure.Region(cx-3, ruinSpacing); rx <= structure.Region(cx+3, ruinSpacing); rx++ {
-		for rz := structure.Region(cz-3, ruinSpacing); rz <= structure.Region(cz+3, ruinSpacing); rz++ {
+	for rx := structure.Region(cx-ruinReachChunks, ruinSpacing); rx <= structure.Region(cx+ruinReachChunks, ruinSpacing); rx++ {
+		for rz := structure.Region(cz-ruinReachChunks, ruinSpacing); rz <= structure.Region(cz+ruinReachChunks, ruinSpacing); rz++ {
 			sx, sz := o.ruinPick(rx, rz)
-			if sx < cx-3 || sx > cx+3 || sz < cz-3 || sz > cz+3 {
+			if sx < cx-ruinReachChunks || sx > cx+ruinReachChunks || sz < cz-ruinReachChunks || sz > cz+ruinReachChunks {
 				continue
 			}
 			pieces := o.ruinStart(sx, sz)
@@ -381,7 +480,7 @@ func (o *Overworld) ruinY(p ruinPiece, area structure.Box, raw func(cx, cz int32
 			break
 		}
 	}
-	lowest, deep := int32(512), int32(0)
+	lowest, deep := int32(ruinNoFloor), int32(0)
 	for x := area.X0; x <= area.X1; x++ {
 		for z := area.Z0; z <= area.Z1; z++ {
 			y := h - 1
@@ -393,12 +492,12 @@ func (o *Overworld) ruinY(p ruinPiece, area structure.Box, raw func(cx, cz int32
 				y--
 			}
 			lowest = min(lowest, y)
-			if y < h-3 {
+			if y < h-ruinDeepDrop {
 				deep++
 			}
 		}
 	}
-	if lowest-h < -3 && deep > area.X1-area.X0-2 {
+	if lowest-h < -ruinDeepDrop && deep > area.X1-area.X0-ruinDeepMargin {
 		h = lowest + 1
 	}
 	return h - 1
@@ -451,7 +550,7 @@ func (b *scBuild) ruinPiece(p ruinPiece, raw func(cx, cz int32) *PackedChunk) {
 		b.dropEntity(pos)
 		if o.holdsLiquid[name] && (below || cs.Water) {
 			i := (pos[1]-MinY)<<8 | (pos[2]&15)<<4 | pos[0]&15
-			b.c.Water[i>>6] |= 1 << (i & 63)
+			b.c.Water[i>>waterWordShift] |= 1 << (i & waterBitMask)
 		}
 		if d := o.st.BlockEntityFor(id, st.Name, pos[0], pos[1], pos[2]); d != nil {
 			b.c.BlockEntities = append(b.c.BlockEntities, structure.BlockEntity{X: pos[0], Y: pos[1], Z: pos[2], Data: d})
@@ -485,15 +584,14 @@ func (b *scBuild) ruinChest(p ruinPiece, pos [3]int32) {
 		b.dropEntity(pos)
 	}
 	cy := pos[1] - 1
-	// State index 3 of minecraft:cardinal_direction.
-	chest := o.state(blockChest, map[string]any{stateCardinalDirection: cardinalNames[3]})
+	chest := o.state(blockChest, map[string]any{stateCardinalDirection: cardinalNames[ruinChestFacing]})
 	if !b.setWorld(pos[0], cy, pos[2], chest) {
 		return
 	}
 	b.dropEntity([3]int32{pos[0], cy, pos[2]})
 	if pos[1] <= SeaLevel {
 		i := (cy-MinY)<<8 | (pos[2]&15)<<4 | pos[0]&15
-		b.c.Water[i>>6] |= 1 << (i & 63)
+		b.c.Water[i>>waterWordShift] |= 1 << (i & waterBitMask)
 	}
 	table := "loot_tables/chests/underwater_ruin_small.json"
 	if p.big {

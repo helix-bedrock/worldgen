@@ -163,7 +163,9 @@ func (t *treeFeature) mangrovePlace(w *featureWorld, x, y, z int32, r *rand.MT) 
 }
 
 // rootDirs are the four sides the roots spread to: north, east, south, west.
-var rootDirs = [4][2]int32{{0, -1}, {1, 0}, {0, 1}, {-1, 0}}
+func rootDirs() [4][2]int32 {
+	return [4][2]int32{{0, -1}, {1, 0}, {0, 1}, {-1, 0}}
+}
 
 func (t *treeFeature) mangroveRoots(w *featureWorld, x, y, z, h int32, r *rand.MT) (int32, int32, int32, bool) {
 	m := t.mangrove
@@ -178,7 +180,7 @@ func (t *treeFeature) mangroveRoots(w *featureWorld, x, y, z, h int32, r *rand.M
 		}
 	}
 	roots := []blockPos{{x, ty - 1, z}}
-	for _, d := range rootDirs {
+	for _, d := range rootDirs() {
 		start := blockPos{x + d[0], ty, z + d[1]}
 		var list []blockPos
 		t.mangroveRootWalk(w, start, d, blockPos{x, ty, z}, &list, 0, r)

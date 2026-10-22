@@ -28,10 +28,15 @@ import (
 // randomness: a missing feature type does not shift the others.
 
 // passOrder is the order BDS runs placement passes in.
-var passOrder = []string{
+func passOrder() [passCount]string {
+	return [passCount]string{
 	"first_pass", "underground_pass", "after_underground_pass", "before_surface_pass",
 	"surface_pass", "after_surface_pass", "before_sky_pass", "sky_pass", "after_sky_pass", "final_pass",
 }
+}
+
+// passCount is the number of placement passes.
+const passCount = 10
 
 // placer is a feature type the runtime can place.
 type placer interface {
@@ -92,15 +97,30 @@ type featureRule struct {
 
 // coordinateOrders maps coordinate_eval_order to the axis order. BDS's enum
 // is xyz, xzy, yxz, yzx, zxy, zyx (sub_C81F600).
-var coordinateOrders = map[string][3]int{
-	"xyz": {0, 1, 2}, "xzy": {0, 2, 1}, "yxz": {1, 0, 2},
-	"yzx": {1, 2, 0}, "zxy": {2, 0, 1}, "zyx": {2, 1, 0},
+func coordinateOrders(name string) ([3]int, bool) {
+	switch name {
+	case "xyz":
+		return [3]int{0, 1, 2}, true
+	case "xzy":
+		return [3]int{0, 2, 1}, true
+	case "yxz":
+		return [3]int{1, 0, 2}, true
+	case "yzx":
+		return [3]int{1, 2, 0}, true
+	case "zxy":
+		return [3]int{2, 0, 1}, true
+	case "zyx":
+		return [3]int{2, 1, 0}, true
+	}
+	return [3]int{}, false
 }
 
 // defaultOrder is the order used when a rule gives no coordinate_eval_order:
 // xzy, so y can depend on the x and z just drawn. Checked against BDS
 // chunks: with xyz, plains grass and sand discs land elsewhere.
-var defaultOrder = [3]int{0, 2, 1}
+func defaultOrder() [3]int {
+	return [3]int{0, 2, 1}
+}
 
 // featureRules are all loaded rules, attached to biomes.
 type featureRules struct {
@@ -149,6 +169,7 @@ func (o *Overworld) loadFeatureRules(fsys fs.FS, dir string, defs map[string]*bi
 		maxID = max(maxID, id)
 	}
 	fr := &featureRules{byBiome: make([][][]*featureRule, maxID+1)}
+	passNames := passOrder()
 	for _, f := range files {
 		data, err := fs.ReadFile(fsys, f)
 		if err != nil {
@@ -159,12 +180,12 @@ func (o *Overworld) loadFeatureRules(fsys fs.FS, dir string, defs map[string]*bi
 			return fmt.Errorf("worldgen: decode %s: %w", f, err)
 		}
 		r := raw.Rules
-		pass := slices.Index(passOrder, r.Conditions.Pass)
+		pass := slices.Index(passNames[:], r.Conditions.Pass)
 		if pass < 0 {
 			continue
 		}
 		feat, known := features.get(r.Description.PlacesFeature)
-		rule := &featureRule{id: r.Description.Identifier, hash: ruleHash(r.Description.Identifier), pass: pass, feature: feat, order: defaultOrder}
+		rule := &featureRule{id: r.Description.Identifier, hash: ruleHash(r.Description.Identifier), pass: pass, feature: feat, order: defaultOrder()}
 		if it, ok := constInt(r.Distribution.Iterations); ok {
 			if it <= 0 || !known {
 				continue
@@ -208,7 +229,7 @@ func (o *Overworld) loadFeatureRules(fsys fs.FS, dir string, defs map[string]*bi
 		}
 		if r.Distribution.Order != "" {
 			var ok bool
-			rule.order, ok = coordinateOrders[r.Distribution.Order]
+			rule.order, ok = coordinateOrders(r.Distribution.Order)
 			if !ok {
 				continue
 			}
@@ -240,7 +261,7 @@ func (o *Overworld) loadFeatureRules(fsys fs.FS, dir string, defs map[string]*bi
 			}
 			if ok {
 				if fr.byBiome[id] == nil {
-					fr.byBiome[id] = make([][]*featureRule, len(passOrder))
+					fr.byBiome[id] = make([][]*featureRule, passCount)
 				}
 				fr.byBiome[id][pass] = append(fr.byBiome[id][pass], rule)
 			}
@@ -760,7 +781,7 @@ func (o *Overworld) decorateFrom(w *featureWorld, ox, oz int32, origin *PackedCh
 	bs := origin.biomeList
 	single := len(bs) == 1
 	var rule, feat rand.MT
-	for pass := range passOrder {
+	for pass := range passCount {
 		for _, b := range bs {
 			if int(b) >= len(o.rules.byBiome) || o.rules.byBiome[b] == nil {
 				continue

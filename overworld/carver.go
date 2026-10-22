@@ -48,10 +48,13 @@ const (
 	caveLegacyLen   = 112
 )
 
-var (
-	caveDecay     = [2]float32{0.9, 0.75}
-	caveDampSteep = float32(0.92)
-	caveDamp      = float32(0.7)
+// Tunnel turn damping of the CaveFeature walk: the pitch and yaw turn rates
+// decay each step, and the pitch is damped harder on a steep tunnel.
+const (
+	cavePitchDecay float32 = 0.9
+	caveYawDecay   float32 = 0.75
+	caveDampSteep  float32 = 0.92
+	caveDamp       float32 = 0.7
 )
 
 func newCaveCarver(o *Overworld, skip uint32, height int32, yScale, h, v, floor [2]float32, fill string) (*caveCarver, error) {
@@ -114,7 +117,7 @@ func (cv *caveCarver) start(r *rand.MT, sx, sz int32, out *[]carveNode) {
 		}
 		for range tunnels {
 			f := r.Float()
-			yaw := f*3.1415927 + f*3.1415927
+			yaw := f*pi32 + f*pi32
 			g := r.Float()
 			pitch := ((g + -0.5) + (g + -0.5)) * 0.125
 			thickness := caveThickness(r)
@@ -146,7 +149,7 @@ func (cv *caveCarver) room(r *rand.MT, x, y, z float32, p [6]float32, out *[]car
 		ys = cv.yScale[0] + (cv.yScale[1]-cv.yScale[0])*m.Float()
 	}
 	l := int32(caveLegacyLen - m.Uint32()%28)
-	s := sin32((float32(l>>1) * 3.1415927) / float32(l))
+	s := sin32((float32(l>>1) * pi32) / float32(l))
 	radius := s*(cv.width+thickness) + 1.5
 	vr := ys * radius
 	*out = append(*out, carveNode{
@@ -184,7 +187,7 @@ func (cv *caveCarver) tunnel(parent *rand.MT, x, y, z, thickness, yaw, pitch, yS
 	split += l >> 2
 	var pitchMod, yawMod float32
 	for i := startStep; i < l; i++ {
-		s := sin32(float32(i) * 3.1415927 / float32(l))
+		s := sin32(float32(i) * pi32 / float32(l))
 		cp := cos32(pitch)
 		sp := sin32(pitch)
 		x += cos32(yaw) * cp
@@ -211,8 +214,8 @@ func (cv *caveCarver) tunnel(parent *rand.MT, x, y, z, thickness, yaw, pitch, yS
 				step: i, len: l, thickness: thickness,
 			})
 		}
-		pitchMod = pitchMod*caveDecay[0] + addPitch
-		yawMod = yawMod*caveDecay[1] + addYaw
+		pitchMod = pitchMod*cavePitchDecay + addPitch
+		yawMod = yawMod*caveYawDecay + addYaw
 	}
 }
 

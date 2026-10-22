@@ -307,9 +307,9 @@ func (b *scBuild) setWorld(wx, wy, wz int32, s uint32) bool {
 	wet := b.o.isWater(uint32(b.c.Blocks[i])) && b.o.holdsWater(s)
 	b.c.set(int(wx&15), int(wy), int(wz&15), s)
 	if wet {
-		b.c.Water[i>>6] |= 1 << (i & 63)
+		b.c.Water[i>>waterWordShift] |= 1 << (i & waterBitMask)
 	} else {
-		b.c.Water[i>>6] &^= 1 << (i & 63)
+		b.c.Water[i>>waterWordShift] &^= 1 << (i & waterBitMask)
 	}
 	return true
 }
@@ -948,7 +948,7 @@ func (b *scBuild) template(path string, origin [3]int32, rot int) []templateMark
 		}
 		if cs.Water {
 			i := (p[1]-MinY)<<8 | (p[2]&15)<<4 | p[0]&15
-			b.c.Water[i>>6] |= 1 << (i & 63)
+			b.c.Water[i>>waterWordShift] |= 1 << (i & waterBitMask)
 		}
 		if d := o.st.BlockEntityFor(cs.ID, st.Name, p[0], p[1], p[2]); d != nil {
 			b.c.BlockEntities = append(b.c.BlockEntities, structure.BlockEntity{X: p[0], Y: p[1], Z: p[2], Data: d})

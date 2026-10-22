@@ -28,24 +28,29 @@ type crustTemplate struct {
 // crustProbe and crustOrigin are BDS's per-crust, per-turn offsets
 // (dword_1491D54..qword_1491DF0): the column the crust is tested on, and
 // from it back to the template's corner. Turn 3 is BDS's fallback value.
-var (
-	crustProbe = [5][4][2]int32{
+func crustProbe() [5][4][2]int32 {
+	return [5][4][2]int32{
 		{{6, 6}, {-7, 6}, {-7, -7}, {6, -7}},
 		{{6, 6}, {-6, 6}, {-7, -7}, {6, -7}},
 		{{4, 4}, {-4, 4}, {-4, -4}, {4, -4}},
 		{{4, 4}, {-4, 4}, {-4, -4}, {4, -4}},
 		{{3, 6}, {-7, 3}, {-2, -7}, {7, -3}},
 	}
-	crustOrigin = [5][4][2]int32{
+}
+func crustOrigin() [5][4][2]int32 {
+	return [5][4][2]int32{
 		{{-6, -6}, {7, -6}, {7, 7}, {-6, 7}},
 		{{-6, -6}, {6, -6}, {7, 7}, {-6, 7}},
 		{{-4, -4}, {4, -4}, {4, 4}, {-4, 4}},
 		{{-4, -4}, {4, -4}, {4, 4}, {-4, 4}},
 		{{-3, -6}, {7, -3}, {2, 7}, {-7, 3}},
 	}
-	// outcropOffset is the outcropping's corner from the probe column, by
-	// outcropping and turn (sub_4991970).
-	outcropOffset = [6][4][3]int32{
+}
+
+// outcropOffset is the outcropping's corner from the probe column, by
+// outcropping and turn (sub_4991970).
+func outcropOffset() [6][4][3]int32 {
+	return [6][4][3]int32{
 		{{-5, 0, -2}, {3, 0, -5}, {5, 0, 2}, {-2, 0, 5}},
 		{{-7, -2, -3}, {3, -2, -6}, {6, -2, 3}, {-2, -2, 5}},
 		{{-4, 0, -3}, {3, 0, -4}, {4, 0, 3}, {-3, 0, 4}},
@@ -53,7 +58,7 @@ var (
 		{{-2, 0, -2}, {2, 0, -2}, {2, 0, 2}, {-2, 0, 2}},
 		{{-5, 0, -5}, {6, 0, -6}, {5, 0, 5}, {-5, 0, 5}},
 	}
-)
+}
 
 func newCoralCrust(cf *coralFeature) *coralCrustFeature {
 	f := &coralCrustFeature{coral: cf}
@@ -101,7 +106,7 @@ type crustPiece struct {
 func (f *coralCrustFeature) place(w *featureWorld, x, y, z int32, r *rand.MT) (blockPos, bool) {
 	o := w.o
 	crust, rot := r.IntN(5), r.IntN(4)
-	pr := crustProbe[crust][rot]
+	pr := crustProbe()[crust][rot]
 	p := blockPos{x + pr[0], y, z + pr[1]}
 	limit := int32(SeaLevel - 9)
 	for p[1] < limit {
@@ -120,7 +125,7 @@ func (f *coralCrustFeature) place(w *featureWorld, x, y, z int32, r *rand.MT) (b
 	if i := f.coral.coralIndex(below); i >= 0 && i < 5 {
 		return blockPos{}, false
 	}
-	or := crustOrigin[crust][rot]
+	or := crustOrigin()[crust][rot]
 	pieces := []crustPiece{{crust, rot, blockPos{p[0] + or[0], p[1], p[2] + or[1]}}}
 	if r.IntN(4) != 0 {
 		n := r.IntN(5) + 4
@@ -134,10 +139,10 @@ func (f *coralCrustFeature) place(w *featureWorld, x, y, z int32, r *rand.MT) (b
 			if r.IntN(2) == 0 {
 				dz = -dz
 			}
-			cp := crustProbe[c][cr]
+			cp := crustProbe()[c][cr]
 			q := blockPos{p[0] + dx + cp[0], p[1] - 1, p[2] + dz + cp[1]}
 			if b, _ := w.block(q[0], q[1], q[2]); o.solidMaterial(b) {
-				co := crustOrigin[c][cr]
+				co := crustOrigin()[c][cr]
 				pieces = append(pieces, crustPiece{c, cr, blockPos{q[0] + co[0], p[1], q[2] + co[1]}})
 			}
 		}
@@ -151,7 +156,7 @@ func (f *coralCrustFeature) place(w *featureWorld, x, y, z int32, r *rand.MT) (b
 	// One crust alone, or a quarter of the time from the start: an
 	// outcropping in the first crust's turn instead.
 	oc := r.IntN(6)
-	off := outcropOffset[oc][rot]
+	off := outcropOffset()[oc][rot]
 	f.placeTemplate(w, &f.outcrops[oc], blockPos{p[0] + off[0], p[1] + off[1], p[2] + off[2]}, int(rot), r)
 	return p, true
 }
@@ -263,18 +268,18 @@ func (f *coralCrustFeature) growMarkers(w *featureWorld, markers []blockPos, r *
 	for _, s := range b.sides {
 		base := b.at(s.pos)
 		attach := cf.coralIndex(base) >= 0 || base == cf.stone
-		row := coralExceptTable[2]
+		row := coralExceptTable()[2]
 		if s.dir >= 2 && s.dir <= 5 {
-			row = coralExceptTable[s.dir-2]
+			row = coralExceptTable()[s.dir-2]
 		}
 		nd := row[r.IntN(3)]
-		v := facingVec[nd]
+		v := facingVec()[nd]
 		t := blockPos{s.pos[0] + v[0], s.pos[1] + v[1], s.pos[2] + v[2]}
 		if !b.waterAt(t) || !attach {
 			continue
 		}
 		c := min(max(r.IntN(2)+2*r.IntN(3), 0), 4)
-		w.set(t[0], t[1], t[2], cf.wallFans[c][wallFanDirection[nd-2]])
+		w.set(t[0], t[1], t[2], cf.wallFans[c][wallFanDirection()[nd-2]])
 	}
 }
 

@@ -12,6 +12,20 @@ import (
 
 // partiallyExposedBlobFeature replaces the blocks around a floor that are
 // buried on every side but one (PartiallyExposedBlobFeature, sub_49BED10).
+// Ocean floor feature constants (sub_D794130, sub_49C1E50).
+const (
+	// blobAxes is the number of axes: the farthest block within the radius
+	// on each axis is radius times blobAxes away by Manhattan distance.
+	blobAxes = 3
+	// anemoneDepth is how far below sea level a sea anemone may sink.
+	anemoneDepth = 15
+	// anemoneFanChance is 1 in how many sea anemones are a coral fan
+	// rather than a coral plant.
+	anemoneFanChance = 4
+	// anemonePlants is the number of coral kinds.
+	anemonePlants = 5
+)
+
 type partiallyExposedBlobFeature struct {
 	block  uint32
 	radius int32
@@ -69,7 +83,7 @@ func (f *partiallyExposedBlobFeature) place(w *featureWorld, x, y, z int32, r *r
 	// Every block within the radius on each axis, nearest first by
 	// Manhattan distance (sub_D794130): one draw per block.
 	rad := f.radius
-	for depth := int32(0); depth <= 3*rad; depth++ {
+	for depth := int32(0); depth <= blobAxes*rad; depth++ {
 		mx := min(depth, rad)
 		for dx := -mx; dx <= mx; dx++ {
 			my := min(depth-mathx.Abs(dx), rad)
@@ -94,7 +108,7 @@ func (f *partiallyExposedBlobFeature) try(w *featureWorld, x, y, z int32, r *ran
 	if r.Float() > f.chance || !f.buried(w, x, y, z) {
 		return false
 	}
-	for face, st := range faceStep {
+	for face, st := range faceStep() {
 		if face != f.exposed && !f.buried(w, x+st[0], y+st[1], z+st[2]) {
 			return false
 		}
@@ -111,11 +125,11 @@ func (o *Overworld) bubbleColumns(c *Chunk) {
 	if o.ids.magma == 0 || o.ids.bubbleColumn == 0 {
 		return
 	}
-	for i := 0; i < len(c.Blocks)-256; i++ {
+	for i := 0; i < len(c.Blocks)-chunkColumns; i++ {
 		if uint32(c.Blocks[i]) != o.ids.magma {
 			continue
 		}
-		for j := i + 256; j < len(c.Blocks) && uint32(c.Blocks[j]) == o.ids.water; j += 256 {
+		for j := i + chunkColumns; j < len(c.Blocks) && uint32(c.Blocks[j]) == o.ids.water; j += chunkColumns {
 			c.Blocks[j] = uint16(o.ids.bubbleColumn)
 		}
 	}
@@ -125,12 +139,12 @@ func (o *Overworld) bubbleColumns(c *Chunk) {
 // position (SeaAnemoneFeature, sub_49C1E50).
 type seaAnemoneFeature struct {
 	coral  *coralFeature
-	plants [5]uint32
+	plants [anemonePlants]uint32
 }
 
 func (f *seaAnemoneFeature) place(w *featureWorld, x, y, z int32, r *rand.MT) (blockPos, bool) {
 	o := w.o
-	limit := int32(SeaLevel - 15)
+	limit := int32(SeaLevel - anemoneDepth)
 	for y > limit && !w.solidMaterialAt(x, y-1, z) {
 		y--
 	}
@@ -139,10 +153,10 @@ func (f *seaAnemoneFeature) place(w *featureWorld, x, y, z int32, r *rand.MT) (b
 	if b, _ := w.block(x, y, z); !o.waterMaterial(b) || !w.solidMaterialAt(x, y-1, z) || y <= limit {
 		return blockPos{}, false
 	}
-	if r.IntN(4) != 0 {
-		w.set(x, y, z, f.plants[r.IntN(5)])
+	if r.IntN(anemoneFanChance) != 0 {
+		w.set(x, y, z, f.plants[r.IntN(anemonePlants)])
 	} else {
-		fan := r.IntN(5)
+		fan := r.IntN(anemonePlants)
 		w.set(x, y, z, f.coral.fans[fan][r.IntN(2)])
 	}
 	return blockPos{x, y, z}, true

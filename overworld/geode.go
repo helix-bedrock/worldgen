@@ -27,10 +27,14 @@ type geodeFeature struct {
 }
 
 // geodeFaceNames are the minecraft:block_face values of BDS faces 0-5.
-var geodeFaceNames = [6]string{"down", "up", "north", "south", "west", "east"}
+func geodeFaceNames() [6]string {
+	return [6]string{"down", "up", "north", "south", "west", "east"}
+}
 
 // geodeBudFaces is the order BDS tries the faces for a bud (dword_15400DC).
-var geodeBudFaces = [6]int{1, 0, 2, 3, 4, 5}
+func geodeBudFaces() [6]int {
+	return [6]int{1, 0, 2, 3, 4, 5}
+}
 
 // rawGeode is the JSON of a minecraft:geode_feature.
 type rawGeode struct {
@@ -80,7 +84,7 @@ func (o *Overworld) parseGeode(raw json.RawMessage) (placer, error) {
 			continue
 		}
 		var faces [6]uint32
-		for i, n := range geodeFaceNames {
+		for i, n := range geodeFaceNames() {
 			faces[i] = o.withProp(def, "minecraft:block_face", n)
 		}
 		f.placements = append(f.placements, faces)
@@ -243,8 +247,8 @@ func (f *geodeFeature) place(w *featureWorld, x, y, z int32, r *rand.MT) (blockP
 	if len(f.placements) > 0 {
 		for _, s := range g.spots {
 			p := f.placements[r.IntN(int32(len(f.placements)))]
-			for _, face := range geodeBudFaces {
-				st := faceStep[face]
+			for _, face := range geodeBudFaces() {
+				st := faceStep()[face]
 				bx, by, bz := s[0]+st[0], s[1]+st[1], s[2]+st[2]
 				nb, _ := w.block(bx, by, bz)
 				if nb != o.ids.air && !o.waterMaterial(nb) {

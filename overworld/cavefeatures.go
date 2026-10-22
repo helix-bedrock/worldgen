@@ -24,15 +24,23 @@ const (
 )
 
 // faceDY is the y step of the vertical faces.
-var faceDY = [2]int32{-1, 1}
+func faceDY() [2]int32 {
+	return [2]int32{-1, 1}
+}
 
-// parseIntRange reads an intRange, def when absent or malformed.
-func parseIntRange(raw json.RawMessage, def int32) intRange {
-	r := intRange{def, def}
-	if len(raw) > 0 && json.Unmarshal(raw, &r) != nil {
-		return intRange{def, def}
+// parseIntRange reads an intRange, zero when absent or malformed.
+func parseIntRange(raw json.RawMessage) intRange {
+	var r intRange
+	if len(raw) > 0 && !jsonOK(raw, &r) {
+		return intRange{}
 	}
 	return r
+}
+
+// jsonOK reports whether raw decodes into v. Callers that skip a malformed
+// entry use it so the decode error is plainly dropped, not returned.
+func jsonOK(raw json.RawMessage, v any) bool {
+	return json.Unmarshal(raw, v) == nil
 }
 
 // sturdyFace reports whether a block can hold something on a face
@@ -45,10 +53,10 @@ func (o *Overworld) sturdyFace(b uint32, face int) bool {
 		return false
 	}
 	name := strings.TrimPrefix(o.blockName(b), "minecraft:")
-	if thinBlocks[name] {
+	if isThinBlock(name) {
 		return false
 	}
-	for _, s := range thinSuffixes {
+	for _, s := range thinSuffixes() {
 		if strings.HasSuffix(name, s) {
 			return false
 		}
@@ -56,21 +64,65 @@ func (o *Overworld) sturdyFace(b uint32, face int) bool {
 	return true
 }
 
-var thinBlocks = map[string]bool{}
+func thinSuffixes() [27]string {
+	return [27]string{"_slab", "_stairs", "_fence", "_fence_gate", "_wall", "_pane", "_door", "_trapdoor",
+		"_carpet", "_button", "_pressure_plate", "_sign", "_hanging_sign", "_bud", "_candle", "candle", "_rail", "rail",
+		"_torch", "_lantern", "lantern", "_coral", "_coral_fan", "_wall_fan", "_head", "_skull", "_bars"}
+}
 
-var thinSuffixes = []string{"_slab", "_stairs", "_fence", "_fence_gate", "_wall", "_pane", "_door", "_trapdoor",
-	"_carpet", "_button", "_pressure_plate", "_sign", "_hanging_sign", "_bud", "_candle", "candle", "_rail", "rail",
-	"_torch", "_lantern", "lantern", "_coral", "_coral_fan", "_wall_fan", "_head", "_skull", "_bars"}
-
-func init() {
-	for _, n := range strings.Fields(`glow_lichen sculk_vein vine pointed_dripstone cave_vines cave_vines_body_with_berries
-cave_vines_head_with_berries spore_blossom azalea flowering_azalea big_dripleaf small_dripleaf_block hanging_roots
-moss_carpet pale_moss_carpet pale_hanging_moss amethyst_cluster chain iron_chain web ladder lever snow_layer
-bed cake flower_pot end_rod lightning_rod scaffolding bamboo cactus chest trapped_chest ender_chest
-enchanting_table daylight_detector daylight_detector_inverted sculk_sensor calibrated_sculk_sensor sculk_shrieker
-farmland grass_path dirt_path mud soul_sand honey_block`) {
-		thinBlocks[n] = true
+// isThinBlock reports whether a block, named without its namespace, is
+// thin or partial and so gives no sturdy face.
+func isThinBlock(name string) bool {
+	switch name {
+	case "glow_lichen",
+		"sculk_vein",
+		"vine",
+		"pointed_dripstone",
+		"cave_vines",
+		"cave_vines_body_with_berries",
+		"cave_vines_head_with_berries",
+		"spore_blossom",
+		"azalea",
+		"flowering_azalea",
+		"big_dripleaf",
+		"small_dripleaf_block",
+		"hanging_roots",
+		"moss_carpet",
+		"pale_moss_carpet",
+		"pale_hanging_moss",
+		"amethyst_cluster",
+		"chain",
+		"iron_chain",
+		"web",
+		"ladder",
+		"lever",
+		"snow_layer",
+		"bed",
+		"cake",
+		"flower_pot",
+		"end_rod",
+		"lightning_rod",
+		"scaffolding",
+		"bamboo",
+		"cactus",
+		"chest",
+		"trapped_chest",
+		"ender_chest",
+		"enchanting_table",
+		"daylight_detector",
+		"daylight_detector_inverted",
+		"sculk_sensor",
+		"calibrated_sculk_sensor",
+		"sculk_shrieker",
+		"farmland",
+		"grass_path",
+		"dirt_path",
+		"mud",
+		"soul_sand",
+		"honey_block":
+		return true
 	}
+	return false
 }
 
 // withProp returns b with one property changed, or b when it has no such
@@ -197,7 +249,9 @@ func (f *snapToSurfaceFeature) place(w *featureWorld, x, y, z int32, r *rand.MT)
 }
 
 // faceStep is the block step toward each face.
-var faceStep = [6][3]int32{{0, -1, 0}, {0, 1, 0}, {0, 0, -1}, {0, 0, 1}, {-1, 0, 0}, {1, 0, 0}}
+func faceStep() [6][3]int32 {
+	return [6][3]int32{{0, -1, 0}, {0, 1, 0}, {0, 0, -1}, {0, 0, 1}, {-1, 0, 0}, {1, 0, 0}}
+}
 
 // scan walks from (x, y, z) toward face (sub_D313B20 with the column scan
 // sub_D2D3770) and returns the open block next to the surface it finds.
@@ -208,7 +262,7 @@ func (f *snapToSurfaceFeature) scan(w *featureWorld, x, y, z int32, face int) (b
 		return blockPos{}, false
 	}
 	solid := b != o.ids.air && !o.waterMaterial(b)
-	st := faceStep[face]
+	st := faceStep()[face]
 	// The scan only runs on through blocks of the start's biome (the
 	// wrapper lambda sub_D2DE640 compares the block target's biome, slot
 	// 25).
@@ -314,8 +368,8 @@ func (o *Overworld) parseVegetationPatch(raw json.RawMessage, set *featureSet) (
 		return nil, nil
 	}
 	return &vegetationPatchFeature{replace: parseMatcher(r.Replace), ground: ground, vegetation: featureRef{r.Vegetation, set},
-		ceiling: r.Surface == "ceiling", depth: parseIntRange(r.Depth, 0), deepChance: r.Deep, vertical: r.Vertical,
-		vegChance: r.VegChance, radius: parseIntRange(r.Radius, 0), edgeChance: r.Edge, waterlog: r.Waterlog}, nil
+		ceiling: r.Surface == "ceiling", depth: parseIntRange(r.Depth), deepChance: r.Deep, vertical: r.Vertical,
+		vegChance: r.VegChance, radius: parseIntRange(r.Radius), edgeChance: r.Edge, waterlog: r.Waterlog}, nil
 }
 
 func (f *vegetationPatchFeature) place(w *featureWorld, x, y, z int32, r *rand.MT) (blockPos, bool) {
@@ -327,7 +381,7 @@ func (f *vegetationPatchFeature) place(w *featureWorld, x, y, z int32, r *rand.M
 	if f.ceiling {
 		dir = faceUp
 	}
-	dy := faceDY[dir]
+	dy := faceDY()[dir]
 	var placed []blockPos
 	if rx >= -1 && rz >= -1 {
 		for i := -rx - 1; i <= rx+1; i++ {
@@ -504,16 +558,16 @@ func (o *Overworld) parseGrowingPlant(raw json.RawMessage) (placer, error) {
 	if err := json.Unmarshal(raw, &r); err != nil {
 		return nil, err
 	}
-	f := &growingPlantFeature{up: strings.EqualFold(r.Direction, "up"), age: parseIntRange(r.Age, 0), allowWater: r.AllowWater}
+	f := &growingPlantFeature{up: strings.EqualFold(r.Direction, "up"), age: parseIntRange(r.Age), allowWater: r.AllowWater}
 	for _, e := range r.Heights {
 		if len(e) != 2 {
 			return nil, nil
 		}
 		var wgt float32
-		if json.Unmarshal(e[1], &wgt) != nil {
+		if !jsonOK(e[1], &wgt) {
 			return nil, nil
 		}
-		f.heights = append(f.heights, weightedRange{parseIntRange(e[0], 0), wgt})
+		f.heights = append(f.heights, weightedRange{parseIntRange(e[0]), wgt})
 	}
 	f.body, f.head = o.parseWeightedBlocks(r.Body), o.parseWeightedBlocks(r.Head)
 	if len(f.heights) == 0 || len(f.body) == 0 || len(f.head) == 0 {
@@ -588,17 +642,21 @@ type vinesSingleFaceFeature struct {
 // singleFaceVines are the vine_direction_bits of a vine held by a block to the
 // north, east, south and west (sub_CEC5A70 with the table set at
 // sub_CED62C0).
-var singleFaceVines = [4]struct {
+type vineSupport struct {
 	dx, dz int32
 	bits   float64
-}{{0, -1, 4}, {1, 0, 8}, {0, 1, 1}, {-1, 0, 2}}
+}
+
+func singleFaceVines() [4]vineSupport {
+	return [4]vineSupport{{0, -1, 4}, {1, 0, 8}, {0, 1, 1}, {-1, 0, 2}}
+}
 
 func (f *vinesSingleFaceFeature) place(w *featureWorld, x, y, z int32, r *rand.MT) (blockPos, bool) {
 	o := w.o
 	if b, _ := w.block(x, y, z); b != o.ids.air {
 		return blockPos{}, false
 	}
-	for _, s := range singleFaceVines {
+	for _, s := range singleFaceVines() {
 		b, _ := w.block(x+s.dx, y, z+s.dz)
 		// VERIFY: BDS wants the block's solid flag (BlockLegacy +266 bit 2)
 		// and a solid material; full blocks by name stand in for both.
@@ -622,10 +680,8 @@ type mossVegetationFeature struct {
 
 func (o *Overworld) newMossVegetation(id func(string) uint32) *mossVegetationFeature {
 	f := &mossVegetationFeature{double: map[uint32]bool{}}
-	for _, p := range []weightedBlock{{id("minecraft:flowering_azalea"), 4}, {id("minecraft:azalea"), 7},
-		{id("minecraft:moss_carpet"), 25}, {id(blockShortGrass), 50}, {id(blockTallGrass), 10}} {
-		f.plants = append(f.plants, p)
-	}
+	f.plants = append(f.plants, []weightedBlock{{id("minecraft:flowering_azalea"), 4}, {id("minecraft:azalea"), 7},
+		{id("minecraft:moss_carpet"), 25}, {id(blockShortGrass), 50}, {id(blockTallGrass), 10}}...)
 	f.double[id(blockTallGrass)] = true
 	return f
 }
@@ -704,7 +760,7 @@ func (f *dripleafFeature) placeSmall(w *featureWorld, x, y, z, dir int32) (block
 	if !o.airOrWater(b) || !o.airOrWater(above) || !o.plantSurvives(f.small, below) {
 		return blockPos{}, false
 	}
-	lower := o.withProp(o.withProp(f.small, stateCardinalDirection, legacyDirections[dir]), "upper_block_bit", false)
+	lower := o.withProp(o.withProp(f.small, stateCardinalDirection, legacyDirections()[dir]), "upper_block_bit", false)
 	w.set(x, y, z, lower)
 	w.set(x, y+1, z, o.withProp(lower, "upper_block_bit", true))
 	return blockPos{x, y, z}, true

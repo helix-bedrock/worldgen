@@ -32,7 +32,7 @@ func (o *Overworld) canyons(c *Chunk, aq *aquifer, cx, cz int32) {
 			r.Uint32() // two skipped draws
 			r.Uint32()
 			z := float32(16*sz + r.IntN(16))
-			yaw := r.Float() * 3.1415927
+			yaw := r.Float() * pi32
 			pitch := (r.Float() + -0.5) * 0.25
 			w1 := r.Float()
 			width := w1*3 + r.Float()*3
@@ -73,7 +73,7 @@ func (o *Overworld) canyon(c *Chunk, aq *aquifer, cx, cz int32, centreX, centreZ
 	var yawMod, pitchMod float32
 	remaining := l
 	for step := int32(1); ; step++ {
-		radius := sin32((float32(step-1)*3.1415927)/fl)*width + 1.5
+		radius := sin32((float32(step-1)*pi32)/fl)*width + 1.5
 		hrDraw := t.Uint32()
 		vrDraw := t.Uint32()
 		cp := cos32(pitch)

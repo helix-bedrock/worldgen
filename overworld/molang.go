@@ -211,10 +211,13 @@ func (p *molangParser) ternary() (molang, error) {
 	return molangCond{c, a, b}, nil
 }
 
-var molangLevels = [][]string{{"||"}, {"&&"}, {"==", "!="}, {"<=", ">=", "<", ">"}, {"+", "-"}, {"*", "/"}}
+// molangLevels are the binary operators by precedence, loosest first.
+func molangLevels() [][]string {
+	return [][]string{{"||"}, {"&&"}, {"==", "!="}, {"<=", ">=", "<", ">"}, {"+", "-"}, {"*", "/"}}
+}
 
 func (p *molangParser) binary(level int) (molang, error) {
-	if level == len(molangLevels) {
+	if level == len(molangLevels()) {
 		return p.unary()
 	}
 	l, err := p.binary(level + 1)
@@ -223,7 +226,7 @@ func (p *molangParser) binary(level int) (molang, error) {
 	}
 	for {
 		op := ""
-		for _, o := range molangLevels[level] {
+		for _, o := range molangLevels()[level] {
 			if p.eat(o) {
 				op = o
 				break

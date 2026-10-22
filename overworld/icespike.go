@@ -28,6 +28,42 @@ func (o *Overworld) blockID(name string) uint32 {
 	return b
 }
 
+// Ice spike and ice patch constants (sub_51CB360, sub_51CAD30).
+const (
+	// spikeFloorGap keeps the walk down above the bottom of the world.
+	spikeFloorGap = 2
+	// spikeLift is the random lift of the spike's base.
+	spikeLift = 4
+	// spikeMinHeight and spikeHeightRange give the spike height.
+	spikeMinHeight   = 7
+	spikeHeightRange = 4
+	// spikeWidthDivisor turns the height into the base width.
+	spikeWidthDivisor = 4
+	// A spike at least spikeTallWidth wide becomes a tall one with chance
+	// 1 in spikeTallChance, lifted spikeTallMinLift plus up to
+	// spikeTallLiftRange.
+	spikeTallWidth     = 2
+	spikeTallChance    = 60
+	spikeTallLiftRange = 30
+	spikeTallMinLift   = 10
+	// spikeMirrorWidth is the layer width from which a layer is mirrored
+	// downwards.
+	spikeMirrorWidth = 2
+	// spikeRoundOffset rounds the disc of each layer.
+	spikeRoundOffset = 0.25
+	// spikeEdgeKeep is the chance above which an edge block is skipped.
+	spikeEdgeKeep = 0.75
+	// spikeSolidColumn is a run longer than any column: the middle column
+	// is never broken.
+	spikeSolidColumn = 50
+	// spikeCornerRun bounds the runs and gaps of the corner columns.
+	spikeCornerRun = 5
+	// spikeColumnDepth is how far below sea level the column goes.
+	spikeColumnDepth = 13
+	// icePatchMinRadius is the smallest ice patch radius.
+	icePatchMinRadius = 2
+)
+
 // onSnow walks down from y through air (not below MinY+2) and reports the y it stopped
 // at and whether the block there is snow.
 func onSnow(w *featureWorld, x, y, z int32, snow uint32) (int32, bool) {
@@ -36,7 +72,7 @@ func onSnow(w *featureWorld, x, y, z int32, snow uint32) (int32, bool) {
 		if !ok {
 			return y, false
 		}
-		if b != w.o.ids.air || y <= MinY+2 {
+		if b != w.o.ids.air || y <= MinY+spikeFloorGap {
 			return y, b == snow
 		}
 		y--
@@ -66,25 +102,25 @@ func (f *iceSpikeFeature) place(w *featureWorld, x, y, z int32, r *rand.MT) (blo
 	if !ok {
 		return blockPos{}, false
 	}
-	y += r.IntN(4)
-	h := r.IntN(4) + 7
-	j := h/4 + r.IntN(2)
-	if j >= 2 && r.IntN(60) == 0 {
-		y += r.IntN(30) + 10
+	y += r.IntN(spikeLift)
+	h := r.IntN(spikeHeightRange) + spikeMinHeight
+	j := h/spikeWidthDivisor + r.IntN(2)
+	if j >= spikeTallWidth && r.IntN(spikeTallChance) == 0 {
+		y += r.IntN(spikeTallLiftRange) + spikeTallMinLift
 	}
 	for k := range h {
 		fr := (1 - float32(k)/float32(h)) * float32(j)
 		l := int32(math.Ceil(float64(fr)))
 		ff := fr * fr
-		mirror := k != 0 && l >= 2
+		mirror := k != 0 && l >= spikeMirrorWidth
 		for i := -l; i <= l; i++ {
-			fi := float32(mathx.Abs(i)) - 0.25
+			fi := float32(mathx.Abs(i)) - spikeRoundOffset
 			for jz := -l; jz <= l; jz++ {
-				fj := float32(mathx.Abs(jz)) - 0.25
+				fj := float32(mathx.Abs(jz)) - spikeRoundOffset
 				if (i != 0 || jz != 0) && fi*fi+fj*fj > ff {
 					continue
 				}
-				if (i == -l || i == l || jz == -l || jz == l) && r.Float() > 0.75 {
+				if (i == -l || i == l || jz == -l || jz == l) && r.Float() > spikeEdgeKeep {
 					continue
 				}
 				f.put(w, x+i, y+k, z+jz, false)
@@ -100,11 +136,11 @@ func (f *iceSpikeFeature) place(w *featureWorld, x, y, z int32, r *rand.MT) (blo
 	for dx := -k1; dx <= k1; dx++ {
 		for dz := -k1; dz <= k1; dz++ {
 			cy := y - 1
-			n := int32(50)
+			n := int32(spikeSolidColumn)
 			if mathx.Abs(dx) == 1 && mathx.Abs(dz) == 1 {
-				n = r.IntN(5)
+				n = r.IntN(spikeCornerRun)
 			}
-			for cy > SeaLevel-13 {
+			for cy > SeaLevel-spikeColumnDepth {
 				b, ok := w.block(x+dx, cy, z+dz)
 				if !ok || !f.spikeMay(w, b, true) {
 					break
@@ -112,8 +148,8 @@ func (f *iceSpikeFeature) place(w *featureWorld, x, y, z int32, r *rand.MT) (blo
 				w.set(x+dx, cy, z+dz, f.packed)
 				cy--
 				if n <= 1 {
-					cy -= r.IntN(5) + 1
-					n = r.IntN(5)
+					cy -= r.IntN(spikeCornerRun) + 1
+					n = r.IntN(spikeCornerRun)
 				} else {
 					n--
 				}
@@ -136,7 +172,7 @@ func (f *icePatchFeature) place(w *featureWorld, x, y, z int32, r *rand.MT) (blo
 	if !ok {
 		return blockPos{}, false
 	}
-	n := r.IntN(f.radius-2) + 2
+	n := r.IntN(f.radius-icePatchMinRadius) + icePatchMinRadius
 	for bx := x - n; bx <= x+n; bx++ {
 		for bz := z - n; bz <= z+n; bz++ {
 			if (bx-x)*(bx-x)+(bz-z)*(bz-z) > n*n {

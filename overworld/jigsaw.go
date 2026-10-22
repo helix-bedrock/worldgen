@@ -322,9 +322,9 @@ func (w chunkWorld) Set(x, y, z int32, id uint32, water bool) bool {
 	}
 	w.c.Blocks[i] = uint16(id)
 	if water {
-		w.c.Water[i>>6] |= 1 << (i & 63)
+		w.c.Water[i>>waterWordShift] |= 1 << (i & waterBitMask)
 	} else {
-		w.c.Water[i>>6] &^= 1 << (i & 63)
+		w.c.Water[i>>waterWordShift] &^= 1 << (i & waterBitMask)
 	}
 	return true
 }

@@ -4,6 +4,24 @@ package overworld
 // sub_517CD10): per column, water at the top freezes to ice and a snow layer
 // falls on the top block where the biome is cold enough.
 
+// Constants of the biome temperature (sub_C7B8560, sub_C7B91C0).
+const (
+	// coolingStart is how far above sea level the air starts to cool.
+	coolingStart = 17
+	// columnNoiseScale samples the column noise at 1/8 of block scale and
+	// reads the stored byte back at 1/8.
+	columnNoiseScale = 0.125
+	// columnNoiseByte scales the noise up twice before it is stored in a
+	// byte.
+	columnNoiseByte = 8
+	// coolingRate and coolingDivisor give the cooling per block of height.
+	coolingRate    = -0.05
+	coolingDivisor = 40
+	// freezeTemperature is the temperature at or below which water freezes
+	// and snow falls.
+	freezeTemperature = 0.15
+)
+
 // temperature is the biome temperature at a block (sub_C7B8560): the
 // biome's own, frozen ocean patches, and cooling above sea level + 17 that
 // varies per column.
@@ -12,15 +30,15 @@ func (o *Overworld) temperature(b uint32, x, y, z int32) float32 {
 		return 1
 	}
 	t := o.temperatureAt(o.surfaces[b], x, z)
-	const limit = SeaLevel + 17
+	const limit = SeaLevel + coolingStart
 	if y <= limit {
 		return t
 	}
 	// The column noise is stored in a byte at 1/8 resolution
 	// (sub_C7B91C0): noise * 8 * 8, read back * 0.125.
-	n := o.surfNoise.heightTemp.Sum2(float32(x)*0.125, float32(z)*0.125)
-	col := float32(int8(int32(n * 8 * 8)))
-	return t + float32(float64(((float32(y)+col*0.125)-limit)*-0.05)/40)
+	n := o.surfNoise.heightTemp.Sum2(float32(x)*columnNoiseScale, float32(z)*columnNoiseScale)
+	col := float32(int8(int32(n * columnNoiseByte * columnNoiseByte)))
+	return t + float32(float64(((float32(y)+col*columnNoiseScale)-limit)*coolingRate)/coolingDivisor)
 }
 
 // rainTop is the y above the highest block that stops rain in a column of
@@ -52,12 +70,12 @@ func (o *Overworld) freeze(chunkX, chunkZ int32, c *Chunk) {
 			if below >= MinY && below < MaxY {
 				b := c.Block(x, int(below), z)
 				// Only source water freezes; generated water is all source.
-				if b == o.ids.water && o.temperature(c.Biome(x, int(below), z), wx, below, wz) <= 0.15 {
+				if b == o.ids.water && o.temperature(c.Biome(x, int(below), z), wx, below, wz) <= freezeTemperature {
 					c.set(x, int(below), z, o.ids.ice)
 				}
 			}
 			if top >= MinY && top < MaxY && o.snowReplaces(c.Block(x, int(top), z)) &&
-				o.temperature(c.Biome(x, int(top), z), wx, top, wz) <= 0.15 && o.snowCanStand(c, x, int(top), z) {
+				o.temperature(c.Biome(x, int(top), z), wx, top, wz) <= freezeTemperature && o.snowCanStand(c, x, int(top), z) {
 				c.set(x, int(top), z, snow)
 			}
 		}

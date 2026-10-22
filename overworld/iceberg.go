@@ -14,11 +14,11 @@ import (
 // tableSin and tableCos are BDS's sine table lookups (mce::Math, 65536
 // steps per turn).
 func tableSin(a float32) float32 {
-	return float32(math.Sin(float64(uint16(int32(a*10430.378))) * (2 * math.Pi / 65536)))
+	return float32(math.Sin(float64(uint16(int32(a*sinTableRadian))) * (2 * math.Pi / sinTableSize)))
 }
 
 func tableCos(a float32) float32 {
-	return float32(math.Sin(float64(uint16(int32(a*10430.378+16384))) * (2 * math.Pi / 65536)))
+	return float32(math.Sin(float64(uint16(int32(a*sinTableRadian+sinTableQuarter))) * (2 * math.Pi / sinTableSize)))
 }
 
 // ceilf is BDS's inlined ceiling of a positive float: the truncation, plus
@@ -92,7 +92,7 @@ func (f *icebergFeature) place(w *featureWorld, x, _, z int32, r *rand.MT) (bloc
 	minor += 3
 	snowyF := r.Float()
 	a := r.Float()
-	angle := (a + a) * 3.1415927
+	angle := (a + a) * pi32
 	v12 := r.IntN(7)
 	width := min(height+v12-r.IntN(5), 11)
 	block := f.packedIce
@@ -217,7 +217,7 @@ func (f *icebergFeature) place(w *featureWorld, x, _, z int32, r *rand.MT) (bloc
 	var carveAngle float32
 	if round {
 		c := r.Float()
-		carveAngle = (c + c) * 3.1415927
+		carveAngle = (c + c) * pi32
 	} else {
 		carveAngle = angle + 1.5707964
 	}

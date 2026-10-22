@@ -35,10 +35,12 @@ func newAquiferNoises(world rand.Positional) aquiferNoises {
 
 // aquiferNeighbours are the chunk offsets whose preliminary surface a cell
 // checks, in BDS's order.
-var aquiferNeighbours = [13][2]int32{
-	{-2, -1}, {-1, -1}, {0, -1}, {1, -1},
-	{-3, 0}, {-2, 0}, {-1, 0}, {0, 0}, {1, 0},
-	{-2, 1}, {-1, 1}, {0, 1}, {1, 1},
+func aquiferNeighbours() [13][2]int32 {
+	return [13][2]int32{
+		{-2, -1}, {-1, -1}, {0, -1}, {1, -1},
+		{-3, 0}, {-2, 0}, {-1, 0}, {0, 0}, {1, 0},
+		{-2, 1}, {-1, 1}, {0, 1}, {1, 1},
+	}
 }
 
 type aquiferCenter struct {
@@ -175,7 +177,7 @@ func (a *aquifer) computeFluid(x, y, z int32) (int32, bool) {
 	o := a.o
 	minSurface := int32(noSurface)
 	near := false
-	for _, off := range aquiferNeighbours {
+	for _, off := range aquiferNeighbours() {
 		h := a.prelimAt((x+16*off[0])>>2, (z+16*off[1])>>2)
 		centre := off[0] == 0 && off[1] == 0
 		if centre && y-12 > h+8 {
