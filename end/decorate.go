@@ -182,6 +182,8 @@ type decoIDs struct {
 	obsidian, chorusPlant, chorusFlower, bedrock, gateway uint32
 	// ironBars by the sides they join: bit i for chorusDirs[i].
 	ironBars [16]uint32
+	// frames are item frames by facing_direction.
+	frames [6]uint32
 }
 
 func (e *End) loadDecoIDs() error {
@@ -217,6 +219,13 @@ func (e *End) loadDecoIDs() error {
 			return errMissing("minecraft:iron_bars")
 		}
 		e.deco.ironBars[join] = id
+	}
+	for f := range e.deco.frames {
+		id, ok := e.reg.Lookup("minecraft:frame", map[string]any{"facing_direction": int32(f)})
+		if !ok {
+			return errMissing("minecraft:frame")
+		}
+		e.deco.frames[f] = id
 	}
 	return nil
 }
@@ -486,12 +495,14 @@ func (e *End) originWrites(ox, oz int32, neighbour func(cx, cz int32) *Chunk) *o
 }
 
 // Decorate adds the decoration to c, the GenerateChunk output for chunk
-// (chunkX, chunkZ). neighbour must return the unchanged GenerateChunk
-// output of any chunk within 2 chunks, the target's own included (nil for
-// one it cannot provide: it reads as air). Cache does the same with the
+// (chunkX, chunkZ), then the End city pieces in it: BDS builds them after
+// the chorus. neighbour must return the unchanged GenerateChunk output of
+// any chunk within 2 chunks, the target's own included (nil for one it
+// cannot provide: it reads as air). Cache does the same with the
 // neighbours kept. It is safe to call from many goroutines if neighbour is.
 func (e *End) Decorate(chunkX, chunkZ int32, c *Chunk, neighbour func(cx, cz int32) *Chunk) {
 	e.decorateWith(chunkX, chunkZ, c, func(ox, oz int32) *originWrites { return e.originWrites(ox, oz, neighbour) })
+	e.placeCities(chunkX, chunkZ, c)
 }
 
 // decorateWith applies the placements of the nine origins around chunk
@@ -552,4 +563,5 @@ func (c *Cache) Generate(chunkX, chunkZ int32, out *Chunk) {
 		}
 		return ow
 	})
+	c.e.placeCities(chunkX, chunkZ, out)
 }

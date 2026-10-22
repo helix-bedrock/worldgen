@@ -26,8 +26,8 @@
 >   fire, glowstone, ores (gold, quartz, magma, gravel, blackstone, ancient debris), basalt deltas,
 >   basalt pillars, soul sand, Nether fossils, Nether fortresses, Nether ruined portals and
 >   bastion remnants match BDS; huge crimson and warped fungi, fungi, roots and vines are close.
-> - **The End is in progress:** terrain, the obsidian pillars, small islands, chorus plants and end
->   gateways match BDS; End cities are not done yet.
+> - **The End matches BDS:** terrain, the obsidian pillars, small islands, chorus plants, end gateways
+>   and End cities with their ships.
 > - **The API is not stable.** Names and behaviour change between commits.
 >
 > **[STATUS.md](STATUS.md) lists everything that is generated and everything that is missing.**

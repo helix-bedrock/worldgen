@@ -80,7 +80,7 @@ var blockEntityIDs = map[string]string{
 	"minecraft:wall_banner": "Banner", "minecraft:skeleton_skull": "Skull", "minecraft:decorated_pot": "DecoratedPot",
 	"minecraft:chiseled_bookshelf": "ChiseledBookshelf", "minecraft:unpowered_comparator": "Comparator",
 	"minecraft:suspicious_sand": "BrushableBlock", "minecraft:suspicious_gravel": "BrushableBlock",
-	"minecraft:trial_spawner": "TrialSpawner", "minecraft:vault": "Vault",
+	"minecraft:trial_spawner": "TrialSpawner", "minecraft:vault": "Vault", "minecraft:ender_chest": "EnderChest",
 }
 
 // bedColors are Bedrock's colour indexes for bed block entities.
@@ -296,6 +296,10 @@ func (l *Lib) ConvertJavaState(st TemplateState) (uint32, bool, bool) {
 			}
 			set("minecraft:facing_direction", v)
 			if f, ok := javaFacing[v]; ok {
+				// A sideways end rod names the side it points away from.
+				if target == "end_rod" && f >= 2 {
+					f = javaFacing[Opposite(v)]
+				}
 				set("facing_direction", f)
 			}
 			// A wall torch's Java facing points away from its wall; Bedrock
@@ -367,6 +371,12 @@ func (l *Lib) ConvertJavaState(st TemplateState) (uint32, bool, bool) {
 			set("hanging", v == "true")
 		case "attached":
 			set("attached_bit", v == "true")
+		case "has_bottle_0":
+			set("brewing_stand_slot_a_bit", v == "true")
+		case "has_bottle_1":
+			set("brewing_stand_slot_b_bit", v == "true")
+		case "has_bottle_2":
+			set("brewing_stand_slot_c_bit", v == "true")
 		case "age", "level", "layers", "rotation", "pickles", "bites", "moisture", "candles":
 			if n64, err := strconv.ParseInt(v, 10, 32); err == nil {
 				n := int32(n64)

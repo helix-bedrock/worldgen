@@ -58,6 +58,11 @@ type End struct {
 	deco    decoIDs
 	spikes  [10]spike
 	regions sync.Pool
+
+	// st prepares the city templates; cities holds each laid-out city by
+	// start chunk (nil where none starts).
+	st     *structure.Lib
+	cities sync.Map
 }
 
 func errMissing(name string) error {
@@ -102,17 +107,26 @@ func New(seed int64, reg *blocks.Registry, biomeIDs map[string]uint32) (*End, er
 		return nil, err
 	}
 	e.spikes = spikes(seed)
+	var err error
+	if e.st, err = structure.NewLib(seed, reg); err != nil {
+		return nil, err
+	}
 	return e, nil
 }
 
 // Seed returns the world seed.
 func (e *End) Seed() int64 { return e.seed }
 
-// GenerateChunk fills c with the chunk at (chunkX, chunkZ), in BDS's order
-// (TheEndGenerator loadChunk, sub_5194820). The End's surface builder only
-// turns stone into end stone, and the terrain has no stone, so it is
-// left out.
+// GenerateChunk fills c with the terrain of the chunk at (chunkX, chunkZ),
+// in BDS's order (TheEndGenerator loadChunk, sub_5194820). The End's
+// surface builder only turns stone into end stone, and the terrain has no
+// stone, so it is left out. Decorate adds the rest, End cities included.
 func (e *End) GenerateChunk(chunkX, chunkZ int32, c *Chunk) {
+	e.baseChunk(chunkX, chunkZ, c)
+}
+
+// baseChunk is the chunk's terrain.
+func (e *End) baseChunk(chunkX, chunkZ int32, c *Chunk) {
 	c.BlockEntities = c.BlockEntities[:0]
 	for i := range c.Blocks {
 		c.Blocks[i] = uint16(e.ids.air)

@@ -83,3 +83,48 @@ func TestGateway(t *testing.T) {
 		t.Errorf("block entities: %v", ch.BlockEntities)
 	}
 }
+
+// TestCities pins the layouts of End cities that matched a BDS world of
+// the same seed block for block: the piece counts, where the start and the
+// ship are, and the first chest's loot seed.
+func TestCities(t *testing.T) {
+	e := testEnd(t, 236621124415672384)
+	for _, c := range []struct {
+		cx, cz int32
+		pieces int
+		ship   bool
+	}{{-36, -55, 91, true}, {65, -19, 18, false}} {
+		ps := e.CityPieces(c.cx, c.cz)
+		if len(ps) != c.pieces {
+			t.Errorf("city %d %d: %d pieces, BDS has %d", c.cx, c.cz, len(ps), c.pieces)
+			continue
+		}
+		if ps[0].Name != "base_floor" || ps[0].Pos[0] != c.cx*16+8 || ps[0].Pos[2] != c.cz*16+8 {
+			t.Errorf("city %d %d starts with %s at %v", c.cx, c.cz, ps[0].Name, ps[0].Pos)
+		}
+		ship := false
+		for _, p := range ps {
+			if p.Name == "ship" {
+				ship = true
+				if p.Pos != [3]int32{-526, 119, -784} {
+					t.Errorf("ship at %v, BDS has it at -526 119 -784", p.Pos)
+				}
+			}
+		}
+		if ship != c.ship {
+			t.Errorf("city %d %d: ship %v, BDS %v", c.cx, c.cz, ship, c.ship)
+		}
+	}
+	cache := NewCache(e, 64)
+	var ch Chunk
+	cache.Generate(-34, -55, &ch)
+	for _, be := range ch.BlockEntities {
+		if be.X == -530 && be.Y == 101 && be.Z == -877 {
+			if s, _ := be.Data["LootTableSeed"].(int32); s != 1019559790 {
+				t.Errorf("chest loot seed %d, BDS has 1019559790", s)
+			}
+			return
+		}
+	}
+	t.Errorf("no chest at -530 101 -877")
+}
