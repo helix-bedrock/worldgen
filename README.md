@@ -79,20 +79,21 @@ shared by every dimension's structures. The dimension packages do not import eac
 - **Same world as vanilla:** seeds give BDS's terrain, biomes, caves, ores and decorations.
 - **Data-driven:** biomes, features and feature rules are read from Mojang's own data files in
   [`data/vanilla`](data/vanilla), not hard-coded.
-- **Fast:** about 19 ms per finished chunk, generated on many threads at once.
+- **Fast:** about 30 to 40 ms per finished chunk, generated on many threads at once.
 - **Low memory:** cached chunks are stored packed, at about a fifth of their full size.
 - **No dependencies:** only the Go standard library.
 
 ## Performance
 
-Measured on the Helix test server while a player flew through 21,000 chunks:
+Measured on the Helix test server while a player flew through 17,000 chunks:
 
 | Step | Average per chunk |
 |---|---|
-| Generation (terrain and features) | **~19 ms** |
-| Copy into the server's chunk format | ~2.7 ms |
+| Generation (terrain, features and structures) | **~30 to 40 ms** |
+| Copy into the server's chunk format | ~3.5 ms |
 
-It started at 200 to 390 ms per chunk. Speed and memory matter, but matching BDS comes first: an
+Structures and the full decoration raised it from the earlier 19 ms. It started at 200 to 390 ms
+per chunk. Speed and memory matter, but matching BDS comes first: an
 optimization that changes the world is not accepted.
 
 ## Roadmap
