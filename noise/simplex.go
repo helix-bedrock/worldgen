@@ -51,6 +51,13 @@ func newSimplexOrder(r Random, swap bool) Simplex {
 	return s
 }
 
+// NewSimplex draws one simplex octave from r, the third draw as its x
+// origin: the End's island noise.
+func NewSimplex(r Random) *Simplex {
+	s := newSimplexOrder(r, false)
+	return &s
+}
+
 // fastFloor rounds down, except that values <= 0 that are already whole go
 // one lower. Vanilla does it this way and the noise depends on it.
 func fastFloor(v float32) int32 {
@@ -66,8 +73,9 @@ func (s *Simplex) corner2(gi int32, x, y float32) float32 {
 		return 0
 	}
 	g := &simplexGrad[gi%12]
-	t *= t
-	return t * t * (g[0]*x + g[1]*y)
+	// BDS multiplies t in one at a time (sub_D1EB5D0); (t*t)*(t*t) can
+	// round differently.
+	return (g[0]*x + g[1]*y) * (t * t * t * t)
 }
 
 // Sample2 returns 2D simplex noise at (x, y), without the octave origin.

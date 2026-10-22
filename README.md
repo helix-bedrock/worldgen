@@ -26,7 +26,8 @@
 >   fire, glowstone, ores (gold, quartz, magma, gravel, blackstone, ancient debris), basalt deltas,
 >   basalt pillars, soul sand, Nether fossils, Nether fortresses, Nether ruined portals and
 >   bastion remnants match BDS; huge crimson and warped fungi, fungi, roots and vines are close.
-> - **The End is not started.**
+> - **The End is in progress:** terrain, the obsidian pillars, small islands, chorus plants and end
+>   gateways match BDS; End cities are not done yet.
 > - **The API is not stable.** Names and behaviour change between commits.
 >
 > **[STATUS.md](STATUS.md) lists everything that is generated and everything that is missing.**
@@ -84,8 +85,7 @@ cache.Generate(chunkX, chunkZ, &c) // terrain + features, safe from many gorouti
 
 The generator returns indices into the block list; your server maps them to its own block IDs.
 
-Each dimension has its own package: [`overworld`](overworld) and [`nether`](nether) today, with the
-End to follow. The shared vanilla data and the `biome`, `blocks`, `noise` and `rand` packages stay at the top,
+Each dimension has its own package: [`overworld`](overworld), [`nether`](nether) and [`end`](end). The shared vanilla data and the `biome`, `blocks`, `noise` and `rand` packages stay at the top,
 with [`structure`](structure): templates, jigsaw assembly, block rules and the ruined portal builder
 shared by every dimension's structures. The dimension packages do not import each other.
 

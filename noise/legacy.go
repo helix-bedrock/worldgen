@@ -48,20 +48,20 @@ type GridValues [GridXZ * GridY * GridXZ]float32
 //     gradient products are not recomputed: the previous corner's are reused,
 //     even across columns. BDS never resets this between columns, so the
 //     lowest octaves carry values over from one column to the next.
-func (n *legacyOctave) addGrid(out []float32, ny int, x0, y0, z0 float32, sx, sy, sz, invAmp float32) {
+func (n *legacyOctave) addGrid(out []float32, nxz, ny int, x0, y0, z0 float32, sx, sy, sz, invAmp float32) {
 	start := 0*sy + n.oy
 	startCell := int32(start)
 	startFrac := start - float32(int32(start))
 	lastCell := int32(-1)
 	var cache [4]float32
 	idx := 0
-	for i := range GridXZ {
+	for i := range nxz {
 		fx := (float32(i)+x0)*sx + n.ox
 		flx := floor32(fx)
 		xi := int32(uint8(int32(flx)))
 		xf := fx - flx
 		xs := smooth(xf)
-		for k := range GridXZ {
+		for k := range nxz {
 			fz := (float32(k)+z0)*sz + n.oz
 			flz := floor32(fz)
 			zi := int32(uint8(int32(flz)))
@@ -143,7 +143,7 @@ const (
 func addOctaves(octs []legacyOctave, out *GridValues, x0, y0, z0, sxz, sy float32) {
 	a := float32(1)
 	for i := range octs {
-		octs[i].addGrid(out[:], GridY, x0, y0, z0, sxz*a, sy*a, sxz*a, 1/a)
+		octs[i].addGrid(out[:], GridXZ, GridY, x0, y0, z0, sxz*a, sy*a, sxz*a, 1/a)
 		a *= 0.5
 	}
 }
@@ -203,9 +203,14 @@ func (o *LegacyOctaves) Scale() float32 { return o.scale }
 // in cell units. Octave i is sampled at input scale s*2^-i and weighted
 // 2^i (BDS's sub_D23EF10 per octave).
 func (o *LegacyOctaves) AddGrid(out []float32, ny int, x0, y0, z0, sxz, sy float32) {
+	o.AddGridN(out, GridXZ, ny, x0, y0, z0, sxz, sy)
+}
+
+// AddGridN is AddGrid on a grid nxz corners wide: the End's is 3.
+func (o *LegacyOctaves) AddGridN(out []float32, nxz, ny int, x0, y0, z0, sxz, sy float32) {
 	a := float32(1)
 	for i := range o.octs {
-		o.octs[i].addGrid(out, ny, x0, y0, z0, sxz*a, sy*a, sxz*a, 1/a)
+		o.octs[i].addGrid(out, nxz, ny, x0, y0, z0, sxz*a, sy*a, sxz*a, 1/a)
 		a *= 0.5
 	}
 }
