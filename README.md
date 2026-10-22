@@ -22,12 +22,16 @@
 >   witch huts, igloos, ocean ruins, shipwrecks, buried treasure, ocean monuments, pillager outposts,
 >   ruined portals, woodland mansions, strongholds, trail ruins, trial chambers, abandoned camps, fossils
 >   and desert wells. Chests are still empty in game.
-> - **The Nether is in progress:** terrain, biomes, surfaces, bedrock, the cave carver, lava springs,
+> - **The Nether is generated:** terrain, biomes, surfaces, bedrock, the cave carver, lava springs,
 >   fire, glowstone, ores (gold, quartz, magma, gravel, blackstone, ancient debris), basalt deltas,
 >   basalt pillars, soul sand, Nether fossils, Nether fortresses, Nether ruined portals and
 >   bastion remnants match BDS; huge crimson and warped fungi, fungi, roots and vines are close.
-> - **The End matches BDS:** terrain, the obsidian pillars, small islands, chorus plants, end gateways
->   and End cities with their ships.
+> - **The End matches BDS:** terrain, the obsidian pillars with their End crystals, small islands,
+>   chorus plants, end gateways and End cities with their ships. The exit portal is provided for the
+>   engine's dragon fight, which builds it in BDS.
+> - **Every dimension's major parts are in place.** What is left is a refinement pass over all three
+>   (small differences listed in [STATUS.md](STATUS.md)), and mobs in structures, which worldgen hands
+>   to the engine as spawn records (only the End crystals so far).
 > - **The API is not stable.** Names and behaviour change between commits.
 >
 > **[STATUS.md](STATUS.md) lists everything that is generated and everything that is missing.**
@@ -136,7 +140,7 @@ The full list of what is and is not generated is in [STATUS.md](STATUS.md).
 | Trail ruins, trial chambers (placement matches BDS's locate; pools from BDS, buried terrain) | 🟡 written from BDS; trial chambers match BDS for the first 26 pieces, then drift |
 | Fossils, desert wells | 🟡 written from BDS; desert wells checked in game |
 | Nether (terrain, cave carver, ores, all five biomes' decorations, fortresses, ruined portals, bastions) | 🟡 matches BDS closely; fortresses, ruined portals and bastions match; fungus trees close |
-| The End | ⬜ not started |
+| The End (terrain, pillars and crystals, islands, chorus, gateways, End cities, exit portal) | ✅ matches BDS; a few chorus plants and stair corner shapes differ (refinement) |
 
 **The goal is to match the latest Minecraft version exactly.** After that, every time Minecraft
 updates, worldgen will be updated to the new version and gain everything the update adds. The

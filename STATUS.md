@@ -1,7 +1,8 @@
 # What worldgen generates
 
 Status as of 2026-10-22. This page lists everything worldgen places today and what is still
-missing, so you know what to expect in a world. Only the **Overworld** is generated so far.
+missing, so you know what to expect in a world. The **Overworld**, the **Nether** and the **End** are
+generated; a refinement pass over all three comes next.
 
 Every part is built from the Bedrock Dedicated Server (BDS 1.26.52) and compared with chunks that
 BDS generated from the same seed. The marks mean:
