@@ -2,8 +2,6 @@
 
 <img src=".github/helix-mark.svg" alt="Helix" width="120">
 
-<h1>worldgen</h1>
-
 <p>
   <b>Vanilla Minecraft: Bedrock Edition world generation</b><br>
   Fast, low memory, standard library only
