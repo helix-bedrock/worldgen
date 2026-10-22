@@ -21,6 +21,8 @@ func (o *Overworld) newIceSpike() *iceSpikeFeature {
 	return &iceSpikeFeature{packed: o.ids.packedIce, snow: o.blockID("minecraft:snow"), ice: o.ids.ice}
 }
 
+// blockID is the default state of block name, or 0 when the block list
+// lacks it.
 func (o *Overworld) blockID(name string) uint32 {
 	b, _ := o.reg.Default(name)
 	return b

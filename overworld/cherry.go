@@ -169,17 +169,12 @@ func (t *treeFeature) cherryBranch(w *featureWorld, x, y, z, h, dx, dz, start in
 	}
 	tx, ty, tz := x+n*dx, y+endY, z+n*dz
 	mx, my, mz := x, y+start, z
-	put := func(b uint32) {
-		if t.acaciaFree(w, mx, my, mz) {
-			w.set(mx, my, mz, b)
-		}
-	}
 	mx, mz = mx+dx, mz+dz
 	if extends {
-		put(sideLog)
+		t.cherryLog(w, mx, my, mz, sideLog)
 		mx, mz = mx+dx, mz+dz
 	}
-	put(sideLog)
+	t.cherryLog(w, mx, my, mz, sideLog)
 	step := int32(-1)
 	if ty > my {
 		step = 1
@@ -189,10 +184,10 @@ func (t *treeFeature) cherryBranch(w *featureWorld, x, y, z, h, dx, dz, start in
 		f := float32(mathx.Abs(ty-my)) / float32(dist)
 		if f <= r.Float() {
 			mx, mz = mx+dx, mz+dz
-			put(sideLog)
+			t.cherryLog(w, mx, my, mz, sideLog)
 		} else {
 			my += step
-			put(t.log)
+			t.cherryLog(w, mx, my, mz, t.log)
 		}
 	}
 	return blockPos{tx, ty + 1, tz}
@@ -268,5 +263,13 @@ func (t *treeFeature) cherryHanging(w *featureWorld, c *cherryCanopy, p blockPos
 				t.cherryPut(w, x, p[1]+ly-2, z, c.leaf)
 			}
 		}
+	}
+}
+
+// cherryLog sets block b of a cherry branch at (x, y, z) when the spot is
+// free.
+func (t *treeFeature) cherryLog(w *featureWorld, x, y, z int32, b uint32) {
+	if t.acaciaFree(w, x, y, z) {
+		w.set(x, y, z, b)
 	}
 }

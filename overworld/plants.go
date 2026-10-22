@@ -76,13 +76,12 @@ func (f *cactusFeature) place(w *featureWorld, x, y, z int32, r *rand.MT) (block
 // VERIFY: the tag below (xmmword_F613DE8) is taken as sand.
 func (f *cactusFeature) survives(w *featureWorld, x, y, z int32) bool {
 	o := w.o
-	lava := func(b uint32) bool { return b == o.ids.lava || b == o.ids.flowingLava }
 	for _, d := range [4][2]int32{{0, -1}, {0, 1}, {-1, 0}, {1, 0}} {
-		if b, ok := w.block(x+d[0], y, z+d[1]); ok && (o.solidMaterial(b) || lava(b)) {
+		if b, ok := w.block(x+d[0], y, z+d[1]); ok && (o.solidMaterial(b) || o.isLava(b)) {
 			return false
 		}
 	}
-	if b, ok := w.block(x, y+1, z); ok && lava(b) {
+	if b, ok := w.block(x, y+1, z); ok && o.isLava(b) {
 		return false
 	}
 	below, ok := w.block(x, y-1, z)
@@ -488,31 +487,9 @@ func (f *rootSystemFeature) free(w *featureWorld, b uint32) bool {
 }
 
 func (f *rootSystemFeature) place(w *featureWorld, x, y, z int32, r *rand.MT) (blockPos, bool) {
-	o := w.o
 	h := w.heightmap(x, z)
-	airOrWater := func(b uint32, ok bool) bool { return ok && (b == o.ids.air || o.waterMaterial(b)) }
 	for k, py := 0, y; k < 184; k, py = k+1, py+1 {
-		ok := func() bool {
-			if b, ok := w.block(x, py-1, z); !ok || !o.solidMaterial(b) {
-				return false
-			}
-			b0, ok0 := w.block(x, py, z)
-			if !ok0 || !f.free(w, b0) || !airOrWater(b0, ok0) {
-				return false
-			}
-			b1, ok1 := w.block(x, py+1, z)
-			if !airOrWater(b1, ok1) {
-				return false
-			}
-			b2, ok2 := w.block(x, py+2, z)
-			if !airOrWater(b2, ok2) || o.waterMaterial(b0) && o.waterMaterial(b1) && o.waterMaterial(b2) {
-				return false
-			}
-			// BDS then lowers the tree by one or two blocks when the block
-			// below is water; it was just tested solid, so the tree stays.
-			_, placed := f.tree.place(w, x, py, z, r)
-			return placed
-		}()
+		ok := f.treeFits(w, x, py, z, r)
 		if ok {
 			f.grow(w, x, y, z, py, r)
 			return blockPos{x, py, z}, true
@@ -580,4 +557,29 @@ func (f *melonFeature) place(w *featureWorld, x, y, z int32, r *rand.MT) (blockP
 		}
 	}
 	return blockPos{x, y, z}, true
+}
+
+// treeFits places the tree at (x, py, z) when the spot holds it: solid
+// below, three free air or water blocks, not all water.
+func (f *rootSystemFeature) treeFits(w *featureWorld, x, py, z int32, r *rand.MT) bool {
+	o := w.o
+	if b, ok := w.block(x, py-1, z); !ok || !o.solidMaterial(b) {
+		return false
+	}
+	b0, ok0 := w.block(x, py, z)
+	if !ok0 || !f.free(w, b0) || !(ok0 && o.emptyOrWater(b0)) {
+		return false
+	}
+	b1, ok1 := w.block(x, py+1, z)
+	if !(ok1 && o.emptyOrWater(b1)) {
+		return false
+	}
+	b2, ok2 := w.block(x, py+2, z)
+	if !(ok2 && o.emptyOrWater(b2)) || o.waterMaterial(b0) && o.waterMaterial(b1) && o.waterMaterial(b2) {
+		return false
+	}
+	// BDS then lowers the tree by one or two blocks when the block
+	// below is water; it was just tested solid, so the tree stays.
+	_, placed := f.tree.place(w, x, py, z, r)
+	return placed
 }

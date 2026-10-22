@@ -97,17 +97,14 @@ func New(seed int64, reg *blocks.Registry, biomeIDs map[string]uint32) (*Nether,
 		return nil, fmt.Errorf("worldgen: %d block states do not fit the 16-bit chunk storage", reg.Len())
 	}
 	n := &Nether{seed: seed, reg: reg}
-	for _, b := range []struct {
-		dst  *uint32
-		name string
-	}{
-		{&n.ids.air, "minecraft:air"},
-		{&n.ids.netherrack, "minecraft:netherrack"},
-		{&n.ids.lava, "minecraft:lava"},
+	for _, b := range []blockTarget{
+		{&n.ids.air, blockAir},
+		{&n.ids.netherrack, blockNetherrack},
+		{&n.ids.lava, blockLava},
 		{&n.ids.bedrock, "minecraft:bedrock"},
-		{&n.ids.water, "minecraft:water"},
-		{&n.ids.flowingWater, "minecraft:flowing_water"},
-		{&n.ids.flowingLava, "minecraft:flowing_lava"},
+		{&n.ids.water, blockWater},
+		{&n.ids.flowingWater, blockFlowingWater},
+		{&n.ids.flowingLava, blockFlowingLava},
 	} {
 		id, ok := reg.Default(b.name)
 		if !ok {

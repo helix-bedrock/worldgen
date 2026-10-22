@@ -1,7 +1,6 @@
 package overworld
 
 import (
-	"cmp"
 	"slices"
 
 	"github.com/helix-bedrock/worldgen/structure"
@@ -19,7 +18,7 @@ func (o *Overworld) portalPick(rx, rz int32) (int32, int32) {
 // isPortalChunk reports whether a ruined portal starts in chunk (cx, cz).
 // Every region has one.
 func (o *Overworld) isPortalChunk(cx, cz int32) bool {
-	x, z := o.portalPick(floorDivRegion(cx, structure.PortalSpacing), floorDivRegion(cz, structure.PortalSpacing))
+	x, z := o.portalPick(structure.Region(cx, structure.PortalSpacing), structure.Region(cz, structure.PortalSpacing))
 	return x == cx && z == cz
 }
 
@@ -27,8 +26,8 @@ func (o *Overworld) isPortalChunk(cx, cz int32) bool {
 // (cx, cz): the box is within 16 blocks of the start chunk's corner and
 // the netherrack spreads 14 past its middle.
 func (o *Overworld) portalsReach(cx, cz int32, f func(sx, sz int32)) {
-	for rx := floorDivRegion(cx-2, structure.PortalSpacing); rx <= floorDivRegion(cx+2, structure.PortalSpacing); rx++ {
-		for rz := floorDivRegion(cz-2, structure.PortalSpacing); rz <= floorDivRegion(cz+2, structure.PortalSpacing); rz++ {
+	for rx := structure.Region(cx-2, structure.PortalSpacing); rx <= structure.Region(cx+2, structure.PortalSpacing); rx++ {
+		for rz := structure.Region(cz-2, structure.PortalSpacing); rz <= structure.Region(cz+2, structure.PortalSpacing); rz++ {
 			sx, sz := o.portalPick(rx, rz)
 			if sx >= cx-2 && sx <= cx+2 && sz >= cz-2 && sz <= cz+2 {
 				f(sx, sz)
@@ -104,21 +103,9 @@ func (o *Overworld) biomeHas(b uint32, tag string) bool {
 // portalWorld is the overworld a portal is built in: raw gives the
 // undecorated terrain.
 func (o *Overworld) portalWorld(cx, cz int32, raw func(cx, cz int32) *PackedChunk) structure.PortalWorld {
-	chunks := map[[2]int32]*PackedChunk{}
-	read := func(x, y, z int32) uint32 {
-		k := [2]int32{x >> 4, z >> 4}
-		c, ok := chunks[k]
-		if !ok {
-			c = raw(k[0], k[1])
-			chunks[k] = c
-		}
-		if c == nil {
-			return o.ids.air
-		}
-		return c.at(int(y-MinY)<<8 | int(z&15)<<4 | int(x&15))
-	}
+	terrain := &cachedTerrain{o: o, raw: raw, chunks: map[[2]int32]*PackedChunk{}}
 	return structure.PortalWorld{
-		Block: read, MinY: MinY, MaxY: MaxY, Sea: SeaLevel,
+		Block: terrain.block, MinY: MinY, MaxY: MaxY, Sea: SeaLevel,
 		Solid:    o.solidMaterial,
 		Leaves:   func(b uint32) bool { return o.hasBlockTag(b, "leaves") },
 		BiomeHas: func(x, y, z int32, tag string) bool { return o.biomeHas(o.BiomeAt(x, y, z), tag) },
@@ -131,34 +118,19 @@ func (o *Overworld) portalWorld(cx, cz int32, raw func(cx, cz int32) *PackedChun
 // returns the middle of its box: above it, or inside it for a buried one
 // (Kind "buried ruined_portal"). It is safe for concurrent use.
 func (o *Overworld) NearestRuinedPortal(x, z int32, maxRegions int32) (Scattered, bool) {
-	type cand struct {
-		cx, cz int32
-		d      int64
-	}
-	var cands []cand
-	rx0, rz0 := floorDivRegion(x>>4, structure.PortalSpacing), floorDivRegion(z>>4, structure.PortalSpacing)
+	var cands []locateCand
+	rx0, rz0 := structure.Region(x>>4, structure.PortalSpacing), structure.Region(z>>4, structure.PortalSpacing)
 	for rx := rx0 - maxRegions; rx <= rx0+maxRegions; rx++ {
 		for rz := rz0 - maxRegions; rz <= rz0+maxRegions; rz++ {
 			cx, cz := o.portalPick(rx, rz)
 			dx, dz := int64(cx*16+8-x), int64(cz*16+8-z)
-			cands = append(cands, cand{cx, cz, dx*dx + dz*dz})
+			cands = append(cands, locateCand{cx, cz, dx*dx + dz*dz})
 		}
 	}
-	slices.SortFunc(cands, func(a, b cand) int { return cmp.Compare(a.d, b.d) })
-	raw := map[[2]int32]*PackedChunk{}
-	get := func(cx, cz int32) *PackedChunk {
-		k := [2]int32{cx, cz}
-		if pc, ok := raw[k]; ok {
-			return pc
-		}
-		var ch Chunk
-		o.GenerateChunk(cx, cz, &ch)
-		pc := Pack(&ch)
-		raw[k] = pc
-		return pc
-	}
+	slices.SortFunc(cands, compareLocateCand)
+	raw := newRawChunks(o)
 	for _, c := range cands {
-		p := o.portalAt(c.cx, c.cz, get)
+		p := o.portalAt(c.cx, c.cz, raw.get)
 		if p == nil {
 			continue
 		}
@@ -170,4 +142,26 @@ func (o *Overworld) NearestRuinedPortal(x, z int32, maxRegions int32) (Scattered
 		return s, true
 	}
 	return Scattered{}, false
+}
+
+// cachedTerrain reads blocks from a raw terrain source, asking it for each
+// chunk once.
+type cachedTerrain struct {
+	o      *Overworld
+	raw    func(cx, cz int32) *PackedChunk
+	chunks map[[2]int32]*PackedChunk
+}
+
+// block is the block at (x, y, z); air where raw has no chunk.
+func (t *cachedTerrain) block(x, y, z int32) uint32 {
+	k := [2]int32{x >> 4, z >> 4}
+	c, ok := t.chunks[k]
+	if !ok {
+		c = t.raw(k[0], k[1])
+		t.chunks[k] = c
+	}
+	if c == nil {
+		return t.o.ids.air
+	}
+	return c.at(int(y-MinY)<<8 | int(z&15)<<4 | int(x&15))
 }

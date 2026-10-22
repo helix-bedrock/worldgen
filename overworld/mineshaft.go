@@ -144,6 +144,51 @@ func (o *Overworld) buildMineshaft(cx, cz int32, r *rand.MT) *mineshaft {
 	return ms
 }
 
+// Mineshaft piece directions, as msPiece takes them.
+const (
+	msSouth int32 = iota
+	msWest
+	msNorth
+	msEast
+)
+
+// msCrossingExit grows a piece out of side dir of crossing box b.
+func (o *Overworld) msCrossingExit(ms *mineshaft, r *rand.MT, b structure.Box, dir, depth int32) {
+	switch dir {
+	case msNorth:
+		o.msPiece(ms, r, b.X0+1, b.Y0, b.Z0-1, msNorth, depth)
+	case msSouth:
+		o.msPiece(ms, r, b.X0+1, b.Y0, b.Z1+1, msSouth, depth)
+	case msWest:
+		o.msPiece(ms, r, b.X0-1, b.Y0, b.Z0+1, msWest, depth)
+	case msEast:
+		o.msPiece(ms, r, b.X1+1, b.Y0, b.Z0+1, msEast, depth)
+	}
+}
+
+// msRoomSide grows the corridors along one side of a mineshaft room.
+type msRoomSide struct {
+	p      *msPiece
+	r      *rand.MT
+	y0, ys int32
+}
+
+// grow walks a side span blocks long, placing a child every few blocks
+// with at and recording the openings to it.
+func (s msRoomSide) grow(span int32, at func(j, y int32) (*msPiece, structure.Box)) {
+	for j := int32(0); j < span; j += 4 {
+		k := s.r.IntN(span)
+		if j+k+3 > span {
+			break
+		}
+		j += k
+		y := s.y0 + s.r.IntN(s.ys) + 1
+		if c, e := at(j, y); c != nil {
+			s.p.entrances = append(s.p.entrances, e)
+		}
+	}
+}
+
 // msChildren adds the pieces that grow from p.
 func (o *Overworld) msChildren(ms *mineshaft, p *msPiece, r *rand.MT) {
 	b := p.bb
@@ -161,41 +206,29 @@ func (o *Overworld) msChildren(ms *mineshaft, p *msPiece, r *rand.MT) {
 			ys = 1
 		}
 		xs, zs := b.X1-b.X0+1, b.Z1-b.Z0+1
-		side := func(span int32, at func(j, y int32) (*msPiece, structure.Box)) {
-			for j := int32(0); j < span; j += 4 {
-				k := r.IntN(span)
-				if j+k+3 > span {
-					break
-				}
-				j += k
-				y := b.Y0 + r.IntN(ys) + 1
-				if c, e := at(j, y); c != nil {
-					p.entrances = append(p.entrances, e)
-				}
-			}
-		}
-		side(xs, func(j, y int32) (*msPiece, structure.Box) {
+		side := msRoomSide{p: p, r: r, y0: b.Y0, ys: ys}
+		side.grow(xs, func(j, y int32) (*msPiece, structure.Box) {
 			c := o.msPiece(ms, r, b.X0+j, y, b.Z0-1, 2, p.depth)
 			if c == nil {
 				return nil, structure.Box{}
 			}
 			return c, structure.NewBox(c.bb.X0, c.bb.Y0, b.Z0, c.bb.X1, c.bb.Y1, b.Z0+1)
 		})
-		side(xs, func(j, y int32) (*msPiece, structure.Box) {
+		side.grow(xs, func(j, y int32) (*msPiece, structure.Box) {
 			c := o.msPiece(ms, r, b.X0+j, y, b.Z1+1, 0, p.depth)
 			if c == nil {
 				return nil, structure.Box{}
 			}
 			return c, structure.NewBox(c.bb.X0, c.bb.Y0, b.Z1-1, c.bb.X1, c.bb.Y1, b.Z1)
 		})
-		side(zs, func(j, y int32) (*msPiece, structure.Box) {
+		side.grow(zs, func(j, y int32) (*msPiece, structure.Box) {
 			c := o.msPiece(ms, r, b.X0-1, y, b.Z0+j, 1, p.depth)
 			if c == nil {
 				return nil, structure.Box{}
 			}
 			return c, structure.NewBox(b.X0, c.bb.Y0, c.bb.Z0, b.X0+1, c.bb.Y1, c.bb.Z1)
 		})
-		side(zs, func(j, y int32) (*msPiece, structure.Box) {
+		side.grow(zs, func(j, y int32) (*msPiece, structure.Box) {
 			c := o.msPiece(ms, r, b.X1+1, y, b.Z0+j, 3, p.depth)
 			if c == nil {
 				return nil, structure.Box{}
@@ -268,27 +301,23 @@ func (o *Overworld) msChildren(ms *mineshaft, p *msPiece, r *rand.MT) {
 		}
 	case msCrossing:
 		d := p.depth
-		north := func() { o.msPiece(ms, r, b.X0+1, b.Y0, b.Z0-1, 2, d) }
-		south := func() { o.msPiece(ms, r, b.X0+1, b.Y0, b.Z1+1, 0, d) }
-		west := func() { o.msPiece(ms, r, b.X0-1, b.Y0, b.Z0+1, 1, d) }
-		east := func() { o.msPiece(ms, r, b.X1+1, b.Y0, b.Z0+1, 3, d) }
 		switch p.dir {
 		case 0:
-			south()
-			west()
-			east()
+			o.msCrossingExit(ms, r, b, msSouth, d)
+			o.msCrossingExit(ms, r, b, msWest, d)
+			o.msCrossingExit(ms, r, b, msEast, d)
 		case 1:
-			north()
-			south()
-			west()
+			o.msCrossingExit(ms, r, b, msNorth, d)
+			o.msCrossingExit(ms, r, b, msSouth, d)
+			o.msCrossingExit(ms, r, b, msWest, d)
 		case 2:
-			north()
-			west()
-			east()
+			o.msCrossingExit(ms, r, b, msNorth, d)
+			o.msCrossingExit(ms, r, b, msWest, d)
+			o.msCrossingExit(ms, r, b, msEast, d)
 		case 3:
-			north()
-			south()
-			east()
+			o.msCrossingExit(ms, r, b, msNorth, d)
+			o.msCrossingExit(ms, r, b, msSouth, d)
+			o.msCrossingExit(ms, r, b, msEast, d)
 		}
 		if p.twoFloors {
 			if nextBool(r) {
@@ -650,18 +679,14 @@ func (o *Overworld) mineshaftReaches(cx, cz int32) bool {
 // build places one mineshaft's pieces that reach the chunk, in order.
 func (b *msBuild) build(ms *mineshaft) {
 	o := b.o
-	id := func(name string) uint32 {
-		s, _ := o.reg.Default(name)
-		return s
-	}
 	b.ms = ms
 	if ms.mesa {
-		b.log, b.planks, b.fence = id("minecraft:dark_oak_log"), id("minecraft:dark_oak_planks"), id("minecraft:dark_oak_fence")
+		b.log, b.planks, b.fence = o.blockID("minecraft:dark_oak_log"), o.blockID("minecraft:dark_oak_planks"), o.blockID("minecraft:dark_oak_fence")
 	} else {
-		b.log, b.planks, b.fence = id("minecraft:oak_log"), id("minecraft:oak_planks"), id("minecraft:oak_fence")
+		b.log, b.planks, b.fence = o.blockID("minecraft:oak_log"), o.blockID("minecraft:oak_planks"), o.blockID("minecraft:oak_fence")
 	}
-	b.web, b.torch, b.rail = id("minecraft:web"), id("minecraft:torch"), id("minecraft:rail")
-	b.chain, b.spawner = id("minecraft:iron_chain"), id("minecraft:mob_spawner")
+	b.web, b.torch, b.rail = o.blockID("minecraft:web"), o.blockID(blockTorch), o.blockID("minecraft:rail")
+	b.chain, b.spawner = o.blockID("minecraft:iron_chain"), o.blockID("minecraft:mob_spawner")
 	for _, p := range ms.pieces {
 		if !p.bb.Intersects(b.cbox) || b.edgesLiquid(p) {
 			continue
@@ -875,14 +900,14 @@ func (b *msBuild) support(p *msPiece, z int32) {
 	}
 	b.fill(p, 0, 2, z, 2, 2, z, b.planks, air)
 	states := torchStates[p.orient&3]
-	t1, ok := b.o.reg.Lookup("minecraft:torch", map[string]any{"torch_facing_direction": states[0]})
+	t1, ok := b.o.reg.Lookup(blockTorch, map[string]any{"torch_facing_direction": states[0]})
 	if !ok {
 		t1 = b.torch
 	}
 	if b.r.Float() < 0.05 {
 		b.place(p, t1, 1, 2, z-1)
 	}
-	t2, ok := b.o.reg.Lookup("minecraft:torch", map[string]any{"torch_facing_direction": states[1]})
+	t2, ok := b.o.reg.Lookup(blockTorch, map[string]any{"torch_facing_direction": states[1]})
 	if !ok {
 		t2 = b.torch
 	}
@@ -921,7 +946,7 @@ func (b *msBuild) replaceableForPillar(s uint32) bool {
 		return true
 	}
 	switch b.o.blockName(s) {
-	case "minecraft:glow_lichen", "minecraft:seagrass", "minecraft:short_grass", "minecraft:fern":
+	case "minecraft:glow_lichen", blockSeagrass, blockShortGrass, blockFern:
 		return true
 	}
 	return false

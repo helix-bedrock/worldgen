@@ -194,16 +194,19 @@ func bastionKind(r *rand.MT) int {
 	return int(r.IntN(4))
 }
 
+// startCand is a structure start chunk and its squared distance from the
+// search point.
+type startCand struct {
+	cx, cz int32
+	d      int64
+}
+
 // NearestBastion finds the bastion remnant whose start is nearest to block
 // (x, z), searching maxRings rings of placement regions around it, and
 // returns the centre of its start piece's floor. kind is one of
 // BastionKinds, or "" for any. It is safe for concurrent use.
 func (n *Nether) NearestBastion(x, z, maxRings int32, kind string) (bx, by, bz int32, found bool) {
-	type cand struct {
-		cx, cz int32
-		d      int64
-	}
-	var cands []cand
+	var cands []startCand
 	rx0, rz0 := mathx.FloorDiv(x>>4, complexSpacing), mathx.FloorDiv(z>>4, complexSpacing)
 	for rx := rx0 - maxRings; rx <= rx0+maxRings; rx++ {
 		for rz := rz0 - maxRings; rz <= rz0+maxRings; rz++ {
@@ -216,10 +219,10 @@ func (n *Nether) NearestBastion(x, z, maxRings int32, kind string) (bx, by, bz i
 				continue
 			}
 			dx, dz := int64(cx*16-x), int64(cz*16-z)
-			cands = append(cands, cand{cx, cz, dx*dx + dz*dz})
+			cands = append(cands, startCand{cx, cz, dx*dx + dz*dz})
 		}
 	}
-	slices.SortFunc(cands, func(a, b cand) int { return cmp.Compare(a.d, b.d) })
+	slices.SortFunc(cands, func(a, b startCand) int { return cmp.Compare(a.d, b.d) })
 	for _, c := range cands {
 		if b := n.bastionAt(c.cx, c.cz); b != nil {
 			s := b.pieces[0].BB

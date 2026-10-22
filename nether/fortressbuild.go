@@ -15,15 +15,12 @@ type fortressIDs struct {
 
 func (n *Nether) loadFortressIDs() error {
 	ids := &n.nb
-	for _, b := range []struct {
-		dst  *uint32
-		name string
-	}{
+	for _, b := range []blockTarget{
 		{&ids.bricks, "minecraft:nether_brick"},
 		{&ids.fence, "minecraft:nether_brick_fence"},
 		{&ids.wart, "minecraft:nether_wart"},
-		{&ids.soulSand, "minecraft:soul_sand"},
-		{&ids.lava, "minecraft:lava"},
+		{&ids.soulSand, blockSoulSand},
+		{&ids.lava, blockLava},
 		{&ids.spawner, "minecraft:mob_spawner"},
 	} {
 		id, ok := n.reg.Default(b.name)
@@ -33,12 +30,12 @@ func (n *Nether) loadFortressIDs() error {
 		*b.dst = id
 	}
 	var ok bool
-	if ids.chest, ok = n.reg.Lookup("minecraft:chest", map[string]any{"minecraft:cardinal_direction": "west"}); !ok {
-		return errMissing("minecraft:chest")
+	if ids.chest, ok = n.reg.Lookup(blockChest, map[string]any{"minecraft:cardinal_direction": "west"}); !ok {
+		return errMissing(blockChest)
 	}
 	for d := range ids.stairs {
-		if ids.stairs[d], ok = n.reg.Lookup("minecraft:nether_brick_stairs", map[string]any{"weirdo_direction": float64(d)}); !ok {
-			return errMissing("minecraft:nether_brick_stairs")
+		if ids.stairs[d], ok = n.reg.Lookup(blockNetherBrickStairs, map[string]any{"weirdo_direction": float64(d)}); !ok {
+			return errMissing(blockNetherBrickStairs)
 		}
 	}
 	return n.loadFences()
@@ -260,23 +257,26 @@ func (b *nbBuild) buildBridgeCrossing() {
 func (b *nbBuild) buildEndFiller() {
 	var r rand.MT
 	r.Seed(b.p.seed)
+	for x := int32(0); x <= 4; x++ {
+		b.fillerRow(&r, x, 3, 8)
+		b.fillerRow(&r, x, 4, 8)
+	}
+	b.fillerRow(&r, 0, 5, 8)
+	b.fillerRow(&r, 4, 5, 8)
+	for x := int32(0); x <= 4; x++ {
+		b.fillerRow(&r, x, 2, 5)
+	}
+	for x := int32(0); x <= 4; x++ {
+		b.fillerRow(&r, x, 0, 3)
+		b.fillerRow(&r, x, 1, 3)
+	}
+}
+
+// fillerRow lays one row of the filler's end at (x, y), a raw draw mod m
+// long.
+func (b *nbBuild) fillerRow(r *rand.MT, x, y int32, m uint32) {
 	nb := b.n.nb.bricks
-	row := func(x, y int32, m uint32) {
-		b.box(x, y, 0, x, y, int32(r.Uint32()%m), nb, nb)
-	}
-	for x := int32(0); x <= 4; x++ {
-		row(x, 3, 8)
-		row(x, 4, 8)
-	}
-	row(0, 5, 8)
-	row(4, 5, 8)
-	for x := int32(0); x <= 4; x++ {
-		row(x, 2, 5)
-	}
-	for x := int32(0); x <= 4; x++ {
-		row(x, 0, 3)
-		row(x, 1, 3)
-	}
+	b.box(x, y, 0, x, y, int32(r.Uint32()%m), nb, nb)
 }
 
 func (b *nbBuild) buildRoomCrossing() {

@@ -18,6 +18,26 @@ type oreFeature struct {
 	rules []oreRule
 }
 
+// oreFile is a minecraft:ore_feature file.
+type oreFile struct {
+	Ore struct {
+		Count int32         `json:"count"`
+		Rules []oreFileRule `json:"replace_rules"`
+	} `json:"minecraft:ore_feature"`
+}
+
+// oreFileRule is one replace rule of an ore feature file.
+type oreFileRule struct {
+	Places     string           `json:"places_block"`
+	MayReplace []oreFileReplace `json:"may_replace"`
+}
+
+// oreFileReplace is a block an ore rule may replace.
+type oreFileReplace struct {
+	Name   string         `json:"name"`
+	States map[string]any `json:"states"`
+}
+
 type oreRule struct {
 	place   uint32
 	replace []bool // by state
@@ -31,18 +51,7 @@ func (n *Nether) loadOre(id string) (*oreFeature, error) {
 	if err != nil {
 		return nil, fmt.Errorf("worldgen: read %s: %w", id, err)
 	}
-	var f struct {
-		Ore struct {
-			Count int32 `json:"count"`
-			Rules []struct {
-				Places     string `json:"places_block"`
-				MayReplace []struct {
-					Name   string         `json:"name"`
-					States map[string]any `json:"states"`
-				} `json:"may_replace"`
-			} `json:"replace_rules"`
-		} `json:"minecraft:ore_feature"`
-	}
+	var f oreFile
 	if err := json.Unmarshal(raw, &f); err != nil {
 		return nil, fmt.Errorf("worldgen: decode %s: %w", id, err)
 	}

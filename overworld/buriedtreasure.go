@@ -1,7 +1,6 @@
 package overworld
 
 import (
-	"cmp"
 	"slices"
 
 	"github.com/helix-bedrock/worldgen/rand"
@@ -33,7 +32,7 @@ var treasureBiomes = []string{"beach", "cold_beach", "stone_beach", "mushroom_is
 // isTreasureChunk reports whether a buried treasure starts in chunk
 // (cx, cz).
 func (o *Overworld) isTreasureChunk(cx, cz int32) bool {
-	x, z := o.treasurePick(floorDivRegion(cx, treasureSpacing), floorDivRegion(cz, treasureSpacing))
+	x, z := o.treasurePick(structure.Region(cx, treasureSpacing), structure.Region(cz, treasureSpacing))
 	if x != cx || z != cz {
 		return false
 	}
@@ -55,21 +54,25 @@ func (o *Overworld) treasurePick(rx, rz int32) (int32, int32) {
 // drawing from r.
 func (o *Overworld) treasureSpot(cx, cz int32, c *Chunk, raw *PackedChunk, r *rand.MT) [3]int32 {
 	x, z := cx*16+8, cz*16+8
-	solid := func(x, y, z int32) bool {
-		if y < MinY || y >= MaxY {
-			return false
-		}
-		b := c.Block(int(x&15), int(y), int(z&15))
-		return o.solidMaterial(b) && !o.liquidMaterial(b)
-	}
 	y := o.topSolid(raw, x, z, false) - r.IntN(2) - 4
-	for !(solid(x, y+1, z) && solid(x, y, z-1) && solid(x+1, y, z) && solid(x, y, z+1) && solid(x-1, y, z)) && y >= 6 {
+	for !(o.treasureSolid(c, x, y+1, z) && o.treasureSolid(c, x, y, z-1) && o.treasureSolid(c, x+1, y, z) &&
+		o.treasureSolid(c, x, y, z+1) && o.treasureSolid(c, x-1, y, z)) && y >= 6 {
 		y--
 	}
-	for !solid(x, y-1, z) && y >= 6 {
+	for !o.treasureSolid(c, x, y-1, z) && y >= 6 {
 		y--
 	}
 	return [3]int32{x, y, z}
+}
+
+// treasureSolid reports whether the block of c at (x, y, z) is solid and
+// not liquid; blocks outside the world are not.
+func (o *Overworld) treasureSolid(c *Chunk, x, y, z int32) bool {
+	if y < MinY || y >= MaxY {
+		return false
+	}
+	b := c.Block(int(x&15), int(y), int(z&15))
+	return o.solidMaterial(b) && !o.liquidMaterial(b)
 }
 
 // placeTreasure writes the buried treasure of chunk (cx, cz), if it has
@@ -83,7 +86,7 @@ func (o *Overworld) placeTreasure(cx, cz int32, c *Chunk, raw *PackedChunk) {
 	p := o.treasureSpot(cx, cz, c, raw, &r)
 	b := scBuild{o: o, c: c, cbox: structure.NewBox(cx*16, MinY, cz*16, cx*16+15, MaxY-1, cz*16+15)}
 	b.ids()
-	chest, _ := o.reg.Default("minecraft:chest")
+	chest, _ := o.reg.Default(blockChest)
 	if !b.setWorld(p[0], p[1], p[2], chest) {
 		return
 	}
@@ -100,20 +103,16 @@ func (o *Overworld) placeTreasure(cx, cz int32, c *Chunk, raw *PackedChunk) {
 // searching maxRegions placement regions (4 chunks each) around it, and
 // returns its chest. It is safe for concurrent use.
 func (o *Overworld) NearestBuriedTreasure(x, z int32, maxRegions int32) (Scattered, bool) {
-	type cand struct {
-		cx, cz int32
-		d      int64
-	}
-	var cands []cand
-	rx0, rz0 := floorDivRegion(x>>4, treasureSpacing), floorDivRegion(z>>4, treasureSpacing)
+	var cands []locateCand
+	rx0, rz0 := structure.Region(x>>4, treasureSpacing), structure.Region(z>>4, treasureSpacing)
 	for rx := rx0 - maxRegions; rx <= rx0+maxRegions; rx++ {
 		for rz := rz0 - maxRegions; rz <= rz0+maxRegions; rz++ {
 			cx, cz := o.treasurePick(rx, rz)
 			dx, dz := int64(cx*16+8-x), int64(cz*16+8-z)
-			cands = append(cands, cand{cx, cz, dx*dx + dz*dz})
+			cands = append(cands, locateCand{cx, cz, dx*dx + dz*dz})
 		}
 	}
-	slices.SortFunc(cands, func(a, b cand) int { return cmp.Compare(a.d, b.d) })
+	slices.SortFunc(cands, compareLocateCand)
 	for _, c := range cands {
 		if !o.isTreasureChunk(c.cx, c.cz) {
 			continue

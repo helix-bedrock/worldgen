@@ -29,61 +29,70 @@ type fungusIDs struct {
 	solid, replaceable []bool
 }
 
+// look is the state of block name with props.
+func (n *Nether) look(name string, props map[string]any) (uint32, error) {
+	id, ok := n.reg.Lookup(name, props)
+	if !ok {
+		return 0, fmt.Errorf("worldgen: block %s %v missing from the block list", name, props)
+	}
+	return id, nil
+}
+
+// fungusKind loads the blocks of a huge fungus with the stem and hat
+// blocks.
+func (n *Nether) fungusKind(stem, hat string, vines bool) (k fungusKind, err error) {
+	if k.stem, err = n.look(stem, map[string]any{"pillar_axis": "y"}); err != nil {
+		return k, err
+	}
+	if k.hat, err = n.look(hat, nil); err != nil {
+		return k, err
+	}
+	k.decor, err = n.look("minecraft:shroomlight", nil)
+	k.vines = vines
+	return k, err
+}
+
+// replaceableBlocks returns the blocks a huge fungus may replace; none of
+// them is solid.
+func replaceableBlocks() []string {
+	return []string{
+		blockAir, blockLava, blockFlowingLava, blockWater, blockFlowingWater, blockFire, blockSoulFire,
+		blockCrimsonRoots, blockWarpedRoots, blockNetherSprouts,
+	}
+}
+
 func (n *Nether) loadFungi() error {
-	look := func(name string, props map[string]any) (uint32, error) {
-		id, ok := n.reg.Lookup(name, props)
-		if !ok {
-			return 0, fmt.Errorf("worldgen: block %s %v missing from the block list", name, props)
-		}
-		return id, nil
-	}
 	var err error
-	kind := func(stem, hat string, vines bool) (k fungusKind) {
-		if err != nil {
-			return
-		}
-		if k.stem, err = look(stem, map[string]any{"pillar_axis": "y"}); err != nil {
-			return
-		}
-		if k.hat, err = look(hat, nil); err != nil {
-			return
-		}
-		k.decor, err = look("minecraft:shroomlight", nil)
-		k.vines = vines
-		return
+	if n.crimson, err = n.fungusKind("minecraft:crimson_stem", blockNetherWart, true); err != nil {
+		return err
 	}
-	n.crimson = kind("minecraft:crimson_stem", "minecraft:nether_wart_block", true)
-	n.warped = kind("minecraft:warped_stem", "minecraft:warped_wart_block", false)
-	if err != nil {
+	if n.warped, err = n.fungusKind("minecraft:warped_stem", blockWarpedWart, false); err != nil {
 		return err
 	}
 	f := &n.fungi
-	for _, b := range []struct {
-		dst  *uint32
-		name string
-	}{
+	for _, b := range []blockTarget{
 		{&f.crimsonNylium, "minecraft:crimson_nylium"}, {&f.warpedNylium, "minecraft:warped_nylium"},
-		{&f.crimsonFungus, "minecraft:crimson_fungus"}, {&f.warpedFungus, "minecraft:warped_fungus"},
+		{&f.crimsonFungus, blockCrimsonFungus}, {&f.warpedFungus, blockWarpedFungus},
 	} {
-		if *b.dst, err = look(b.name, nil); err != nil {
+		if *b.dst, err = n.look(b.name, nil); err != nil {
 			return err
 		}
 	}
 	for age := range int32(26) {
-		if f.weepingVines[age], err = look("minecraft:weeping_vines", map[string]any{"weeping_vines_age": float64(age)}); err != nil {
+		if f.weepingVines[age], err = n.look(blockWeepingVines, map[string]any{"weeping_vines_age": float64(age)}); err != nil {
 			return err
 		}
-		if f.twistingVines[age], err = look("minecraft:twisting_vines", map[string]any{"twisting_vines_age": float64(age)}); err != nil {
+		if f.twistingVines[age], err = n.look(blockTwistingVines, map[string]any{"twisting_vines_age": float64(age)}); err != nil {
 			return err
 		}
 	}
-	if f.netherWart, err = look("minecraft:nether_wart_block", nil); err != nil {
+	if f.netherWart, err = n.look(blockNetherWart, nil); err != nil {
 		return err
 	}
-	if f.warpedWart, err = look("minecraft:warped_wart_block", nil); err != nil {
+	if f.warpedWart, err = n.look(blockWarpedWart, nil); err != nil {
 		return err
 	}
-	for _, name := range []string{"minecraft:dirt", "minecraft:grass_block", "minecraft:podzol", "minecraft:coarse_dirt",
+	for _, name := range []string{blockDirt, blockGrass, "minecraft:podzol", blockCoarseDirt,
 		"minecraft:mycelium", "minecraft:dirt_with_roots", "minecraft:moss_block", "minecraft:pale_moss_block",
 		"minecraft:mud", "minecraft:muddy_mangrove_roots", "minecraft:farmland"} {
 		if id, ok := n.reg.Default(name); ok {
@@ -92,17 +101,16 @@ func (n *Nether) loadFungi() error {
 	}
 	// VERIFY: both flags are read from BDS per block; these name lists
 	// cover the blocks the Nether generates.
-	nonSolid := map[string]bool{
-		"minecraft:air": true, "minecraft:lava": true, "minecraft:flowing_lava": true, "minecraft:water": true,
-		"minecraft:flowing_water": true, "minecraft:fire": true, "minecraft:soul_fire": true,
-		"minecraft:crimson_roots": true, "minecraft:warped_roots": true, "minecraft:nether_sprouts": true,
-		"minecraft:crimson_fungus": true, "minecraft:warped_fungus": true, "minecraft:weeping_vines": true,
-		"minecraft:twisting_vines": true, "minecraft:brown_mushroom": true, "minecraft:red_mushroom": true,
+	replaceable := map[string]bool{}
+	for _, name := range replaceableBlocks() {
+		replaceable[name] = true
 	}
-	replaceable := map[string]bool{
-		"minecraft:air": true, "minecraft:lava": true, "minecraft:flowing_lava": true, "minecraft:water": true,
-		"minecraft:flowing_water": true, "minecraft:fire": true, "minecraft:soul_fire": true,
-		"minecraft:crimson_roots": true, "minecraft:warped_roots": true, "minecraft:nether_sprouts": true,
+	nonSolid := map[string]bool{
+		blockCrimsonFungus: true, blockWarpedFungus: true, blockWeepingVines: true,
+		blockTwistingVines: true, blockBrownMushroom: true, blockRedMushroom: true,
+	}
+	for name := range replaceable {
+		nonSolid[name] = true
 	}
 	f.solid = make([]bool, n.reg.Len())
 	f.replaceable = make([]bool, n.reg.Len())

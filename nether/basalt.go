@@ -1,6 +1,7 @@
 package nether
 
 import (
+	"github.com/helix-bedrock/worldgen/cube"
 	"github.com/helix-bedrock/worldgen/internal/mathx"
 	"github.com/helix-bedrock/worldgen/rand"
 )
@@ -17,7 +18,6 @@ func (n *Nether) msolid(b uint32) bool { return n.fungi.solid[b] }
 // enclosed air-topped block gets magma when the delta has a rim, and lava
 // goes at the rim offset from it.
 func (n *Nether) deltaFeature(r *region, x, y, z int32, mt *rand.MT) {
-	f := &n.fungi
 	step := int32(-1)
 	if n.msolid(r.at(x, y, z)) {
 		step = 1
@@ -48,37 +48,41 @@ func (n *Nether) deltaFeature(r *region, x, y, z int32, mt *rand.MT) {
 	sizeX := mt.IntN(4) + 3
 	sizeZ := mt.IntN(4) + 3
 	reach := max(sizeX, sizeZ)
-	// clear is BDS's enclosure test: not lava, air above, and the five
-	// other neighbours not air.
-	clear := func(px, py, pz int32) bool {
-		if r.at(px, py, pz) == n.ids.lava || r.at(px, py+1, pz) != n.ids.air {
-			return false
-		}
-		for _, d := range [5][3]int32{{0, -1, 0}, {0, 0, -1}, {0, 0, 1}, {1, 0, 0}, {-1, 0, 0}} {
-			if r.at(px+d[0], py+d[1], pz+d[2]) == n.ids.air {
-				return false
-			}
-		}
-		return true
-	}
-	_ = f
 	for dx := -sizeX; dx <= sizeX; dx++ {
 		for dz := -sizeZ; dz <= sizeZ; dz++ {
 			if mathx.Abs(dx)+mathx.Abs(dz) > reach {
 				continue
 			}
 			px, pz := x+dx, z+dz
-			if !clear(px, y, pz) {
+			if !n.deltaClear(r, px, y, pz) {
 				continue
 			}
 			if rim {
 				r.set(px, y, pz, n.deco.magma)
 			}
-			if qx, qz := px+rimX, pz+rimZ; clear(qx, y, qz) {
+			if qx, qz := px+rimX, pz+rimZ; n.deltaClear(r, qx, y, qz) {
 				r.set(qx, y, qz, n.ids.lava)
 			}
 		}
 	}
+}
+
+// deltaClear is BDS's delta enclosure test: not lava, air above, and the
+// five other neighbours not air.
+func (n *Nether) deltaClear(r *region, x, y, z int32) bool {
+	if r.at(x, y, z) == n.ids.lava || r.at(x, y+1, z) != n.ids.air {
+		return false
+	}
+	for _, f := range cube.Faces() {
+		if f == cube.FaceUp {
+			continue
+		}
+		dx, dy, dz := f.Step()
+		if r.at(x+dx, y+dy, z+dz) == n.ids.air {
+			return false
+		}
+	}
+	return true
 }
 
 // basaltColumns is BDS's BasaltColumnsFeature (sub_4985E50). From the

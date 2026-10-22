@@ -57,7 +57,7 @@ func (o *Overworld) cityPick(rx, rz int32, r *rand.MT) (int32, int32) {
 // (cx, cz).
 func (o *Overworld) IsAncientCityChunk(cx, cz int32) bool {
 	var r rand.MT
-	px, pz := o.cityPick(floorDivRegion(cx, citySpacing), floorDivRegion(cz, citySpacing), &r)
+	px, pz := o.cityPick(structure.Region(cx, citySpacing), structure.Region(cz, citySpacing), &r)
 	return px == cx && pz == cz && o.BiomeAt(cx*16, cityAnchorY+1, cz*16) == o.deepDark
 }
 
@@ -187,8 +187,8 @@ func (o *Overworld) forCityPieces(cx, cz int32, f func(*structure.Piece) bool) {
 		return
 	}
 	chunkBox := structure.NewBox(cx*16, MinY, cz*16, cx*16+15, MaxY-1, cz*16+15)
-	r0x, r1x := floorDivRegion(cx-cityReach, citySpacing), floorDivRegion(cx+cityReach, citySpacing)
-	r0z, r1z := floorDivRegion(cz-cityReach, citySpacing), floorDivRegion(cz+cityReach, citySpacing)
+	r0x, r1x := structure.Region(cx-cityReach, citySpacing), structure.Region(cx+cityReach, citySpacing)
+	r0z, r1z := structure.Region(cz-cityReach, citySpacing), structure.Region(cz+cityReach, citySpacing)
 	for rx := r0x; rx <= r1x; rx++ {
 		for rz := r0z; rz <= r1z; rz++ {
 			c := o.cityAt(rx, rz)
@@ -216,7 +216,7 @@ type AncientCity struct {
 // (x, z), searching placement regions ring by ring up to maxRings out. It
 // is safe for concurrent use.
 func (o *Overworld) NearestAncientCity(x, z, maxRings int32) (AncientCity, bool) {
-	rx0, rz0 := floorDivRegion(x>>4, citySpacing), floorDivRegion(z>>4, citySpacing)
+	rx0, rz0 := structure.Region(x>>4, citySpacing), structure.Region(z>>4, citySpacing)
 	var r rand.MT
 	best, found := int64(-1), [2]int32{}
 	for ring := int32(0); ring <= maxRings; ring++ {

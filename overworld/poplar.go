@@ -292,10 +292,10 @@ func (o *Overworld) treeFree(b uint32) bool {
 		return true
 	}
 	switch o.blockName(b) {
-	case "minecraft:short_grass", "minecraft:tall_grass", "minecraft:fern", "minecraft:large_fern",
-		"minecraft:deadbush", "minecraft:seagrass", "minecraft:fire", "minecraft:soul_fire",
-		"minecraft:snow_layer", "minecraft:vine", "minecraft:glow_lichen", "minecraft:resin_clump",
-		"minecraft:light_block", "minecraft:structure_void", "minecraft:crimson_roots",
+	case blockShortGrass, blockTallGrass, blockFern, "minecraft:large_fern",
+		blockDeadBush, blockSeagrass, "minecraft:fire", "minecraft:soul_fire",
+		blockSnowLayer, blockVine, "minecraft:glow_lichen", "minecraft:resin_clump",
+		"minecraft:light_block", blockStructureVoid, "minecraft:crimson_roots",
 		"minecraft:warped_roots", "minecraft:nether_sprouts", "minecraft:hanging_roots",
 		"minecraft:leaf_litter", "minecraft:short_dry_grass", "minecraft:tall_dry_grass", "minecraft:bush":
 		return true

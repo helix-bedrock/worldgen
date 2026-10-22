@@ -55,9 +55,9 @@ func (n *Nether) loadFossils() error {
 			}
 			st := tpl.Palette[b.State]
 			switch st.Name {
-			case "minecraft:air":
+			case blockAir:
 				continue
-			case "minecraft:bone_block":
+			case blockBoneBlock:
 			default:
 				return fmt.Errorf("worldgen: %s: block %s not supported", path, st.Name)
 			}
@@ -69,7 +69,7 @@ func (n *Nether) loadFossils() error {
 		}
 	}
 	for i, a := range []string{"x", "y", "z"} {
-		id, ok := n.reg.Lookup("minecraft:bone_block", map[string]any{"pillar_axis": a})
+		id, ok := n.reg.Lookup(blockBoneBlock, map[string]any{"pillar_axis": a})
 		if !ok {
 			return fmt.Errorf("worldgen: bone block with axis %s missing from the block list", a)
 		}

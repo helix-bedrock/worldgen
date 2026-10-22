@@ -64,6 +64,55 @@ type surfaceNoises struct {
 	beach *noise.LegacyOctaves
 }
 
+// surfaceBlock is the state of a surface material, noBlock for none.
+func (n *Nether) surfaceBlock(b biome.Block) (uint32, error) {
+	if b.Name == "" {
+		return noBlock, nil
+	}
+	id, ok := n.reg.Lookup(b.Name, b.States)
+	if !ok {
+		id, ok = n.reg.Default(b.Name)
+	}
+	if !ok {
+		return 0, fmt.Errorf("worldgen: surface block %s missing from the block list", b.Name)
+	}
+	return id, nil
+}
+
+// surfaceMats resolves a builder's five materials.
+func (n *Nether) surfaceMats(top, mid, seaFloor, foundation, sea biome.Block) (surfaceMats, error) {
+	var m surfaceMats
+	dst := [5]*uint32{&m.top, &m.mid, &m.seaFloor, &m.foundation, &m.sea}
+	for i, b := range [5]biome.Block{top, mid, seaFloor, foundation, sea} {
+		id, err := n.surfaceBlock(b)
+		if err != nil {
+			return m, err
+		}
+		*dst[i] = id
+	}
+	return m, nil
+}
+
+// list returns the materials in the order top, mid, sea floor, foundation,
+// sea.
+func (m surfaceMats) list() [5]uint32 {
+	return [5]uint32{m.top, m.mid, m.seaFloor, m.foundation, m.sea}
+}
+
+// cappedMats appends the capped materials src to dst, each with a
+// one-octave noise seeded from *ms, which counts up.
+func (n *Nether) cappedMats(src []biome.Block, dst *[]cappedMat, ms *uint32) error {
+	for _, m := range src {
+		id, err := n.surfaceBlock(m)
+		if err != nil {
+			return err
+		}
+		*dst = append(*dst, cappedMat{id, noise.NewLegacyOctaves(rand.NewMT(*ms), 1)})
+		*ms++
+	}
+	return nil
+}
+
 // loadSurfaces resolves the Nether biomes' surface builders to block IDs,
 // indexed by biome ID.
 func (n *Nether) loadSurfaces(biomeIDs map[string]uint32) error {
@@ -76,32 +125,6 @@ func (n *Nether) loadSurfaces(biomeIDs map[string]uint32) error {
 	// (sub_C752060).
 	n.surfNoise.beach = noise.NewLegacyOctaves(rand.NewMT(seed), 1)
 
-	block := func(b biome.Block) (uint32, error) {
-		if b.Name == "" {
-			return noBlock, nil
-		}
-		id, ok := n.reg.Lookup(b.Name, b.States)
-		if !ok {
-			id, ok = n.reg.Default(b.Name)
-		}
-		if !ok {
-			return 0, fmt.Errorf("worldgen: surface block %s missing from the block list", b.Name)
-		}
-		return id, nil
-	}
-	mats := func(top, mid, seaFloor, foundation, sea biome.Block) (surfaceMats, error) {
-		var m surfaceMats
-		var err error
-		for _, f := range []struct {
-			dst *uint32
-			b   biome.Block
-		}{{&m.top, top}, {&m.mid, mid}, {&m.seaFloor, seaFloor}, {&m.foundation, foundation}, {&m.sea, sea}} {
-			if *f.dst, err = block(f.b); err != nil {
-				return m, err
-			}
-		}
-		return m, nil
-	}
 	var maxID uint32
 	for _, id := range biomeIDs {
 		maxID = max(maxID, id)
@@ -127,31 +150,24 @@ func (n *Nether) loadSurfaces(biomeIDs map[string]uint32) error {
 		default:
 			continue
 		}
-		if bs.mats, err = mats(s.Top, s.Mid, s.SeaFloor, s.Foundation, s.Sea); err != nil {
+		if bs.mats, err = n.surfaceMats(s.Top, s.Mid, s.SeaFloor, s.Foundation, s.Sea); err != nil {
 			return err
 		}
 		bs.seaFloorDepth = int32(s.SeaFloorDepth)
-		if bs.beach, err = block(s.BeachMaterial); err != nil {
+		if bs.beach, err = n.surfaceBlock(s.BeachMaterial); err != nil {
 			return err
 		}
 		// Each capped material has a one-octave noise; the floors take
 		// seeds seed, seed+1, ... and the ceilings carry on (sub_C7BFB60).
 		ms := seed
-		for _, list := range []struct {
-			src []biome.Block
-			dst *[]cappedMat
-		}{{s.FloorMaterials, &bs.floors}, {s.CeilingMaterials, &bs.ceilings}} {
-			for _, m := range list.src {
-				id, err := block(m)
-				if err != nil {
-					return err
-				}
-				*list.dst = append(*list.dst, cappedMat{id, noise.NewLegacyOctaves(rand.NewMT(ms), 1)})
-				ms++
-			}
+		if err := n.cappedMats(s.FloorMaterials, &bs.floors, &ms); err != nil {
+			return err
+		}
+		if err := n.cappedMats(s.CeilingMaterials, &bs.ceilings, &ms); err != nil {
+			return err
 		}
 		for _, a := range d.Adjustments {
-			m, err := mats(a.Top, a.Mid, a.SeaFloor, a.Foundation, a.Sea)
+			m, err := n.surfaceMats(a.Top, a.Mid, a.SeaFloor, a.Foundation, a.Sea)
 			if err != nil {
 				return err
 			}
@@ -237,15 +253,10 @@ func (n *Nether) adjusted(b *biomeSurface, col *column, y int32) surfaceMats {
 		if v < a.min || v >= a.max {
 			continue
 		}
-		for _, p := range []struct {
-			dst *uint32
-			v   uint32
-		}{
-			{&m.top, a.mats.top}, {&m.mid, a.mats.mid}, {&m.seaFloor, a.mats.seaFloor},
-			{&m.foundation, a.mats.foundation}, {&m.sea, a.mats.sea},
-		} {
-			if p.v != noBlock {
-				*p.dst = p.v
+		dst := [5]*uint32{&m.top, &m.mid, &m.seaFloor, &m.foundation, &m.sea}
+		for i, v := range a.mats.list() {
+			if v != noBlock {
+				*dst[i] = v
 			}
 		}
 	}

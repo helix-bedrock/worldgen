@@ -52,20 +52,23 @@ type netherCarver struct {
 	lava, cuts []bool
 }
 
+// carverFile is the nether_cave_carver_feature file.
+type carverFile struct {
+	F struct {
+		Fill  string     `json:"fill_with"`
+		Width float32    `json:"width_modifier"`
+		Skip  int32      `json:"skip_carve_chance"`
+		Floor [2]float32 `json:"floor_level"`
+	} `json:"minecraft:nether_cave_carver_feature"`
+}
+
 // loadCarver reads nether_cave_carver_feature.
 func (n *Nether) loadCarver() error {
 	raw, err := worldgen.Data.ReadFile("data/vanilla/features/nether_cave_carver_feature.json")
 	if err != nil {
 		return fmt.Errorf("worldgen: read nether carver: %w", err)
 	}
-	var f struct {
-		F struct {
-			Fill  string     `json:"fill_with"`
-			Width float32    `json:"width_modifier"`
-			Skip  int32      `json:"skip_carve_chance"`
-			Floor [2]float32 `json:"floor_level"`
-		} `json:"minecraft:nether_cave_carver_feature"`
-	}
+	var f carverFile
 	if err := json.Unmarshal(raw, &f); err != nil {
 		return fmt.Errorf("worldgen: decode nether carver: %w", err)
 	}
@@ -87,8 +90,8 @@ func (n *Nether) loadCarver() error {
 	// BDS compares block types: lava (its liquid states included) stops a
 	// step; netherrack, dirt, coarse dirt and grass blocks are cut.
 	cuts := map[string]bool{
-		"minecraft:netherrack": true, "minecraft:dirt": true,
-		"minecraft:coarse_dirt": true, "minecraft:grass_block": true,
+		blockNetherrack: true, blockDirt: true,
+		blockCoarseDirt: true, blockGrass: true,
 	}
 	cv.lava = make([]bool, n.reg.Len())
 	cv.cuts = make([]bool, n.reg.Len())
@@ -97,7 +100,7 @@ func (n *Nether) loadCarver() error {
 		if !ok {
 			continue
 		}
-		cv.lava[i] = s.Name == "minecraft:lava" || s.Name == "minecraft:flowing_lava"
+		cv.lava[i] = s.Name == blockLava || s.Name == blockFlowingLava
 		cv.cuts[i] = cuts[s.Name]
 	}
 	return nil
@@ -261,20 +264,17 @@ func (cv *netherCarver) lavaShell(minX, maxX, lo, hi, minZ, maxZ int32, c *Chunk
 	if hi < lo {
 		return false
 	}
-	at := func(x, y, z int32) bool {
-		return y >= 0 && y < Height && cv.lava[c.Block(int(x), int(y), int(z))]
-	}
 	for x := minX; x <= maxX; x++ {
 		for z := minZ; z <= maxZ; z++ {
 			if x == minX || x == maxX || z == minZ || z == maxZ {
 				for y := hi; y >= lo; y-- {
-					if at(x, y, z) {
+					if cv.lavaAt(c, x, y, z) {
 						return true
 					}
 				}
 				continue
 			}
-			if at(x, hi, z) || at(x, lo, z) {
+			if cv.lavaAt(c, x, hi, z) || cv.lavaAt(c, x, lo, z) {
 				return true
 			}
 		}
@@ -282,5 +282,14 @@ func (cv *netherCarver) lavaShell(minX, maxX, lo, hi, minZ, maxZ int32, c *Chunk
 	return false
 }
 
-func (cv *netherCarver) sinAt(a float32) float32 { return cv.sin[uint16(int32(a*10430.378))] }
-func (cv *netherCarver) cosAt(a float32) float32 { return cv.sin[uint16(int32(a*10430.378+16384))] }
+// lavaAt reports whether (x, y, z) of c is lava; outside the height it is
+// not.
+func (cv *netherCarver) lavaAt(c *Chunk, x, y, z int32) bool {
+	return y >= 0 && y < Height && cv.lava[c.Block(int(x), int(y), int(z))]
+}
+
+// sinTurn is the sine table's steps per radian.
+const sinTurn = 10430.378
+
+func (cv *netherCarver) sinAt(a float32) float32 { return cv.sin[uint16(int32(a*sinTurn))] }
+func (cv *netherCarver) cosAt(a float32) float32 { return cv.sin[uint16(int32(a*sinTurn+16384))] }

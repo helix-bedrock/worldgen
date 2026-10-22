@@ -80,8 +80,8 @@ func (o *Overworld) cityAdjustments(chunkX, chunkZ int32) []beardShaver {
 	}
 	var out []beardShaver
 	r := int32(cityReach + 1)
-	r0x, r1x := floorDivRegion(chunkX-r, citySpacing), floorDivRegion(chunkX+r, citySpacing)
-	r0z, r1z := floorDivRegion(chunkZ-r, citySpacing), floorDivRegion(chunkZ+r, citySpacing)
+	r0x, r1x := structure.Region(chunkX-r, citySpacing), structure.Region(chunkX+r, citySpacing)
+	r0z, r1z := structure.Region(chunkZ-r, citySpacing), structure.Region(chunkZ+r, citySpacing)
 	for rx := r0x; rx <= r1x; rx++ {
 		for rz := r0z; rz <= r1z; rz++ {
 			c := o.cityAt(rx, rz)
@@ -120,8 +120,8 @@ func (o *Overworld) villageBeards(chunkX, chunkZ int32) []beardBox {
 		return nil
 	}
 	var out []beardBox
-	r0x, r1x := floorDivRegion(chunkX-7, villageSpacing), floorDivRegion(chunkX+7, villageSpacing)
-	r0z, r1z := floorDivRegion(chunkZ-7, villageSpacing), floorDivRegion(chunkZ+7, villageSpacing)
+	r0x, r1x := structure.Region(chunkX-7, villageSpacing), structure.Region(chunkX+7, villageSpacing)
+	r0z, r1z := structure.Region(chunkZ-7, villageSpacing), structure.Region(chunkZ+7, villageSpacing)
 	for rx := r0x; rx <= r1x; rx++ {
 		for rz := r0z; rz <= r1z; rz++ {
 			sx, sz, _ := o.villagePick(rx, rz)

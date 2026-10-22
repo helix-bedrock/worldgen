@@ -1,6 +1,8 @@
 package overworld
 
 import (
+	"cmp"
+
 	"github.com/helix-bedrock/worldgen/rand"
 	"github.com/helix-bedrock/worldgen/structure"
 )
@@ -20,14 +22,6 @@ const (
 // (StructureFeature::setRandomSeedFor).
 func structureSeed(r *rand.MT, seed int64, rx, rz, salt int32) {
 	r.Seed(structure.RegionSeed(seed, uint32(salt), rx, rz))
-}
-
-// floorDivRegion is chunk / spacing rounded down, as BDS computes it.
-func floorDivRegion(c, spacing int32) int32 { //nolint:unparam // other structures use other spacings
-	if c < 0 {
-		c -= spacing - 1
-	}
-	return c / spacing
 }
 
 // IsVillageChunk reports whether a village starts in chunk (chunkX, chunkZ):
@@ -50,7 +44,7 @@ func (o *Overworld) IsVillageChunk(chunkX, chunkZ int32) bool {
 // pick, before the biome check.
 func (o *Overworld) isVillageSpreadPick(chunkX, chunkZ int32) bool {
 	var r rand.MT
-	rx, rz := floorDivRegion(chunkX, villageSpacing), floorDivRegion(chunkZ, villageSpacing)
+	rx, rz := structure.Region(chunkX, villageSpacing), structure.Region(chunkZ, villageSpacing)
 	structureSeed(&r, o.seed, rx, rz, villageSalt)
 	n := int32(villageSpacing - villageSeparation)
 	a := r.IntN(n)
@@ -74,4 +68,39 @@ func (o *Overworld) biomesOnly(x, y, z, r int32, set []bool) bool {
 		}
 	}
 	return true
+}
+
+// locateCand is a structure start candidate of a locate search: its chunk
+// and its squared distance from the search point.
+type locateCand struct {
+	cx, cz int32
+	d      int64
+}
+
+// compareLocateCand orders locate candidates nearest first.
+func compareLocateCand(a, b locateCand) int { return cmp.Compare(a.d, b.d) }
+
+// rawChunks generates and keeps the undecorated terrain of the chunks a
+// locate search reads.
+type rawChunks struct {
+	o      *Overworld
+	chunks map[[2]int32]*PackedChunk
+}
+
+// newRawChunks returns an empty cache over o.
+func newRawChunks(o *Overworld) *rawChunks {
+	return &rawChunks{o: o, chunks: map[[2]int32]*PackedChunk{}}
+}
+
+// get returns chunk (cx, cz), generating it the first time.
+func (r *rawChunks) get(cx, cz int32) *PackedChunk {
+	k := [2]int32{cx, cz}
+	if pc, ok := r.chunks[k]; ok {
+		return pc
+	}
+	var ch Chunk
+	r.o.GenerateChunk(cx, cz, &ch)
+	pc := Pack(&ch)
+	r.chunks[k] = pc
+	return pc
 }

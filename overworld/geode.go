@@ -32,43 +32,45 @@ var geodeFaceNames = [6]string{"down", "up", "north", "south", "west", "east"}
 // geodeBudFaces is the order BDS tries the faces for a bud (dword_15400DC).
 var geodeBudFaces = [6]int{1, 0, 2, 3, 4, 5}
 
+// rawGeode is the JSON of a minecraft:geode_feature.
+type rawGeode struct {
+	Placements []struct {
+		Name string `json:"name"`
+	} `json:"inner_placements"`
+	MinOuter    int32   `json:"min_outer_wall_distance"`
+	MaxOuter    int32   `json:"max_outer_wall_distance"`
+	MinPoints   int32   `json:"min_distribution_points"`
+	MaxPoints   int32   `json:"max_distribution_points"`
+	MinOffset   int32   `json:"min_point_offset"`
+	MaxOffset   int32   `json:"max_point_offset"`
+	Radius      int32   `json:"max_radius"`
+	CrackOffset float64 `json:"crack_point_offset"`
+	NoiseMul    float32 `json:"noise_multiplier"`
+	Potential   float32 `json:"use_potential_placements_chance"`
+	AltChance   float32 `json:"use_alternate_layer0_chance"`
+	RequireAlt  bool    `json:"placements_require_layer0_alternate"`
+}
+
+// rawGeodeLayers is the layer block names of a geode feature.
+type rawGeodeLayers struct {
+	Filler    string `json:"filler"`
+	Inner     string `json:"inner_layer"`
+	Alternate string `json:"alternate_inner_layer"`
+	Middle    string `json:"middle_layer"`
+	Outer     string `json:"outer_layer"`
+}
+
 func (o *Overworld) parseGeode(raw json.RawMessage) (placer, error) {
-	var r struct {
-		Placements []struct {
-			Name string `json:"name"`
-		} `json:"inner_placements"`
-		MinOuter    int32   `json:"min_outer_wall_distance"`
-		MaxOuter    int32   `json:"max_outer_wall_distance"`
-		MinPoints   int32   `json:"min_distribution_points"`
-		MaxPoints   int32   `json:"max_distribution_points"`
-		MinOffset   int32   `json:"min_point_offset"`
-		MaxOffset   int32   `json:"max_point_offset"`
-		Radius      int32   `json:"max_radius"`
-		CrackOffset float64 `json:"crack_point_offset"`
-		NoiseMul    float32 `json:"noise_multiplier"`
-		Potential   float32 `json:"use_potential_placements_chance"`
-		AltChance   float32 `json:"use_alternate_layer0_chance"`
-		RequireAlt  bool    `json:"placements_require_layer0_alternate"`
-	}
+	var r rawGeode
 	if err := json.Unmarshal(raw, &r); err != nil {
 		return nil, err
 	}
-	var names struct {
-		Filler    string `json:"filler"`
-		Inner     string `json:"inner_layer"`
-		Alternate string `json:"alternate_inner_layer"`
-		Middle    string `json:"middle_layer"`
-		Outer     string `json:"outer_layer"`
-	}
+	var names rawGeodeLayers
 	if err := json.Unmarshal(raw, &names); err != nil {
 		return nil, err
 	}
-	id := func(n string) uint32 {
-		b, _ := o.reg.Default(n)
-		return b
-	}
-	f := &geodeFeature{filler: id(names.Filler), inner: id(names.Inner), alternate: id(names.Alternate),
-		middle: id(names.Middle), outer: id(names.Outer), outerMin: r.MinOuter, outerMax: r.MaxOuter,
+	f := &geodeFeature{filler: o.blockID(names.Filler), inner: o.blockID(names.Inner), alternate: o.blockID(names.Alternate),
+		middle: o.blockID(names.Middle), outer: o.blockID(names.Outer), outerMin: r.MinOuter, outerMax: r.MaxOuter,
 		pointsMin: r.MinPoints, pointsMax: r.MaxPoints, offsetMin: r.MinOffset, offsetMax: r.MaxOffset,
 		radius: r.Radius, crackOffset: int32(r.CrackOffset), noiseMul: r.NoiseMul, potentialChance: r.Potential,
 		altChance: r.AltChance, requireAlt: r.RequireAlt, invalid: map[uint32]bool{}, notReplaceable: map[uint32]bool{}}
@@ -91,7 +93,7 @@ func (o *Overworld) parseGeode(raw json.RawMessage) (placer, error) {
 		s, _ := o.reg.State(b)
 		switch s.Name {
 		case "minecraft:bedrock", "minecraft:packed_ice", "minecraft:blue_ice", "minecraft:air",
-			"minecraft:water", "minecraft:flowing_water", "minecraft:lava", "minecraft:flowing_lava",
+			blockWater, "minecraft:flowing_water", "minecraft:lava", "minecraft:flowing_lava",
 			"minecraft:ice", "minecraft:frosted_ice":
 			f.invalid[b] = true
 		}
@@ -191,18 +193,17 @@ func (f *geodeFeature) place(w *featureWorld, x, y, z int32, r *rand.MT) (blockP
 	g := &geodeRun{f: f, w: w, r: r, oz: z}
 	g.n = noise.NewNormalMT(r, -4, []float32{1})
 	d := float32(n) / float32(f.outerMax)
-	inv := func(v float32) float32 { return float32(1 / float32(math.Sqrt(float64(v)))) }
 	// The filling threshold is 1/sqrt(1.7) as a constant.
 	g.thFill = math.Float32frombits(1061443537)
-	g.thInner = inv(d + 2.2)
-	g.thMiddle = inv(d + 3.2)
-	g.thOuter = inv(d + 4.2)
+	g.thInner = invSqrt32(d + 2.2)
+	g.thMiddle = invSqrt32(d + 3.2)
+	g.thOuter = invSqrt32(d + 4.2)
 	crackBase := float32(r.Float()*0.5) + 2
 	cd := d
 	if n < 4 {
 		cd = 0
 	}
-	g.thCrack = inv(cd + crackBase)
+	g.thCrack = invSqrt32(cd + crackBase)
 	// BDS compares with 0.95 directly (generate_crack_chance is not read).
 	g.crack = r.Float() < 0.95
 	// The invalid-block counter starts from the float bits of d instead of
@@ -271,38 +272,44 @@ func (f *geodeFeature) place(w *featureWorld, x, y, z int32, r *rand.MT) (blockP
 func (g *geodeRun) sweep(ox, oy int32) {
 	R := g.f.radius
 	found := false
-	column := func(x int32) bool {
-		hit := false
-		var crackUp, crackDown bool
-		for y := oy; ; y++ {
-			if g.row(x, y, &hit, &crackUp) || y >= oy+R {
-				break
-			}
-		}
-		for y := oy; y > oy-R; {
-			y--
-			if g.row(x, y, &hit, &crackDown) {
-				break
-			}
-		}
-		if crackUp || crackDown {
-			found = true
-		}
-		return !hit && found
-	}
 	if R >= 0 {
 		for x := ox; x <= ox+R; x++ {
-			if column(x) {
+			if g.column(x, oy, &found) {
 				break
 			}
 		}
 	}
 	for x := ox; x > ox-R; {
 		x--
-		if column(x) {
+		if g.column(x, oy, &found) {
 			break
 		}
 	}
+}
+
+// column walks the rows of column x, up from oy and then down from one
+// below it. found is set once a crack block has been placed; column
+// reports whether the x walk should stop: a crack was found and nothing
+// was in this column.
+func (g *geodeRun) column(x, oy int32, found *bool) bool {
+	R := g.f.radius
+	hit := false
+	var crackUp, crackDown bool
+	for y := oy; ; y++ {
+		if g.row(x, y, &hit, &crackUp) || y >= oy+R {
+			break
+		}
+	}
+	for y := oy; y > oy-R; {
+		y--
+		if g.row(x, y, &hit, &crackDown) {
+			break
+		}
+	}
+	if crackUp || crackDown {
+		*found = true
+	}
+	return !hit && *found
 }
 
 // row is the per-row lambda (sub_51C4910) over z from -radius to +radius
@@ -399,3 +406,6 @@ func (g *geodeRun) cell(x, y, z int32, v, nv float32) {
 		g.ops = append(g.ops, geodeOp{x, y, z, f.outer})
 	}
 }
+
+// invSqrt32 is 1/sqrt(v) rounded to float32.
+func invSqrt32(v float32) float32 { return float32(1 / float32(math.Sqrt(float64(v)))) }

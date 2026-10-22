@@ -21,13 +21,16 @@ type partiallyExposedBlobFeature struct {
 	exposed int
 }
 
+// rawExposedBlob is the JSON of a minecraft:partially_exposed_blob_feature.
+type rawExposedBlob struct {
+	Places json.RawMessage `json:"places_block"`
+	Radius int32           `json:"placement_radius_around_floor"`
+	Chance float32         `json:"placement_probability_per_valid_position"`
+	Face   string          `json:"exposed_face"`
+}
+
 func (o *Overworld) parsePartiallyExposedBlob(raw json.RawMessage) (placer, error) {
-	var r struct {
-		Places json.RawMessage `json:"places_block"`
-		Radius int32           `json:"placement_radius_around_floor"`
-		Chance float32         `json:"placement_probability_per_valid_position"`
-		Face   string          `json:"exposed_face"`
-	}
+	var r rawExposedBlob
 	if err := json.Unmarshal(raw, &r); err != nil {
 		return nil, err
 	}
@@ -128,16 +131,12 @@ type seaAnemoneFeature struct {
 func (f *seaAnemoneFeature) place(w *featureWorld, x, y, z int32, r *rand.MT) (blockPos, bool) {
 	o := w.o
 	limit := int32(SeaLevel - 15)
-	solid := func(y int32) bool {
-		b, _ := w.block(x, y, z)
-		return o.solidMaterial(b)
-	}
-	for y > limit && !solid(y-1) {
+	for y > limit && !w.solidMaterialAt(x, y-1, z) {
 		y--
 	}
 	// VERIFY: BDS also asks whether tube coral may go here (BlockSource
 	// vfunc +88); taken to be yes in water.
-	if b, _ := w.block(x, y, z); !o.waterMaterial(b) || !solid(y-1) || y <= limit {
+	if b, _ := w.block(x, y, z); !o.waterMaterial(b) || !w.solidMaterialAt(x, y-1, z) || y <= limit {
 		return blockPos{}, false
 	}
 	if r.IntN(4) != 0 {
@@ -147,4 +146,11 @@ func (f *seaAnemoneFeature) place(w *featureWorld, x, y, z int32, r *rand.MT) (b
 		w.set(x, y, z, f.coral.fans[fan][r.IntN(2)])
 	}
 	return blockPos{x, y, z}, true
+}
+
+// solidMaterialAt reports whether the block at (x, y, z) has a solid
+// material; an unloaded block is air.
+func (w *featureWorld) solidMaterialAt(x, y, z int32) bool {
+	b, _ := w.block(x, y, z)
+	return w.o.solidMaterial(b)
 }

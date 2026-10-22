@@ -23,16 +23,12 @@ type aquiferNoises struct {
 }
 
 func newAquiferNoises(world rand.Positional) aquiferNoises {
-	n := func(name string, first int) *noise.Normal {
-		r := world.FromHash("minecraft:" + name)
-		return noise.NewNormal(&r, first, []float32{1})
-	}
 	r := world.FromHash("minecraft:aquifer")
 	return aquiferNoises{
-		barrier: n("aquifer_barrier", -3),
-		flood:   n("aquifer_fluid_level_floodedness", -7),
-		spread:  n("aquifer_fluid_level_spread", -5),
-		lava:    n("aquifer_lava", -1),
+		barrier: namedNoise(world, "aquifer_barrier", -3, 1),
+		flood:   namedNoise(world, "aquifer_fluid_level_floodedness", -7, 1),
+		spread:  namedNoise(world, "aquifer_fluid_level_spread", -5, 1),
+		lava:    namedNoise(world, "aquifer_lava", -1, 1),
 		pos:     r.Fork(),
 	}
 }
@@ -317,22 +313,33 @@ func (a *aquifer) sample(x, y, z int32) {
 	f13 := 1 - float32(absDiff(d3, d1))*0.04
 	f23 := 1 - float32(absDiff(d3, d2))*0.04
 
-	barrier, have := float32(0), false
-	addBarrier := func(v float32, near bool) float32 {
-		if !near {
-			return v
-		}
-		if !have {
-			barrier = a.o.aquiferNoise.barrier.Sample(float32(x), float32(y)*0.5, float32(z))
-			have = true
-		}
-		return v + barrier
-	}
-	p12 := addBarrier(pressureTerm(y, l1, l2, lava1, lava2))
-	p13 := addBarrier(pressureTerm(y, l1, l3, lava1, lava3))
-	p23 := addBarrier(pressureTerm(y, l2, l3, lava2, lava3))
+	barrier := barrierSample{n: a.o.aquiferNoise.barrier, x: x, y: y, z: z}
+	p12 := barrier.add(pressureTerm(y, l1, l2, lava1, lava2))
+	p13 := barrier.add(pressureTerm(y, l1, l3, lava1, lava3))
+	p23 := barrier.add(pressureTerm(y, l2, l3, lava2, lava3))
 	f := max(0, f12)
 	a.density = max(0, (f+f)*max(p12, max(max(0, f13)*p13, max(0, f23)*p23)))
+}
+
+// barrierSample is the aquifer barrier noise at one block, sampled only
+// once a pressure term first needs it.
+type barrierSample struct {
+	n       *noise.Normal
+	x, y, z int32
+	v       float32
+	have    bool
+}
+
+// add adds the barrier to pressure v when the two fluids are near.
+func (b *barrierSample) add(v float32, near bool) float32 {
+	if !near {
+		return v
+	}
+	if !b.have {
+		b.v = b.n.Sample(float32(b.x), float32(b.y)*0.5, float32(b.z))
+		b.have = true
+	}
+	return v + b.v
 }
 
 func absDiff(a, b uint64) uint64 {

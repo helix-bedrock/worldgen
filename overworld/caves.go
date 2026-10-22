@@ -22,27 +22,23 @@ type caveNoises struct {
 }
 
 func newCaveNoises(world rand.Positional) caveNoises {
-	n := func(name string, first int, amps ...float32) *noise.Normal {
-		r := world.FromHash("minecraft:" + name)
-		return noise.NewNormal(&r, first, amps)
-	}
 	return caveNoises{
-		pillar:               n("pillar", -7, 1, 1),
-		pillarRareness:       n("pillar_rareness", -8, 1),
-		pillarThickness:      n("pillar_thickness", -8, 1),
-		spaghetti2D:          n("spaghetti_2d", -7, 1),
-		spaghetti2DElevation: n("spaghetti_2d_elevation", -8, 1),
-		spaghetti2DModulator: n("spaghetti_2d_modulator", -11, 1),
-		spaghetti2DThickness: n("spaghetti_2d_thickness", -11, 1),
-		spaghetti3D1:         n("spaghetti_3d_1", -7, 1),
-		spaghetti3D2:         n("spaghetti_3d_2", -7, 1),
-		spaghetti3DRarity:    n("spaghetti_3d_rarity", -11, 1),
-		spaghetti3DThickness: n("spaghetti_3d_thickness", -8, 1),
-		roughness:            n("spaghetti_roughness", -5, 1),
-		roughnessModulator:   n("spaghetti_roughness_modulator", -8, 1),
-		entrance:             n("cave_entrance", -7, 0.4, 0.5, 1),
-		layer:                n("cave_layer", -8, 1),
-		cheese:               n("cave_cheese", -8, 0.5, 1, 2, 1, 2, 1, 0, 2, 0),
+		pillar:               namedNoise(world, "pillar", -7, 1, 1),
+		pillarRareness:       namedNoise(world, "pillar_rareness", -8, 1),
+		pillarThickness:      namedNoise(world, "pillar_thickness", -8, 1),
+		spaghetti2D:          namedNoise(world, "spaghetti_2d", -7, 1),
+		spaghetti2DElevation: namedNoise(world, "spaghetti_2d_elevation", -8, 1),
+		spaghetti2DModulator: namedNoise(world, "spaghetti_2d_modulator", -11, 1),
+		spaghetti2DThickness: namedNoise(world, "spaghetti_2d_thickness", -11, 1),
+		spaghetti3D1:         namedNoise(world, "spaghetti_3d_1", -7, 1),
+		spaghetti3D2:         namedNoise(world, "spaghetti_3d_2", -7, 1),
+		spaghetti3DRarity:    namedNoise(world, "spaghetti_3d_rarity", -11, 1),
+		spaghetti3DThickness: namedNoise(world, "spaghetti_3d_thickness", -8, 1),
+		roughness:            namedNoise(world, "spaghetti_roughness", -5, 1),
+		roughnessModulator:   namedNoise(world, "spaghetti_roughness_modulator", -8, 1),
+		entrance:             namedNoise(world, "cave_entrance", -7, 0.4, 0.5, 1),
+		layer:                namedNoise(world, "cave_layer", -8, 1),
+		cheese:               namedNoise(world, "cave_cheese", -8, 0.5, 1, 2, 1, 2, 1, 0, 2, 0),
 	}
 }
 
@@ -145,4 +141,11 @@ func (c *caveNoises) route(x, y, z, d float32) float32 {
 		pv = -math.MaxFloat32
 	}
 	return max(caves, pv) * caveDensityScale
+}
+
+// namedNoise is the normal noise "minecraft:"+name of the world's
+// positional random, with its first octave and amplitudes.
+func namedNoise(world rand.Positional, name string, first int, amps ...float32) *noise.Normal {
+	r := world.FromHash("minecraft:" + name)
+	return noise.NewNormal(&r, first, amps)
 }

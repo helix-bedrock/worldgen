@@ -17,19 +17,21 @@ const (
 	selectorY  = 34.220596
 	limitXZ    = 684.412
 	limitY     = 2053.2358
+	// limitScale brings a limit noise to density units: 1/512.
+	limitScale = 0.001953125
 )
 
 // falloff is subtracted from every corner at grid height j: a cosine wave
 // over the height, pulled down hard within four corners of the floor and
 // the roof.
-var falloff = func() (f [gridY]float32) {
+func falloff() (f [gridY]float32) {
 	for j := range gridY {
 		d := float32(j)
 		if j >= 9 {
 			d = 16 - d
 		}
 		// BDS's 65536-entry sine table, read a quarter turn on: a cosine.
-		a := float32(float32(float32(float32(float32(j)*3.1415927)*6)/17) * 10430.378)
+		a := float32(float32(float32(float32(float32(j)*3.1415927)*6)/17) * sinTurn)
 		cos := float32(math.Sin(float64(uint16(int32(a+16384))) * (2 * math.Pi / 65536)))
 		v := cos + cos
 		if d < 4 {
@@ -38,13 +40,13 @@ var falloff = func() (f [gridY]float32) {
 		f[j] = v
 	}
 	return f
-}()
+}
 
 // terrain fills c with netherrack where the density is positive, lava
 // below the sea level and air above.
 func (n *Nether) terrain(chunkX, chunkZ int32, c *Chunk) {
-	const size = noise.GridXZ * gridY * noise.GridXZ
-	var sel, lo, hi, d [size]float32
+	var sel, lo, hi, d [densitySize]float32
+	fall := falloff()
 	x0, z0 := float32(chunkX*4), float32(chunkZ*4)
 	n.selector.AddGrid(sel[:], gridY, x0, 0, z0, selectorXZ, selectorY)
 	n.minLimit.AddGrid(lo[:], gridY, x0, 0, z0, limitXZ, limitY)
@@ -56,16 +58,16 @@ func (n *Nether) terrain(chunkX, chunkZ int32, c *Chunk) {
 			d[i] = -10
 			continue
 		}
-		v := lo[i] * 0.001953125
+		v := lo[i] * limitScale
 		t := (sel[i]/10 + 1) * 0.5
 		if t >= 0 {
 			if t <= 1 {
 				v += (hi[i]*0.001953125 - v) * t
 			} else {
-				v = hi[i] * 0.001953125
+				v = hi[i] * limitScale
 			}
 		}
-		v -= falloff[j]
+		v -= fall[j]
 		// The two corners below the top slide toward -10.
 		switch j {
 		case gridY - 3:
@@ -75,7 +77,6 @@ func (n *Nether) terrain(chunkX, chunkZ int32, c *Chunk) {
 		}
 		d[i] = v
 	}
-	at := func(i, j, k int) float32 { return d[(i*noise.GridXZ+k)*gridY+j] }
 	for i := range noise.GridXZ - 1 {
 		for k := range noise.GridXZ - 1 {
 			for j := range gridY - 1 {
@@ -83,10 +84,10 @@ func (n *Nether) terrain(chunkX, chunkZ int32, c *Chunk) {
 					tx := 0.25 * float32(dx)
 					for dz := range 4 {
 						tz := 0.25 * float32(dz)
-						z00 := lerp(tz, at(i, j, k), at(i, j, k+1))
-						z10 := lerp(tz, at(i+1, j, k), at(i+1, j, k+1))
-						z01 := lerp(tz, at(i, j+1, k), at(i, j+1, k+1))
-						z11 := lerp(tz, at(i+1, j+1, k), at(i+1, j+1, k+1))
+						z00 := lerp(tz, densityAt(&d, i, j, k), densityAt(&d, i, j, k+1))
+						z10 := lerp(tz, densityAt(&d, i+1, j, k), densityAt(&d, i+1, j, k+1))
+						z01 := lerp(tz, densityAt(&d, i, j+1, k), densityAt(&d, i, j+1, k+1))
+						z11 := lerp(tz, densityAt(&d, i+1, j+1, k), densityAt(&d, i+1, j+1, k+1))
 						lo, hi := lerp(tx, z00, z10), lerp(tx, z01, z11)
 						for dy := range 8 {
 							y := j*8 + dy
@@ -106,4 +107,13 @@ func (n *Nether) terrain(chunkX, chunkZ int32, c *Chunk) {
 	}
 }
 
+// densitySize is the number of density corners in a chunk.
+const densitySize = noise.GridXZ * gridY * noise.GridXZ
+
+// densityAt returns the density corner (i, j, k) of d.
+func densityAt(d *[densitySize]float32, i, j, k int) float32 {
+	return d[(i*noise.GridXZ+k)*gridY+j]
+}
+
+// lerp blends a toward b by t.
 func lerp(t, a, b float32) float32 { return a + t*(b-a) }

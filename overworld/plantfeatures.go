@@ -44,7 +44,7 @@ func (o *Overworld) newFlowerBed(name string) *flowerBedFeature {
 	def, _ := o.reg.Default(name)
 	for g := range 4 {
 		for d := range 4 {
-			id, ok := o.reg.Lookup(name, map[string]any{"growth": int32(g), "minecraft:cardinal_direction": cardinalNames[d]})
+			id, ok := o.reg.Lookup(name, map[string]any{"growth": int32(g), stateCardinalDirection: cardinalNames[d]})
 			if !ok {
 				id = def
 			}
@@ -152,12 +152,15 @@ type horizontalDecoration struct {
 	allowAdjacent bool
 }
 
+// rawHorizontalDecoration is the JSON of a minecraft:horizontal_tree_decoration_feature.
+type rawHorizontalDecoration struct {
+	Block         biome.Block `json:"places_block"`
+	BarkSideOnly  bool        `json:"bark_side_only"`
+	AllowAdjacent bool        `json:"allow_adjacent"`
+}
+
 func (o *Overworld) parseHorizontalDecoration(raw json.RawMessage) (placer, error) {
-	var r struct {
-		Block         biome.Block `json:"places_block"`
-		BarkSideOnly  bool        `json:"bark_side_only"`
-		AllowAdjacent bool        `json:"allow_adjacent"`
-	}
+	var r rawHorizontalDecoration
 	if err := json.Unmarshal(raw, &r); err != nil {
 		return nil, err
 	}
@@ -166,7 +169,7 @@ func (o *Overworld) parseHorizontalDecoration(raw json.RawMessage) (placer, erro
 		return nil, fmt.Errorf("decoration block %s missing", r.Block.Name)
 	}
 	s, _ := o.reg.State(def)
-	_, hasDir := s.Props["minecraft:cardinal_direction"]
+	_, hasDir := s.Props[stateCardinalDirection]
 	_, hasGrowth := s.Props["growth"]
 	if !hasDir || !hasGrowth {
 		// BDS logs the missing state and places nothing.
@@ -175,7 +178,7 @@ func (o *Overworld) parseHorizontalDecoration(raw json.RawMessage) (placer, erro
 	f := &horizontalDecoration{name: s.Name, barkSideOnly: r.BarkSideOnly, allowAdjacent: r.AllowAdjacent}
 	for i := range 4 {
 		for g := range 2 {
-			id, ok := o.reg.Lookup(s.Name, map[string]any{"minecraft:cardinal_direction": facingCardinal(uint8(i + 2)), "growth": int32(g)})
+			id, ok := o.reg.Lookup(s.Name, map[string]any{stateCardinalDirection: facingCardinal(uint8(i + 2)), "growth": int32(g)})
 			if !ok {
 				id = def
 			}

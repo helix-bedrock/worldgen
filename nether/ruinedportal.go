@@ -69,21 +69,29 @@ func (n *Nether) portalAt(sx, sz int32) *structure.RuinedPortal {
 		p, _ := v.(*structure.RuinedPortal)
 		return p
 	}
-	chunks := map[[2]int32]*Chunk{}
-	read := func(x, y, z int32) uint32 {
-		ck := [2]int32{x >> 4, z >> 4}
-		c, ok := chunks[ck]
-		if !ok {
-			c = new(Chunk)
-			n.baseChunk(ck[0], ck[1], c)
-			chunks[ck] = c
-		}
-		return c.Block(int(x&15), int(y), int(z&15))
-	}
-	p := n.st.RuinedPortal(sx, sz, structure.PortalWorld{Block: read, MaxY: Height, Sea: SeaLevel, Nether: true, Solid: n.solid})
+	b := baseChunks{n: n, chunks: map[[2]int32]*Chunk{}}
+	p := n.st.RuinedPortal(sx, sz, structure.PortalWorld{Block: b.block, MaxY: Height, Sea: SeaLevel, Nether: true, Solid: n.solid})
 	v, _ := n.portals.LoadOrStore(k, p)
 	p, _ = v.(*structure.RuinedPortal)
 	return p
+}
+
+// baseChunks generates base chunks on demand for a portal to read.
+type baseChunks struct {
+	n      *Nether
+	chunks map[[2]int32]*Chunk
+}
+
+// block returns the base chunk block at (x, y, z).
+func (b *baseChunks) block(x, y, z int32) uint32 {
+	ck := [2]int32{x >> 4, z >> 4}
+	c, ok := b.chunks[ck]
+	if !ok {
+		c = new(Chunk)
+		b.n.baseChunk(ck[0], ck[1], c)
+		b.chunks[ck] = c
+	}
+	return c.Block(int(x&15), int(y), int(z&15))
 }
 
 // NearestRuinedPortal finds the Nether ruined portal nearest to block
@@ -91,21 +99,17 @@ func (n *Nether) portalAt(sx, sz int32) *structure.RuinedPortal {
 // spot on the floor of its box, in its middle. It is safe for concurrent
 // use.
 func (n *Nether) NearestRuinedPortal(x, z, maxRegions int32) (px, py, pz int32, found bool) {
-	type cand struct {
-		cx, cz int32
-		d      int64
-	}
-	var cands []cand
+	var cands []startCand
 	sp := int32(structure.NetherPortalSpacing)
 	rx0, rz0 := mathx.FloorDiv(x>>4, sp), mathx.FloorDiv(z>>4, sp)
 	for rx := rx0 - maxRegions; rx <= rx0+maxRegions; rx++ {
 		for rz := rz0 - maxRegions; rz <= rz0+maxRegions; rz++ {
 			cx, cz := n.portalPick(rx, rz)
 			dx, dz := int64(cx*16+8-x), int64(cz*16+8-z)
-			cands = append(cands, cand{cx, cz, dx*dx + dz*dz})
+			cands = append(cands, startCand{cx, cz, dx*dx + dz*dz})
 		}
 	}
-	slices.SortFunc(cands, func(a, b cand) int { return cmp.Compare(a.d, b.d) })
+	slices.SortFunc(cands, func(a, b startCand) int { return cmp.Compare(a.d, b.d) })
 	for _, c := range cands {
 		if p := n.portalAt(c.cx, c.cz); p != nil {
 			return (p.Box.X0 + p.Box.X1) / 2, p.Box.Y0 + 1, (p.Box.Z0 + p.Box.Z1) / 2, true

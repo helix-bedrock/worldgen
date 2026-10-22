@@ -214,6 +214,36 @@ var terracottaColours = [16]string{
 	"light_gray", "cyan", "purple", "blue", "brown", "green", "red", "black",
 }
 
+// blockSet is a set of block states.
+type blockSet = map[uint32]setMember
+
+// setMember is the value of a set entry.
+type setMember = struct{}
+
+// caveCarverParams are the settings that differ between the overworld's
+// two cave carvers: the feature's skip chance and its height limit.
+type caveCarverParams struct {
+	skip   uint32
+	height int32
+}
+
+// overworldCaveCarvers are the underground_cave_carver_feature and
+// underground_extra_cave_carver_feature settings, in order.
+func overworldCaveCarvers() [2]caveCarverParams {
+	return [2]caveCarverParams{{33, 236}, {66, 103}}
+}
+
+// resolveVein looks up the blocks of an ore vein row.
+func resolveVein(reg *blocks.Registry, ore, raw, filler string, minY, maxY int32) (oreVein, error) {
+	v := oreVein{minY: minY, maxY: maxY}
+	err := reg.Resolve(
+		blocks.Want{Dst: &v.ore, Name: "minecraft:" + ore},
+		blocks.Want{Dst: &v.raw, Name: "minecraft:" + raw},
+		blocks.Want{Dst: &v.filler, Name: "minecraft:" + filler},
+	)
+	return v, err
+}
+
 // NewOverworld builds the noise for a seed. reg must contain the vanilla
 // blocks the generator places; biomeIDs maps biome names (no "minecraft:"
 // prefix) to numeric IDs, as from biome.LoadIDs.
@@ -239,46 +269,36 @@ func NewOverworld(seed int64, reg *blocks.Registry, biomeIDs map[string]uint32, 
 	if id, ok := biomeIDs["deep_dark"]; ok {
 		o.deepDark = id
 	}
-	names := []struct {
-		dst  *uint32
-		name string
-	}{
-		{&o.ids.air, "minecraft:air"},
-		{&o.ids.stone, "minecraft:stone"},
-		{&o.ids.deepslate, "minecraft:deepslate"},
-		{&o.ids.water, "minecraft:water"},
-		{&o.ids.bedrock, "minecraft:bedrock"},
-		{&o.ids.grass, "minecraft:grass_block"},
-		{&o.ids.dirt, "minecraft:dirt"},
-		{&o.ids.sand, "minecraft:sand"},
-		{&o.ids.gravel, "minecraft:gravel"},
-		{&o.ids.redSand, "minecraft:red_sand"},
-		{&o.ids.suspiciousSand, "minecraft:suspicious_sand"},
-		{&o.ids.sandstone, "minecraft:sandstone"},
-		{&o.ids.redSandstone, "minecraft:red_sandstone"},
-		{&o.ids.flowingWater, "minecraft:flowing_water"},
-		{&o.ids.lava, "minecraft:lava"},
-		{&o.ids.flowingLava, "minecraft:flowing_lava"},
-		{&o.ids.ice, "minecraft:ice"},
-		{&o.ids.packedIce, "minecraft:packed_ice"},
-		{&o.ids.blueIce, "minecraft:blue_ice"},
-		{&o.ids.snow, "minecraft:snow"},
-		{&o.ids.netherrack, "minecraft:netherrack"},
-		{&o.ids.coarseDirt, "minecraft:coarse_dirt"},
-		{&o.ids.mycelium, "minecraft:mycelium"},
+	names := []blocks.Want{
+		{Dst: &o.ids.air, Name: "minecraft:air"},
+		{Dst: &o.ids.stone, Name: "minecraft:stone"},
+		{Dst: &o.ids.deepslate, Name: "minecraft:deepslate"},
+		{Dst: &o.ids.water, Name: blockWater},
+		{Dst: &o.ids.bedrock, Name: "minecraft:bedrock"},
+		{Dst: &o.ids.grass, Name: "minecraft:grass_block"},
+		{Dst: &o.ids.dirt, Name: "minecraft:dirt"},
+		{Dst: &o.ids.sand, Name: "minecraft:sand"},
+		{Dst: &o.ids.gravel, Name: "minecraft:gravel"},
+		{Dst: &o.ids.redSand, Name: "minecraft:red_sand"},
+		{Dst: &o.ids.suspiciousSand, Name: "minecraft:suspicious_sand"},
+		{Dst: &o.ids.sandstone, Name: "minecraft:sandstone"},
+		{Dst: &o.ids.redSandstone, Name: "minecraft:red_sandstone"},
+		{Dst: &o.ids.flowingWater, Name: "minecraft:flowing_water"},
+		{Dst: &o.ids.lava, Name: "minecraft:lava"},
+		{Dst: &o.ids.flowingLava, Name: "minecraft:flowing_lava"},
+		{Dst: &o.ids.ice, Name: "minecraft:ice"},
+		{Dst: &o.ids.packedIce, Name: "minecraft:packed_ice"},
+		{Dst: &o.ids.blueIce, Name: "minecraft:blue_ice"},
+		{Dst: &o.ids.snow, Name: "minecraft:snow"},
+		{Dst: &o.ids.netherrack, Name: "minecraft:netherrack"},
+		{Dst: &o.ids.coarseDirt, Name: "minecraft:coarse_dirt"},
+		{Dst: &o.ids.mycelium, Name: "minecraft:mycelium"},
 	}
 	for i, c := range terracottaColours {
-		names = append(names, struct {
-			dst  *uint32
-			name string
-		}{&o.ids.terracotta[i], "minecraft:" + c + "_terracotta"})
+		names = append(names, blocks.Want{Dst: &o.ids.terracotta[i], Name: "minecraft:" + c + "_terracotta"})
 	}
-	for _, n := range names {
-		id, ok := reg.Default(n.name)
-		if !ok {
-			return nil, fmt.Errorf("worldgen: block %s missing from the block list", n.name)
-		}
-		*n.dst = id
+	if err := reg.Resolve(names...); err != nil {
+		return nil, err
 	}
 	o.ids.magma, _ = reg.Default("minecraft:magma")
 	o.ids.bubbleColumn, _ = reg.Lookup("minecraft:bubble_column", map[string]any{"drag_down": true})
@@ -299,42 +319,28 @@ func NewOverworld(seed int64, reg *blocks.Registry, biomeIDs map[string]uint32, 
 	o.caves = newCaveNoises(world)
 	o.ores = newOreNoises(world)
 	o.aquiferNoise = newAquiferNoises(world)
-	vein := func(ore, raw, filler string, minY, maxY int32) (oreVein, error) {
-		v := oreVein{minY: minY, maxY: maxY}
-		for _, b := range []struct {
-			dst  *uint32
-			name string
-		}{{&v.ore, ore}, {&v.raw, raw}, {&v.filler, filler}} {
-			id, ok := reg.Default("minecraft:" + b.name)
-			if !ok {
-				return v, fmt.Errorf("worldgen: block minecraft:%s missing from the block list", b.name)
-			}
-			*b.dst = id
-		}
-		return v, nil
-	}
 	// BDS sub_498AB80: the blocks cave carvers may cut.
-	o.ids.carvable = map[uint32]struct{}{}
+	o.ids.carvable = blockSet{}
 	for _, n := range carvableBlocks {
 		id, ok := reg.Default("minecraft:" + n)
 		if !ok {
 			return nil, fmt.Errorf("worldgen: block minecraft:%s missing from the block list", n)
 		}
-		o.ids.carvable[id] = struct{}{}
+		o.ids.carvable[id] = setMember{}
 	}
-	o.ids.canyonCarvable = map[uint32]struct{}{}
+	o.ids.canyonCarvable = blockSet{}
 	for _, n := range canyonCarvableBlocks {
 		id, ok := reg.Default("minecraft:" + n)
 		if !ok {
 			return nil, fmt.Errorf("worldgen: block minecraft:%s missing from the block list", n)
 		}
-		o.ids.canyonCarvable[id] = struct{}{}
+		o.ids.canyonCarvable[id] = setMember{}
 	}
 	var err error
-	if o.ids.veins[0], err = vein("copper_ore", "raw_copper_block", "granite", 0, 50); err != nil {
+	if o.ids.veins[0], err = resolveVein(reg, "copper_ore", "raw_copper_block", "granite", 0, 50); err != nil {
 		return nil, err
 	}
-	if o.ids.veins[1], err = vein("deepslate_iron_ore", "raw_iron_block", "tuff", -60, -8); err != nil {
+	if o.ids.veins[1], err = resolveVein(reg, "deepslate_iron_ore", "raw_iron_block", "tuff", -60, -8); err != nil {
 		return nil, err
 	}
 	terrainRand := world.FromHash("minecraft:terrain")
@@ -349,10 +355,7 @@ func NewOverworld(seed int64, reg *blocks.Registry, biomeIDs map[string]uint32, 
 	o.surfNoise = newSurfaceNoises(seed, world)
 	// The overworld's cave carver features (vanilla features
 	// underground_cave_carver_feature and underground_extra_cave_carver_feature).
-	for _, c := range []struct {
-		skip   uint32
-		height int32
-	}{{33, 236}, {66, 103}} {
+	for _, c := range overworldCaveCarvers() {
 		cv, err := newCaveCarver(o, c.skip, c.height, [2]float32{0.1, 0.9}, [2]float32{0.7, 1.4}, [2]float32{0.8, 1.3}, [2]float32{-1, -0.4}, "minecraft:air")
 		if err != nil {
 			return nil, err
@@ -536,9 +539,9 @@ func (o *Overworld) solidMaterial(b uint32) bool {
 		return false
 	}
 	switch name {
-	case "minecraft:snow_layer", "minecraft:vine", "minecraft:seagrass", "minecraft:kelp",
-		"minecraft:waterlily", "minecraft:deadbush", "minecraft:reeds", "minecraft:web",
-		"minecraft:fire", "minecraft:torch", "minecraft:brown_mushroom", "minecraft:red_mushroom":
+	case blockSnowLayer, blockVine, blockSeagrass, "minecraft:kelp",
+		"minecraft:waterlily", blockDeadBush, "minecraft:reeds", "minecraft:web",
+		"minecraft:fire", blockTorch, "minecraft:brown_mushroom", "minecraft:red_mushroom":
 		return false
 	}
 	return true

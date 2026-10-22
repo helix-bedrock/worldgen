@@ -42,6 +42,25 @@ type surfaceMats struct {
 	top, mid, seaFloor, foundation, sea uint32
 }
 
+// overlay replaces each material that a sets (not noBlock).
+func (m *surfaceMats) overlay(a surfaceMats) {
+	if a.top != noBlock {
+		m.top = a.top
+	}
+	if a.mid != noBlock {
+		m.mid = a.mid
+	}
+	if a.seaFloor != noBlock {
+		m.seaFloor = a.seaFloor
+	}
+	if a.foundation != noBlock {
+		m.foundation = a.foundation
+	}
+	if a.sea != noBlock {
+		m.sea = a.sea
+	}
+}
+
 type matAdjustment struct {
 	freq, min, max float32
 	mats           surfaceMats
@@ -144,103 +163,6 @@ func (o *Overworld) loadSurfaces(defs map[string]*biome.Def, biomeIDs map[string
 		maxID = max(maxID, id)
 	}
 	o.surfaces = make([]*biomeSurface, maxID+1)
-	block := func(b biome.Block) (uint32, error) {
-		if b.Name == "" {
-			return noBlock, nil
-		}
-		id, ok := o.reg.Lookup(b.Name, b.States)
-		if !ok {
-			id, ok = o.reg.Default(flattened(b))
-		}
-		if !ok {
-			return 0, fmt.Errorf("worldgen: surface block %s %v missing from the block list", b.Name, b.States)
-		}
-		return id, nil
-	}
-	mats := func(top, mid, seaFloor, foundation, sea biome.Block) (surfaceMats, error) {
-		var m surfaceMats
-		var err error
-		for _, f := range []struct {
-			dst  *uint32
-			name biome.Block
-		}{{&m.top, top}, {&m.mid, mid}, {&m.seaFloor, seaFloor}, {&m.foundation, foundation}, {&m.sea, sea}} {
-			if *f.dst, err = block(f.name); err != nil {
-				return m, err
-			}
-		}
-		return m, nil
-	}
-	build := func(d *biome.Def, s *biome.Surface) (*biomeSurface, error) {
-		bs := &biomeSurface{temperature: d.Temperature, frozenPatches: d.PartiallyFrozen, steep: noBlock}
-		switch s.Type {
-		case "minecraft:overworld":
-			bs.kind = builderOverworld
-		case "minecraft:swamp":
-			bs.kind = builderSwamp
-			bs.puddleDepth = int32(s.MaxPuddleDepth)
-		case "minecraft:frozen_ocean":
-			bs.kind = builderFrozenOcean
-		case "minecraft:mesa":
-			bs.kind = builderMesa
-			bs.pillars, bs.forest = s.BrycePillars, s.HasForest
-		case "minecraft:noise_gradient":
-			bs.kind = builderGradient
-		default:
-			return nil, nil
-		}
-		var err error
-		if bs.mats, err = mats(s.Top, s.Mid, s.SeaFloor, s.Foundation, s.Sea); err != nil {
-			return nil, err
-		}
-		bs.seaFloorDepth = int32(s.SeaFloorDepth)
-		if bs.kind == builderMesa {
-			if bs.clay, err = block(s.ClayMaterial); err != nil {
-				return nil, err
-			}
-			if bs.hardClay, err = block(s.HardClayMaterial); err != nil {
-				return nil, err
-			}
-			for i := range bs.clayOnly {
-				bs.clayOnly[i] = bs.clay
-			}
-		}
-		if bs.kind == builderGradient {
-			r := world.FromHash(s.NoiseName)
-			bs.gradient = noise.NewNormal(&r, s.FirstOctave, s.Amplitudes)
-			for _, n := range s.NonReplaceable {
-				b, err := block(n)
-				if err != nil {
-					return nil, err
-				}
-				bs.nonReplaceable = append(bs.nonReplaceable, b)
-			}
-			for _, sp := range s.Specifiers {
-				b, err := block(sp.Block)
-				if err != nil {
-					return nil, err
-				}
-				bs.specifiers = append(bs.specifiers, gradientSpec{sp.Min, sp.Max, b})
-			}
-		}
-		for _, a := range d.Adjustments {
-			if a.HeightMin != "" || a.HeightMax != "" {
-				// Height-ranged adjustments are Nether-only and need Molang.
-				continue
-			}
-			m, err := mats(a.Top, a.Mid, a.SeaFloor, a.Foundation, a.Sea)
-			if err != nil {
-				return nil, err
-			}
-			bs.adjustments = append(bs.adjustments, matAdjustment{a.FreqScale, a.Min, a.Max, m})
-		}
-		if d.Steep != nil {
-			if bs.steep, err = block(d.Steep.Material); err != nil {
-				return nil, err
-			}
-			bs.north, bs.south, bs.west, bs.east = d.Steep.North, d.Steep.South, d.Steep.West, d.Steep.East
-		}
-		return bs, nil
-	}
 	o.subsurfaces = make([]*biomeSurface, maxID+1)
 	for name, id := range biomeIDs {
 		d, ok := defs[name]
@@ -249,17 +171,128 @@ func (o *Overworld) loadSurfaces(defs map[string]*biome.Def, biomeIDs map[string
 		}
 		var err error
 		if d.Surface != nil {
-			if o.surfaces[id], err = build(d, d.Surface); err != nil {
+			if o.surfaces[id], err = o.newBiomeSurface(world, d, d.Surface); err != nil {
 				return err
 			}
 		}
 		if d.Subsurface != nil {
-			if o.subsurfaces[id], err = build(d, d.Subsurface); err != nil {
+			if o.subsurfaces[id], err = o.newBiomeSurface(world, d, d.Subsurface); err != nil {
 				return err
 			}
 		}
 	}
 	return nil
+}
+
+// surfaceBlock resolves a surface material; an unnamed one is noBlock.
+func (o *Overworld) surfaceBlock(b biome.Block) (uint32, error) {
+	if b.Name == "" {
+		return noBlock, nil
+	}
+	id, ok := o.reg.Lookup(b.Name, b.States)
+	if !ok {
+		id, ok = o.reg.Default(flattened(b))
+	}
+	if !ok {
+		return 0, fmt.Errorf("worldgen: surface block %s %v missing from the block list", b.Name, b.States)
+	}
+	return id, nil
+}
+
+// surfaceMats resolves the five materials of a surface builder.
+func (o *Overworld) surfaceMats(top, mid, seaFloor, foundation, sea biome.Block) (surfaceMats, error) {
+	var m surfaceMats
+	var err error
+	if m.top, err = o.surfaceBlock(top); err != nil {
+		return m, err
+	}
+	if m.mid, err = o.surfaceBlock(mid); err != nil {
+		return m, err
+	}
+	if m.seaFloor, err = o.surfaceBlock(seaFloor); err != nil {
+		return m, err
+	}
+	if m.foundation, err = o.surfaceBlock(foundation); err != nil {
+		return m, err
+	}
+	if m.sea, err = o.surfaceBlock(sea); err != nil {
+		return m, err
+	}
+	return m, nil
+}
+
+// newBiomeSurface builds a biome's surface (or subsurface) builder s, or
+// nil for a builder type the overworld does not run.
+func (o *Overworld) newBiomeSurface(world rand.Positional, d *biome.Def, s *biome.Surface) (*biomeSurface, error) {
+	bs := &biomeSurface{temperature: d.Temperature, frozenPatches: d.PartiallyFrozen, steep: noBlock}
+	switch s.Type {
+	case "minecraft:overworld":
+		bs.kind = builderOverworld
+	case "minecraft:swamp":
+		bs.kind = builderSwamp
+		bs.puddleDepth = int32(s.MaxPuddleDepth)
+	case "minecraft:frozen_ocean":
+		bs.kind = builderFrozenOcean
+	case "minecraft:mesa":
+		bs.kind = builderMesa
+		bs.pillars, bs.forest = s.BrycePillars, s.HasForest
+	case "minecraft:noise_gradient":
+		bs.kind = builderGradient
+	default:
+		return nil, nil
+	}
+	var err error
+	if bs.mats, err = o.surfaceMats(s.Top, s.Mid, s.SeaFloor, s.Foundation, s.Sea); err != nil {
+		return nil, err
+	}
+	bs.seaFloorDepth = int32(s.SeaFloorDepth)
+	if bs.kind == builderMesa {
+		if bs.clay, err = o.surfaceBlock(s.ClayMaterial); err != nil {
+			return nil, err
+		}
+		if bs.hardClay, err = o.surfaceBlock(s.HardClayMaterial); err != nil {
+			return nil, err
+		}
+		for i := range bs.clayOnly {
+			bs.clayOnly[i] = bs.clay
+		}
+	}
+	if bs.kind == builderGradient {
+		r := world.FromHash(s.NoiseName)
+		bs.gradient = noise.NewNormal(&r, s.FirstOctave, s.Amplitudes)
+		for _, n := range s.NonReplaceable {
+			b, err := o.surfaceBlock(n)
+			if err != nil {
+				return nil, err
+			}
+			bs.nonReplaceable = append(bs.nonReplaceable, b)
+		}
+		for _, sp := range s.Specifiers {
+			b, err := o.surfaceBlock(sp.Block)
+			if err != nil {
+				return nil, err
+			}
+			bs.specifiers = append(bs.specifiers, gradientSpec{sp.Min, sp.Max, b})
+		}
+	}
+	for _, a := range d.Adjustments {
+		if a.HeightMin != "" || a.HeightMax != "" {
+			// Height-ranged adjustments are Nether-only and need Molang.
+			continue
+		}
+		m, err := o.surfaceMats(a.Top, a.Mid, a.SeaFloor, a.Foundation, a.Sea)
+		if err != nil {
+			return nil, err
+		}
+		bs.adjustments = append(bs.adjustments, matAdjustment{a.FreqScale, a.Min, a.Max, m})
+	}
+	if d.Steep != nil {
+		if bs.steep, err = o.surfaceBlock(d.Steep.Material); err != nil {
+			return nil, err
+		}
+		bs.north, bs.south, bs.west, bs.east = d.Steep.North, d.Steep.South, d.Steep.West, d.Steep.East
+	}
+	return bs, nil
 }
 
 // flattened maps an old block-with-state to the separate block newer
@@ -364,6 +397,19 @@ func (o *Overworld) surface(chunkX, chunkZ int32, c *Chunk, mt *rand.MT) {
 // VERIFY against BDS (stony peaks calcite, dappled forest coarse dirt).
 const surfaceNoiseY = 0
 
+// steepDrop is the height difference two blocks apart that makes a column
+// steep.
+const steepDrop = 4
+
+// subsurfaceRun runs the subsurface builder of biome b, if it has one, over
+// the column's blocks start to end (exclusive).
+func (o *Overworld) subsurfaceRun(c *Chunk, col *surfaceColumn, b uint32, start, end int32) {
+	if int(b) < len(o.subsurfaces) && o.subsurfaces[b] != nil {
+		col.start, col.end = start, end
+		o.gradientSurface(c, col, o.subsurfaces[b])
+	}
+}
+
 // subsurface runs subsurface builders over the runs of their biome in each
 // column, bottom up.
 func (o *Overworld) subsurface(c *Chunk, x0, z0 int32) {
@@ -377,22 +423,16 @@ func (o *Overworld) subsurface(c *Chunk, x0, z0 int32) {
 				continue
 			}
 			col := surfaceColumn{x: x, z: z, wx: x0 + int32(x), wz: z0 + int32(z), top: top}
-			run := func(b uint32, start, end int32) {
-				if int(b) < len(o.subsurfaces) && o.subsurfaces[b] != nil {
-					col.start, col.end = start, end
-					o.gradientSurface(c, &col, o.subsurfaces[b])
-				}
-			}
 			start, cur := int32(0), uint32(c.Biomes[z<<4|x])
 			for y := int32(1); y <= top; y++ {
 				b := uint32(c.Biomes[int(y)<<8|z<<4|x])
 				if b == cur {
 					continue
 				}
-				run(cur, start, y)
+				o.subsurfaceRun(c, &col, cur, start, y)
 				start, cur = y, b
 			}
-			run(cur, start, top+1)
+			o.subsurfaceRun(c, &col, cur, start, top+1)
 		}
 	}
 }
@@ -456,17 +496,7 @@ func (o *Overworld) adjusted(b *biomeSurface, col *surfaceColumn) surfaceMats {
 		if v < a.min || v >= a.max {
 			continue
 		}
-		for _, p := range []struct {
-			dst *uint32
-			v   uint32
-		}{
-			{&m.top, a.mats.top}, {&m.mid, a.mats.mid}, {&m.seaFloor, a.mats.seaFloor},
-			{&m.foundation, a.mats.foundation}, {&m.sea, a.mats.sea},
-		} {
-			if p.v != noBlock {
-				*p.dst = p.v
-			}
-		}
+		m.overlay(a.mats)
 	}
 	return m
 }
@@ -475,16 +505,16 @@ func (o *Overworld) adjusted(b *biomeSurface, col *surfaceColumn) surfaceMats {
 // biome's steep directions: the top heights two blocks apart (clamped inside
 // the chunk) differ by 4 or more.
 func (o *Overworld) steepAt(c *Chunk, b *biomeSurface, x, z int) bool {
-	h := func(x, z int) int32 { return c.columnTop(x, z, o.ids.air) }
+	air := o.ids.air
 	if b.north || b.south {
-		d := h(x, max(z-1, 0)) - h(x, min(z, 14)+1)
-		if (b.south && d >= 4) || (b.north && d <= -4) {
+		d := c.columnTop(x, max(z-1, 0), air) - c.columnTop(x, min(z, 14)+1, air)
+		if (b.south && d >= steepDrop) || (b.north && d <= -steepDrop) {
 			return true
 		}
 	}
 	if b.west || b.east {
-		d := h(max(x-1, 0), z) - h(min(x, 14)+1, z)
-		if (b.east && d >= 4) || (b.west && d <= -4) {
+		d := c.columnTop(max(x-1, 0), z, air) - c.columnTop(min(x, 14)+1, z, air)
+		if (b.east && d >= steepDrop) || (b.west && d <= -steepDrop) {
 			return true
 		}
 	}

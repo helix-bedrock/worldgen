@@ -111,11 +111,10 @@ func (f *pointedFeature) place(w *featureWorld, x, y, z int32, r *rand.MT) (bloc
 	o := w.o
 	// The tip points away from a block it can grow from: up from one
 	// below, down from one above, a coin flip when both are (sub_4DE9050).
-	holds := func(b uint32) bool { return inList(f.replace, b) || b == f.base }
 	below, _ := w.block(x, y-1, z)
 	above, _ := w.block(x, y+1, z)
 	var up bool
-	switch b, a := holds(below), holds(above); {
+	switch b, a := f.grows(below), f.grows(above); {
 	case b && a:
 		up = nextBool(r)
 	case b:
@@ -170,24 +169,10 @@ func columnScan(w *featureWorld, x, y, z, rng int32, cont, surface func(uint32) 
 	if !cont(b) {
 		return 0, 0, false, false, false
 	}
-	walk := func(dy int32) (int32, bool) {
-		py := y + dy
-		var i int32
-		for i < rng-1 {
-			b, _ := w.block(x, py, z)
-			if !cont(b) {
-				break
-			}
-			py += dy
-			i++
-		}
-		b, _ := w.block(x, py, z)
-		return i, surface(b)
-	}
-	if i, ok := walk(1); ok {
+	if i, ok := columnWalk(w, x, y, z, rng, 1, cont, surface); ok {
 		ceil, hasCeil = y+i+1, true
 	}
-	if i, ok := walk(-1); ok {
+	if i, ok := columnWalk(w, x, y, z, rng, -1, cont, surface); ok {
 		floor, hasFloor = y-i-1, true
 	}
 	return ceil, floor, hasCeil, hasFloor, true
@@ -227,20 +212,6 @@ func (f *clusterFeature) place(w *featureWorld, x, y, z int32, r *rand.MT) (bloc
 	density := r.Float()
 	xr, zr := r.IntN(6)+2, r.IntN(6)+2
 	density = float32(float32(density*0.39999998) + 0.3)
-	solid := func(b uint32) bool { return inList(f.replace, b) || b == f.base || o.isLava(b) }
-	heightAt := func(dist int32, maxH int32, bias float32) int32 {
-		t := float32(dist) * 0.125
-		g := r.GaussianFloat()
-		var b float32
-		if !(1 < t) {
-			b = bias
-		}
-		v := float32(float32(g*3) + b)
-		if float32(maxH) < v {
-			return maxH
-		}
-		return int32(max(v, 0))
-	}
 	for dx := -xr; dx <= xr; dx++ {
 		for dz := -zr; dz <= zr; dz++ {
 			k := min(xr-mathx.Abs(dx), zr-mathx.Abs(dz))
@@ -255,7 +226,7 @@ func (f *clusterFeature) place(w *featureWorld, x, y, z int32, r *rand.MT) (bloc
 				}
 			}
 			cx, cz := x+dx, z+dz
-			ceil, floor, hasCeil, hasFloor, ok := columnScan(w, cx, y, cz, 12, o.emptyOrWater, solid)
+			ceil, floor, hasCeil, hasFloor, ok := columnScan(w, cx, y, cz, 12, o.emptyOrWater, speleothemWall{&f.speleothemBlocks, o}.solid)
 			if !ok || !hasCeil && !hasFloor {
 				continue
 			}
@@ -273,7 +244,7 @@ func (f *clusterFeature) place(w *featureWorld, x, y, z int32, r *rand.MT) (bloc
 							maxH = min(height, ceil-floor)
 						}
 						half := float32(maxH) * 0.5
-						stal = heightAt(mathx.Abs(dz)+mathx.Abs(dx), maxH, float32(float32((0-half)*(float32(mathx.Abs(dz)+mathx.Abs(dx))*0.125))+half))
+						stal = clusterHeight(r, mathx.Abs(dz)+mathx.Abs(dx), maxH, float32(float32((0-half)*(float32(mathx.Abs(dz)+mathx.Abs(dx))*0.125))+half))
 					}
 				}
 			}
@@ -289,7 +260,7 @@ func (f *clusterFeature) place(w *featureWorld, x, y, z int32, r *rand.MT) (bloc
 					if r.Float() <= density {
 						half := float32(height) * 0.5
 						t := float32(mathx.Abs(dx)+mathx.Abs(dz)) * 0.125
-						stag = heightAt(mathx.Abs(dx)+mathx.Abs(dz), height, float32(float32((0-half)*t)+half))
+						stag = clusterHeight(r, mathx.Abs(dx)+mathx.Abs(dz), height, float32(float32((0-half)*t)+half))
 					}
 				}
 			}
@@ -397,8 +368,7 @@ func (f *largeFeature) place(w *featureWorld, x, y, z int32, r *rand.MT) (blockP
 	if b, _ := w.block(x, y, z); !o.emptyOrWater(b) {
 		return blockPos{}, false
 	}
-	solid := func(b uint32) bool { return inList(f.replace, b) || b == f.base || o.isLava(b) }
-	ceil, floor, hasCeil, hasFloor, ok := columnScan(w, x, y, z, 30, o.emptyOrWater, solid)
+	ceil, floor, hasCeil, hasFloor, ok := columnScan(w, x, y, z, 30, o.emptyOrWater, speleothemWall{&f.speleothemBlocks, o}.solid)
 	if !ok || !hasCeil || !hasFloor {
 		return blockPos{}, false
 	}
@@ -408,16 +378,15 @@ func (f *largeFeature) place(w *featureWorld, x, y, z int32, r *rand.MT) (blockP
 	}
 	maxR := min(max(int32(float32(h)*0.33), 3), 18)
 	radius := 3 + r.IntN(maxR-3+1)
-	lerp := func(t, lo, hi float32) float32 { return float32(float32(t*float32(hi-lo)) + lo) }
 	top := largeTip{x: x, y: ceil - 1, z: z, radius: radius}
-	top.blunt = lerp(r.Float(), 0.3, 0.9)
-	top.scale = lerp(r.Float(), 0.4, 2.0)
+	top.blunt = lerpRounded(r.Float(), 0.3, 0.9)
+	top.scale = lerpRounded(r.Float(), 0.4, 2.0)
 	bot := largeTip{x: x, y: floor + 1, z: z, up: true, radius: radius}
-	bot.blunt = lerp(r.Float(), 0.4, 1.0)
-	bot.scale = lerp(r.Float(), 0.4, 2.0)
+	bot.blunt = lerpRounded(r.Float(), 0.4, 1.0)
+	bot.scale = lerpRounded(r.Float(), 0.4, 2.0)
 	var wd wind
 	if radius >= 4 && top.blunt >= 0.6 && bot.blunt >= 0.6 {
-		speed := lerp(r.Float(), 0, 0.3)
+		speed := lerpRounded(r.Float(), 0, 0.3)
 		a := float32(float32(float32(r.Float()*3.1415927)+0) * 10430.378)
 		wd = wind{on: true, y: y, dx: float32(sinTable[uint16(int32(float32(a+16384)))] * speed), dz: float32(speed * sinTable[uint16(int32(a))])}
 	}
@@ -473,8 +442,7 @@ func (f *largeFeature) moveBack(w *featureWorld, t *largeTip, wd *wind) bool {
 func (f *largeFeature) fits(w *featureWorld, x, y, z, radius int32, wd *wind) bool {
 	o := w.o
 	x, y, z = wd.offset(x, y, z)
-	open := func(b uint32) bool { return o.emptyOrWater(b) || o.isLava(b) }
-	if b, _ := w.block(x, y, z); open(b) {
+	if b, _ := w.block(x, y, z); o.openOrLava(b) {
 		return false
 	}
 	rf := float32(radius)
@@ -483,7 +451,7 @@ func (f *largeFeature) fits(w *featureWorld, x, y, z, radius int32, wd *wind) bo
 		i := float32(a * 10430.378)
 		qz := z + int32(float32(sinTable[uint16(int32(i))]*rf))
 		qx := x + int32(float32(sinTable[uint16(int32(float32(i+16384)))]*rf))
-		if b, _ := w.block(qx, y, qz); open(b) {
+		if b, _ := w.block(qx, y, qz); o.openOrLava(b) {
 			return false
 		}
 		a = float32(a + step)
@@ -544,4 +512,57 @@ func (f *largeFeature) build(w *featureWorld, t *largeTip, wd *wind, r *rand.MT)
 			}
 		}
 	}
+}
+
+// grows reports whether a speleothem can grow from block b.
+func (s *speleothemBlocks) grows(b uint32) bool { return inList(s.replace, b) || b == s.base }
+
+// speleothemWall is the surface test of a speleothem column scan: blocks
+// it grows from, and lava.
+type speleothemWall struct {
+	s *speleothemBlocks
+	o *Overworld
+}
+
+func (v speleothemWall) solid(b uint32) bool { return v.s.grows(b) || v.o.isLava(b) }
+
+// openOrLava reports whether a block is air, water or lava.
+func (o *Overworld) openOrLava(b uint32) bool { return o.emptyOrWater(b) || o.isLava(b) }
+
+// lerpRounded is lo + t*(hi-lo), each step rounded to float32 as BDS does.
+func lerpRounded(t, lo, hi float32) float32 { return float32(float32(t*float32(hi-lo)) + lo) }
+
+// columnWalk walks from (x, y, z) in steps of dy through at most rng-1
+// blocks that pass cont. It returns the steps taken and whether the block
+// it stopped at passes surface.
+func columnWalk(w *featureWorld, x, y, z, rng, dy int32, cont, surface func(uint32) bool) (int32, bool) {
+	py := y + dy
+	var i int32
+	for i < rng-1 {
+		b, _ := w.block(x, py, z)
+		if !cont(b) {
+			break
+		}
+		py += dy
+		i++
+	}
+	b, _ := w.block(x, py, z)
+	return i, surface(b)
+}
+
+// clusterHeight is the length of a cluster speleothem dist blocks from
+// the centre: a gaussian times 3 plus bias (no bias past 8 blocks), at
+// most maxH.
+func clusterHeight(r *rand.MT, dist int32, maxH int32, bias float32) int32 {
+	t := float32(dist) * 0.125
+	g := r.GaussianFloat()
+	var b float32
+	if !(1 < t) {
+		b = bias
+	}
+	v := float32(float32(g*3) + b)
+	if float32(maxH) < v {
+		return maxH
+	}
+	return int32(max(v, 0))
 }
