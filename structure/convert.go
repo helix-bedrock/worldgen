@@ -16,82 +16,185 @@ import (
 // checked against BDS villages with bdsdiff, not ported line by line from
 // sub_D276010.
 
-var javaBlockNames = map[string]string{
-	"torch":                        "torch",
-	"wall_torch":                   "torch",
-	"bricks":                       "brick_block",
-	"terracotta":                   "hardened_clay",
-	"oak_fence_gate":               "fence_gate",
-	"light_gray_glazed_terracotta": "silver_glazed_terracotta",
-	"melon":                        "melon_block",
-	"oak_door":                     "wooden_door",
-	"dirt_path":                    "grass_path",
-	"chain":                        "iron_chain",
-	"tripwire":                     "trip_wire",
-	"magma_block":                  "magma",
-	"attached_melon_stem":          "melon_stem",
-	"oak_pressure_plate":           "wooden_pressure_plate",
-	"oak_trapdoor":                 "trapdoor",
-	"cobblestone_stairs":           "stone_stairs",
-	"skeleton_skull":               "skeleton_skull",
-	"grass":                        "short_grass",
-	"dead_bush":                    "deadbush",
-	"snow_block":                   "snow",
-	"snow":                         "snow_layer",
-	"stonecutter":                  "stonecutter_block",
-	"oak_sign":                     "standing_sign",
-	"blackstone_bricks":            "polished_blackstone_bricks",
-	"spawner":                      "mob_spawner",
-	"note_block":                   "noteblock",
-	"repeater":                     "unpowered_repeater",
-	"comparator":                   "unpowered_comparator",
-	"redstone_torch":               "unlit_redstone_torch",
-	"redstone_wall_torch":          "unlit_redstone_torch",
-	"oak_button":                   "wooden_button",
-	"cobweb":                       "web",
-	"waxed_copper_block":           "waxed_copper",
-	"cave_air":                     "air",
-	"piston_head":                  "air",
-	"water_cauldron":               "cauldron",
-	"sugar_cane":                   "reeds",
-	"lily_pad":                     "waterlily",
+// javaBlockName is the Bedrock name of a Java block with a special case.
+func javaBlockName(name string) (string, bool) {
+	switch name {
+	case "torch":
+		return "torch", true
+	case "wall_torch":
+		return "torch", true
+	case "bricks":
+		return "brick_block", true
+	case "terracotta":
+		return "hardened_clay", true
+	case "oak_fence_gate":
+		return "fence_gate", true
+	case "light_gray_glazed_terracotta":
+		return "silver_glazed_terracotta", true
+	case "melon":
+		return "melon_block", true
+	case "oak_door":
+		return "wooden_door", true
+	case "dirt_path":
+		return "grass_path", true
+	case "chain":
+		return "iron_chain", true
+	case "tripwire":
+		return "trip_wire", true
+	case "magma_block":
+		return "magma", true
+	case "attached_melon_stem":
+		return "melon_stem", true
+	case "oak_pressure_plate":
+		return "wooden_pressure_plate", true
+	case "oak_trapdoor":
+		return "trapdoor", true
+	case "cobblestone_stairs":
+		return "stone_stairs", true
+	case "skeleton_skull":
+		return "skeleton_skull", true
+	case "grass":
+		return "short_grass", true
+	case "dead_bush":
+		return "deadbush", true
+	case "snow_block":
+		return "snow", true
+	case "snow":
+		return "snow_layer", true
+	case "stonecutter":
+		return "stonecutter_block", true
+	case "oak_sign":
+		return "standing_sign", true
+	case "blackstone_bricks":
+		return "polished_blackstone_bricks", true
+	case "spawner":
+		return "mob_spawner", true
+	case "note_block":
+		return "noteblock", true
+	case "repeater":
+		return "unpowered_repeater", true
+	case "comparator":
+		return "unpowered_comparator", true
+	case "redstone_torch":
+		return "unlit_redstone_torch", true
+	case "redstone_wall_torch":
+		return "unlit_redstone_torch", true
+	case "oak_button":
+		return "wooden_button", true
+	case "cobweb":
+		return "web", true
+	case "waxed_copper_block":
+		return "waxed_copper", true
+	case "cave_air":
+		return "air", true
+	case "piston_head":
+		return "air", true
+	case "water_cauldron":
+		return "cauldron", true
+	case "sugar_cane":
+		return "reeds", true
+	case "lily_pad":
+		return "waterlily", true
+	}
+	return "", false
 }
 
 // javaBlockContains are checked after the exact names, in this order.
-var javaBlockContains = [][2]string{
-	{"straw_bed", "straw_bed"},
-	{"bed", "bed"},
-	{"wall_banner", "wall_banner"},
-	{"potted", "flower_pot"},
+func javaBlockContains() [4][2]string {
+	return [4][2]string{
+		{"straw_bed", "straw_bed"},
+		{"bed", "bed"},
+		{"wall_banner", "wall_banner"},
+		{"potted", "flower_pot"},
+	}
 }
 
-// blockEntityIDs are the Bedrock block entity ids of the blocks that have
-// one, by Bedrock block name (suffix match for the families).
-var blockEntityIDs = map[string]string{
-	"minecraft:bed": "Bed", "minecraft:bell": "Bell", "minecraft:chest": "Chest",
-	"minecraft:trapped_chest": "Chest", "minecraft:barrel": "Barrel", "minecraft:furnace": "Furnace",
-	"minecraft:lit_furnace": "Furnace", "minecraft:blast_furnace": "BlastFurnace", "minecraft:smoker": "Smoker",
-	"minecraft:flower_pot": "FlowerPot", "minecraft:lectern": "Lectern", "minecraft:brewing_stand": "BrewingStand",
-	"minecraft:cauldron": "Cauldron", "minecraft:jukebox": "Jukebox", "minecraft:hopper": "Hopper",
-	"minecraft:dispenser": "Dispenser", "minecraft:dropper": "Dropper", "minecraft:campfire": "Campfire",
-	"minecraft:soul_campfire": "Campfire", "minecraft:beehive": "Beehive", "minecraft:bee_nest": "Beehive",
-	"minecraft:mob_spawner": "MobSpawner", "minecraft:noteblock": "Music", "minecraft:enchanting_table": "EnchantTable",
-	"minecraft:standing_sign": "Sign", "minecraft:wall_sign": "Sign", "minecraft:standing_banner": "Banner",
-	"minecraft:wall_banner": "Banner", "minecraft:skeleton_skull": "Skull", "minecraft:decorated_pot": "DecoratedPot",
-	"minecraft:chiseled_bookshelf": "ChiseledBookshelf", "minecraft:unpowered_comparator": "Comparator",
-	"minecraft:suspicious_sand": "BrushableBlock", "minecraft:suspicious_gravel": "BrushableBlock",
-	"minecraft:trial_spawner": "TrialSpawner", "minecraft:vault": "Vault", "minecraft:ender_chest": "EnderChest",
+// blockEntityID is the Bedrock block entity id of a block that has one, by
+// Bedrock block name (suffix match for the families).
+func blockEntityID(name string) (string, bool) {
+	switch name {
+	case "minecraft:bed":
+		return "Bed", true
+	case "minecraft:bell":
+		return "Bell", true
+	case "minecraft:chest", "minecraft:trapped_chest":
+		return "Chest", true
+	case "minecraft:barrel":
+		return "Barrel", true
+	case "minecraft:furnace", "minecraft:lit_furnace":
+		return "Furnace", true
+	case "minecraft:blast_furnace":
+		return "BlastFurnace", true
+	case "minecraft:smoker":
+		return "Smoker", true
+	case "minecraft:flower_pot":
+		return "FlowerPot", true
+	case "minecraft:lectern":
+		return "Lectern", true
+	case "minecraft:brewing_stand":
+		return "BrewingStand", true
+	case "minecraft:cauldron":
+		return "Cauldron", true
+	case "minecraft:jukebox":
+		return "Jukebox", true
+	case "minecraft:hopper":
+		return "Hopper", true
+	case "minecraft:dispenser":
+		return "Dispenser", true
+	case "minecraft:dropper":
+		return "Dropper", true
+	case "minecraft:campfire", "minecraft:soul_campfire":
+		return "Campfire", true
+	case "minecraft:beehive", "minecraft:bee_nest":
+		return "Beehive", true
+	case "minecraft:mob_spawner":
+		return "MobSpawner", true
+	case "minecraft:noteblock":
+		return "Music", true
+	case "minecraft:enchanting_table":
+		return "EnchantTable", true
+	case "minecraft:standing_sign", "minecraft:wall_sign":
+		return "Sign", true
+	case "minecraft:standing_banner", "minecraft:wall_banner":
+		return "Banner", true
+	case "minecraft:skeleton_skull":
+		return "Skull", true
+	case "minecraft:decorated_pot":
+		return "DecoratedPot", true
+	case "minecraft:chiseled_bookshelf":
+		return "ChiseledBookshelf", true
+	case "minecraft:unpowered_comparator":
+		return "Comparator", true
+	case "minecraft:suspicious_sand", "minecraft:suspicious_gravel":
+		return "BrushableBlock", true
+	case "minecraft:trial_spawner":
+		return "TrialSpawner", true
+	case "minecraft:vault":
+		return "Vault", true
+	case "minecraft:ender_chest":
+		return "EnderChest", true
+	}
+	return "", false
 }
 
-// bedColors are Bedrock's colour indexes for bed block entities.
-var bedColors = map[string]uint8{"white": 0, "orange": 1, "magenta": 2, "light_blue": 3, "yellow": 4, "lime": 5,
-	"pink": 6, "gray": 7, "light_gray": 8, "cyan": 9, "purple": 10, "blue": 11, "brown": 12, "green": 13, "red": 14, "black": 15}
+// bedColor is Bedrock's colour index for a bed block entity; an unknown
+// colour is white.
+func bedColor(c string) uint8 {
+	colors := [...]string{"white", "orange", "magenta", "light_blue", "yellow", "lime", "pink", "gray",
+		"light_gray", "cyan", "purple", "blue", "brown", "green", "red", "black"}
+	for i, n := range colors {
+		if n == c {
+			return uint8(i)
+		}
+	}
+	return 0
+}
 
-// blockEntityFor returns the block entity data of a converted block placed
+// BlockEntityFor returns the block entity data of a converted block placed
 // at (x, y, z), nil if it has none. javaName gives the bed colour.
 func (l *Lib) BlockEntityFor(id uint32, javaName string, x, y, z int32) map[string]any {
 	name := l.BlockName(id)
-	beID, ok := blockEntityIDs[name]
+	beID, ok := blockEntityID(name)
 	if !ok {
 		switch {
 		case strings.HasSuffix(name, "_sign") && strings.Contains(name, "hanging"):
@@ -111,7 +214,7 @@ func (l *Lib) BlockEntityFor(id uint32, javaName string, x, y, z int32) map[stri
 	d := map[string]any{"id": beID, "x": x, "y": y, "z": z, "isMovable": uint8(1)}
 	if beID == "Bed" {
 		color := strings.TrimSuffix(strings.TrimPrefix(javaName, "minecraft:"), "_bed")
-		d["color"] = bedColors[color]
+		d["color"] = bedColor(color)
 	}
 	// Outpost templates name the ominous banner illager_captain_wall_banner;
 	// Bedrock keeps it as a banner of type 1 (illager_captain).
@@ -123,14 +226,40 @@ func (l *Lib) BlockEntityFor(id uint32, javaName string, x, y, z int32) map[stri
 }
 
 // javaFacing maps a Java facing to Bedrock's facing_direction.
-var javaFacing = map[string]int32{"down": 0, "up": 1, "north": 2, "south": 3, "west": 4, "east": 5}
+func javaFacing(f string) (int32, bool) {
+	return dirIndex([]string{"down", "up", "north", "south", "west", "east"}, f)
+}
 
-// Bedrock's horizontal "direction" encodings differ per block.
-var (
-	dirSWNE = map[string]int32{"south": 0, "west": 1, "north": 2, "east": 3} // beds, fence gates, repeaters
-	dirESWN = map[string]int32{"east": 0, "south": 1, "west": 2, "north": 3} // doors
-	dirEWSN = map[string]int32{"east": 0, "west": 1, "south": 2, "north": 3} // stairs, trapdoors
-)
+// dirIndex is the index of f in order, and whether it is there.
+func dirIndex(order []string, f string) (int32, bool) {
+	for i, n := range order {
+		if n == f {
+			return int32(i), true
+		}
+	}
+	return 0, false
+}
+
+// Bedrock's horizontal "direction" encodings differ per block; an unknown
+// facing is 0.
+
+// dirSWNE is the encoding of beds, fence gates and repeaters.
+func dirSWNE(f string) int32 {
+	d, _ := dirIndex([]string{"south", "west", "north", "east"}, f)
+	return d
+}
+
+// dirESWN is the encoding of doors.
+func dirESWN(f string) int32 {
+	d, _ := dirIndex([]string{"east", "south", "west", "north"}, f)
+	return d
+}
+
+// dirEWSN is the encoding of stairs and trapdoors.
+func dirEWSN(f string) int32 {
+	d, _ := dirIndex([]string{"east", "west", "south", "north"}, f)
+	return d
+}
 
 // leverDirection is Bedrock's lever_direction for a Java lever: on a wall
 // the side it faces, on the floor ("up") or ceiling ("down") the axis it
@@ -170,7 +299,7 @@ func withJavaProp(p map[string]string, k, v string) map[string]string {
 	return out
 }
 
-// convertJavaState returns the registry index of the Bedrock block for a
+// ConvertJavaState returns the registry index of the Bedrock block for a
 // Java template state and whether it is waterlogged.
 func (l *Lib) ConvertJavaState(st TemplateState) (uint32, bool, bool) {
 	name := strings.TrimPrefix(st.Name, "minecraft:")
@@ -235,10 +364,10 @@ func (l *Lib) ConvertJavaState(st TemplateState) (uint32, bool, bool) {
 	if name == "fence" {
 		name = "oak_fence"
 	}
-	target, ok := javaBlockNames[name]
+	target, ok := javaBlockName(name)
 	if !ok {
 		target = name
-		for _, c := range javaBlockContains {
+		for _, c := range javaBlockContains() {
 			if strings.Contains(name, c[0]) {
 				target = c[1]
 				break
@@ -269,10 +398,10 @@ func (l *Lib) ConvertJavaState(st TemplateState) (uint32, bool, bool) {
 				setProp(props, "minecraft:cardinal_direction", v)
 			}
 			setProp(props, "minecraft:facing_direction", v)
-			if f, ok := javaFacing[v]; ok {
+			if f, ok := javaFacing(v); ok {
 				// A sideways end rod names the side it points away from.
 				if target == "end_rod" && f >= 2 {
-					f = javaFacing[Opposite(v)]
+					f, _ = javaFacing(Opposite(v))
 				}
 				setProp(props, "facing_direction", f)
 			}
@@ -281,13 +410,13 @@ func (l *Lib) ConvertJavaState(st TemplateState) (uint32, bool, bool) {
 			setProp(props, "torch_facing_direction", Opposite(v))
 			switch {
 			case strings.HasSuffix(target, "_door"):
-				setProp(props, "direction", dirESWN[v])
+				setProp(props, "direction", dirESWN(v))
 			case strings.HasSuffix(target, "stairs"):
-				setProp(props, "weirdo_direction", dirEWSN[v])
+				setProp(props, "weirdo_direction", dirEWSN(v))
 			case strings.Contains(target, "trapdoor"):
-				setProp(props, "direction", dirEWSN[v])
+				setProp(props, "direction", dirEWSN(v))
 			default:
-				setProp(props, "direction", dirSWNE[v])
+				setProp(props, "direction", dirSWNE(v))
 			}
 		case "half":
 			top := v == "top" || v == "upper"

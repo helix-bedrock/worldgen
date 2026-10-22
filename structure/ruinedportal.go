@@ -64,40 +64,124 @@ func PortalPick(seed int64, rx, rz, spacing, separation int32) (cx, cz int32) {
 	return cx, rz*spacing + r.IntN(n)
 }
 
-// portalTemplates are BDS's template tables (off_F456D50, off_F456E40).
-var (
-	portalSmall = []string{"portal_1", "portal_2", "portal_3", "portal_4", "portal_5", "portal_6", "portal_7",
-		"portal_8", "portal_9", "portal_10"}
-	portalGiant = []string{"giant_portal_1", "giant_portal_2", "giant_portal_3"}
+// The portal's rolls and heights (sub_4E88070), all from the start chunk's
+// random.
+const (
+	// underChance is the underground roll, mirrorChance the z mirror and
+	// smallChance the pick of a small template over a giant one.
+	underChance  = 0.5
+	mirrorChance = 0.5
+	smallChance  = 0.05
+	// portalMinY is how far above the bottom a buried portal (and the
+	// lowering) stops; netherPortalYRange is the Nether's height spread
+	// above it.
+	portalMinY         = 15
+	netherPortalYRange = 85
+	// desertSinkRange is the random sink of a partly buried desert portal.
+	desertSinkRange = 6
+	// mountainAboveSea is the lowest a buried portal goes in mountains,
+	// above sea level.
+	mountainAboveSea = 7
+	// standingCorners is how many bottom corners must stand on something.
+	standingCorners = 3
+	// The netherrack spread: its random start is drawn below
+	// spreadBase - (box width + depth + 2) / spreadDiv, at least 1, and it
+	// reaches spreadReach blocks out and spreadDrop blocks up or down.
+	spreadBase  = 8
+	spreadDiv   = 4
+	spreadReach = 14
+	spreadDrop  = 3
+	// keepAirChance keeps the air of a surface portal outside deserts.
+	keepAirChance = 0.5
+	// Moss chances: wet or in a jungle, in a swamp, elsewhere.
+	mossWet     = float32(0.8)
+	mossJungle  = 0.8
+	mossSwamp   = 0.5
+	mossDefault = 0.2
+	// bedrockLayers is the bottom layers whose bedrock is never replaced.
+	bedrockLayers = 5
+	// chunkMiddle is the middle block of a chunk, where the start biome is
+	// read.
+	chunkMiddle = 8
 )
 
+// The aging pass and netherrack chances (sub_4E8A680 to sub_4E8AC30).
+const (
+	// ageStoneChance is the chance a stone brick ages at all.
+	ageStoneChance = 0.5
+	// stairsAgeChance splits an aged stone brick stair between its two
+	// outcomes.
+	stairsAgeChance = 0.5
+	magmaChance     = 0.1
+	cryingChance    = 0.2
+	lavaMagma       = 0.2
+	goldVanish      = 0.3
+	// netherrackMagma is the chance a spread block is magma.
+	netherrackMagma = 0.05
+	// dripMax is the longest drip below a spread block, each block of it
+	// drawn with dripChance.
+	dripMax    = 8
+	dripChance = 0.5
+	// stairsUpChance is the chance an aged stair is upside down.
+	stairsUpChance = 0.5
+)
+
+// portalSmall and portalGiant are BDS's template tables (off_F456D50,
+// off_F456E40).
+func portalSmall() [10]string {
+	return [10]string{"portal_1", "portal_2", "portal_3", "portal_4", "portal_5", "portal_6", "portal_7",
+		"portal_8", "portal_9", "portal_10"}
+}
+
+func portalGiant() [3]string {
+	return [3]string{"giant_portal_1", "giant_portal_2", "giant_portal_3"}
+}
+
 // portalSpread is the netherrack chance by distance (qword_1523CB8).
-var portalSpread = [14]float32{1, 1, 1, 1, 1, 1, 1, 0.9, 0.9, 0.8, 0.7, 0.6, 0.4, 0.2}
+func portalSpread() [14]float32 {
+	return [14]float32{1, 1, 1, 1, 1, 1, 1, 0.9, 0.9, 0.8, 0.7, 0.6, 0.4, 0.2}
+}
 
 // Block families the aging pass looks at (xmmword_F60D4B0, F60D480,
 // F60D450, F60D528, plus the blocks it names one by one).
-var (
-	portalFullStone = map[string]bool{
-		"minecraft:stone_bricks": true, "minecraft:mossy_stone_bricks": true, "minecraft:cracked_stone_bricks": true,
-		"minecraft:chiseled_stone_bricks": true, "minecraft:smooth_stone_double_slab": true,
-		"minecraft:sandstone_double_slab": true, "minecraft:petrified_oak_double_slab": true,
-		"minecraft:cobblestone_double_slab": true, "minecraft:brick_double_slab": true,
-		"minecraft:stone_brick_double_slab": true, "minecraft:quartz_double_slab": true,
-		"minecraft:nether_brick_double_slab": true, "minecraft:oak_double_slab": true, "minecraft:stone": true,
+
+// portalFullStone reports the full stone blocks.
+func portalFullStone(name string) bool {
+	switch name {
+	case "minecraft:stone_bricks", "minecraft:mossy_stone_bricks", "minecraft:cracked_stone_bricks",
+		"minecraft:chiseled_stone_bricks", "minecraft:smooth_stone_double_slab",
+		"minecraft:sandstone_double_slab", "minecraft:petrified_oak_double_slab",
+		"minecraft:cobblestone_double_slab", "minecraft:brick_double_slab",
+		"minecraft:stone_brick_double_slab", "minecraft:quartz_double_slab",
+		"minecraft:nether_brick_double_slab", "minecraft:oak_double_slab", "minecraft:stone":
+		return true
 	}
-	portalSlabs = map[string]bool{
-		"minecraft:smooth_stone_slab": true, "minecraft:sandstone_slab": true, "minecraft:petrified_oak_slab": true,
-		"minecraft:cobblestone_slab": true, "minecraft:brick_slab": true, "minecraft:stone_brick_slab": true,
-		"minecraft:quartz_slab": true, "minecraft:nether_brick_slab": true, "minecraft:oak_slab": true,
+	return false
+}
+
+// portalSlabs reports the slabs.
+func portalSlabs(name string) bool {
+	switch name {
+	case "minecraft:smooth_stone_slab", "minecraft:sandstone_slab", "minecraft:petrified_oak_slab",
+		"minecraft:cobblestone_slab", "minecraft:brick_slab", "minecraft:stone_brick_slab",
+		"minecraft:quartz_slab", "minecraft:nether_brick_slab", "minecraft:oak_slab":
+		return true
 	}
-	portalWalls = map[string]bool{
-		"minecraft:cobblestone_wall": true, "minecraft:mossy_cobblestone_wall": true, "minecraft:granite_wall": true,
-		"minecraft:diorite_wall": true, "minecraft:andesite_wall": true, "minecraft:sandstone_wall": true,
-		"minecraft:brick_wall": true, "minecraft:stone_brick_wall": true, "minecraft:mossy_stone_brick_wall": true,
-		"minecraft:nether_brick_wall": true, "minecraft:end_stone_brick_wall": true, "minecraft:prismarine_wall": true,
-		"minecraft:red_sandstone_wall": true, "minecraft:red_nether_brick_wall": true,
+	return false
+}
+
+// portalWalls reports the walls.
+func portalWalls(name string) bool {
+	switch name {
+	case "minecraft:cobblestone_wall", "minecraft:mossy_cobblestone_wall", "minecraft:granite_wall",
+		"minecraft:diorite_wall", "minecraft:andesite_wall", "minecraft:sandstone_wall",
+		"minecraft:brick_wall", "minecraft:stone_brick_wall", "minecraft:mossy_stone_brick_wall",
+		"minecraft:nether_brick_wall", "minecraft:end_stone_brick_wall", "minecraft:prismarine_wall",
+		"minecraft:red_sandstone_wall", "minecraft:red_nether_brick_wall":
+		return true
 	}
-)
+	return false
+}
 
 // PortalWorld is the world a ruined portal is built into.
 type PortalWorld struct {
@@ -158,7 +242,7 @@ func (s *portalSim) get(x, y, z int32) uint32 {
 
 // put is setBlock; the bottom bedrock is never replaced.
 func (s *portalSim) put(x, y, z int32, id uint32, water bool, be map[string]any) {
-	if y < s.w.MinY || y >= s.w.MaxY || (y < s.w.MinY+5 && s.get(x, y, z) == s.l.bedrock) {
+	if y < s.w.MinY || y >= s.w.MaxY || (y < s.w.MinY+bedrockLayers && s.get(x, y, z) == s.l.bedrock) {
 		return
 	}
 	s.set[[3]int32{x, y, z}] = PortalBlock{x, y, z, id, water, be}
@@ -211,16 +295,18 @@ func (l *Lib) RuinedPortal(cx, cz int32, w PortalWorld) *RuinedPortal {
 
 	var r rand.MT
 	r.Seed(l.populationSeed(cx, cz))
-	under := r.Float() < 0.5
-	rot := int(r.IntN(4))
-	mirror := r.Float() >= 0.5
+	under := r.Float() < underChance
+	rot := int(r.IntN(quarterTurns))
+	mirror := r.Float() >= mirrorChance
 	ox, oz := cx*16, cz*16
 	h := s.height(ox, oz, !ocean)
 	var path string
-	if r.Float() >= 0.05 {
-		path = portalSmall[r.IntN(10)]
+	if r.Float() >= smallChance {
+		small := portalSmall()
+		path = small[r.IntN(int32(len(small)))]
 	} else {
-		path = portalGiant[r.IntN(3)]
+		giant := portalGiant()
+		path = giant[r.IntN(int32(len(giant)))]
 	}
 	jt := l.Template("ruined_portal/" + path)
 	if jt == nil {
@@ -239,16 +325,16 @@ func (l *Lib) RuinedPortal(cx, cz int32, w PortalWorld) *RuinedPortal {
 	y = surface - 1
 	switch {
 	case w.Nether:
-		y = w.MinY + 15 + r.IntN(85)
+		y = w.MinY + portalMinY + r.IntN(netherPortalYRange)
 	case !under:
 		if desert {
-			y = surface - (bb.Y1 - bb.Y0) + r.IntN(6)
+			y = surface - (bb.Y1 - bb.Y0) + r.IntN(desertSinkRange)
 		}
 	default:
 		bx, by, bz := midpoint(bb.X0, bb.X1), midpoint(bb.Y0, bb.Y1), midpoint(bb.Z0, bb.Z1)
-		low := w.MinY + 15
+		low := w.MinY + portalMinY
 		if s.biomeHas(bx, by, bz, "extreme_hills") || s.biomeHas(bx, by, bz, "mountain") {
-			low = w.Sea + 7
+			low = w.Sea + mountainAboveSea
 		}
 		y += bb.Y0 - bb.Y1 - 1
 		if y > low {
@@ -258,14 +344,14 @@ func (l *Lib) RuinedPortal(cx, cz int32, w PortalWorld) *RuinedPortal {
 	bb = bb.Raise(y - bb.Y0)
 
 	// Lower the box until three of its bottom corners stand on something.
-	for bb.Y0 > w.MinY+15 {
+	for bb.Y0 > w.MinY+portalMinY {
 		n := 0
 		for _, c := range [4][2]int32{{bb.X0, bb.Z0}, {bb.X0, bb.Z1}, {bb.X1, bb.Z0}, {bb.X1, bb.Z1}} {
 			if s.standing(c[0], bb.Y0, c[1], ocean) {
 				n++
 			}
 		}
-		if n >= 3 {
+		if n >= standingCorners {
 			break
 		}
 		bb = bb.Raise(-1)
@@ -273,12 +359,12 @@ func (l *Lib) RuinedPortal(cx, cz int32, w PortalWorld) *RuinedPortal {
 
 	ids := l.portalIDs()
 	buried := desert || under
-	spread := r.IntN(max(8-((bb.X1-bb.X0)+(bb.Z1-bb.Z0)+2)/4, 1))
+	spread := r.IntN(max(spreadBase-((bb.X1-bb.X0)+(bb.Z1-bb.Z0)+2)/spreadDiv, 1))
 	mx, mz := midpoint(bb.X0, bb.X1), midpoint(bb.Z0, bb.Z1)
-	for x := mx - 14; x <= mx+14; x++ {
-		for dz := int32(-14); dz <= 14; dz++ {
+	for x := mx - spreadReach; x <= mx+spreadReach; x++ {
+		for dz := int32(-spreadReach); dz <= spreadReach; dz++ {
 			d := spread + mathx.Abs(mx-x) + mathx.Abs(dz)
-			if d > 13 || float64(portalSpread[d]) <= r.Float64() {
+			if spreadChance := portalSpread(); d < 0 || d >= int32(len(spreadChance)) || float64(spreadChance[d]) <= r.Float64() {
 				continue
 			}
 			z := mz + dz
@@ -286,7 +372,7 @@ func (l *Lib) RuinedPortal(cx, cz int32, w PortalWorld) *RuinedPortal {
 			if buried {
 				hy = min(hy, bb.Y0)
 			}
-			if mathx.Abs(bb.Y0-hy) <= 3 {
+			if mathx.Abs(bb.Y0-hy) <= spreadDrop {
 				s.netherrack(&r, ids, x, hy, z)
 				s.drip(&r, ids, x, hy-1, z)
 			}
@@ -298,7 +384,7 @@ func (l *Lib) RuinedPortal(cx, cz int32, w PortalWorld) *RuinedPortal {
 	case w.Nether && bb.Y0 < w.Sea:
 		keepAir = false
 	case !under && !desert:
-		keepAir = r.Float() < 0.5
+		keepAir = r.Float() < keepAirChance
 	}
 	wet := false
 	for _, c := range [8][3]int32{
@@ -320,7 +406,7 @@ func (l *Lib) RuinedPortal(cx, cz int32, w PortalWorld) *RuinedPortal {
 		}
 	}
 
-	moss := float32(0.8)
+	moss := mossWet
 	if w.Nether {
 		moss = 0
 	} else if !wet {
@@ -328,11 +414,11 @@ func (l *Lib) RuinedPortal(cx, cz int32, w PortalWorld) *RuinedPortal {
 		case desert:
 			moss = 0
 		case s.startHas(cx, cz, "jungle"):
-			moss = 0.8
+			moss = mossJungle
 		case s.startHas(cx, cz, "swamp"):
-			moss = 0.5
+			moss = mossSwamp
 		default:
-			moss = 0.2
+			moss = mossDefault
 		}
 	}
 	l.agePortal(s, &r, bb, ids, moss, ocean, cold)
@@ -413,7 +499,7 @@ func (l *Lib) agePortal(s *portalSim, r *rand.MT, bb Box, ids portalIDs, moss fl
 				b := s.get(x, y, z)
 				name := l.BlockName(b)
 				switch {
-				case s.w.Nether && portalFullStone[name]:
+				case s.w.Nether && portalFullStone(name):
 					switch name {
 					case "minecraft:stone":
 						st := l.portalStairs(r, "minecraft:polished_blackstone_stairs")
@@ -422,10 +508,11 @@ func (l *Lib) agePortal(s *portalSim, r *rand.MT, bb Box, ids portalIDs, moss fl
 						s.place(x, y, z, ids.chiseledBlackstone)
 					default:
 						st := l.portalStairs(r, "minecraft:polished_blackstone_brick_stairs")
-						s.place(x, y, z, [3]uint32{ids.blackBricks, ids.crackedBlackBricks, st}[r.IntN(3)])
+						bricks := [3]uint32{ids.blackBricks, ids.crackedBlackBricks, st}
+						s.place(x, y, z, bricks[r.IntN(int32(len(bricks)))])
 					}
-				case portalFullStone[name]:
-					if r.Float() >= 0.5 {
+				case portalFullStone(name):
+					if r.Float() >= ageStoneChance {
 						normal := [2]uint32{ids.cracked, l.portalStairs(r, "minecraft:stone_brick_stairs")}
 						mossy := [2]uint32{ids.mossyBricks, l.portalStairs(r, "minecraft:mossy_stone_brick_stairs")}
 						s.place(x, y, z, portalPick(r, moss, normal, mossy))
@@ -434,24 +521,24 @@ func (l *Lib) agePortal(s *portalSim, r *rand.MT, bb Box, ids portalIDs, moss fl
 					st, _ := l.reg.State(b)
 					f := r.Float()
 					switch {
-					case s.w.Nether && f < 0.5:
+					case s.w.Nether && f < stairsAgeChance:
 						s.place(x, y, z, l.state("minecraft:polished_blackstone_brick_stairs", map[string]any{
 							"weirdo_direction": st.Props["weirdo_direction"], "upside_down_bit": st.Props["upside_down_bit"]}))
 					case s.w.Nether:
 						s.place(x, y, z, ids.blackSlab)
-					case f >= 0.5:
+					case f >= stairsAgeChance:
 						ms := l.state("minecraft:mossy_stone_brick_stairs", map[string]any{
 							"weirdo_direction": st.Props["weirdo_direction"], "upside_down_bit": st.Props["upside_down_bit"]})
 						s.place(x, y, z, portalPick(r, moss, [2]uint32{ids.stoneSlab, ids.brickSlab}, [2]uint32{ms, ids.slabMossy}))
 					}
-				case portalSlabs[name]:
+				case portalSlabs(name):
 					switch {
 					case s.w.Nether:
 						s.place(x, y, z, ids.blackSlab)
 					case moss > r.Float():
 						s.place(x, y, z, ids.slabMossy)
 					}
-				case portalWalls[name]:
+				case portalWalls(name):
 					switch {
 					case s.w.Nether:
 						s.place(x, y, z, ids.blackWall)
@@ -463,11 +550,11 @@ func (l *Lib) agePortal(s *portalSim, r *rand.MT, bb Box, ids portalIDs, moss fl
 						s.place(x, y, z, ids.chain)
 					}
 				case b == ids.netherrack:
-					if !cold && r.Float() < 0.1 {
+					if !cold && r.Float() < magmaChance {
 						s.place(x, y, z, ids.magma)
 					}
 				case name == "minecraft:obsidian":
-					if r.Float() < 0.2 {
+					if r.Float() < cryingChance {
 						s.place(x, y, z, ids.crying)
 					}
 				case s.isLava(b):
@@ -476,11 +563,11 @@ func (l *Lib) agePortal(s *portalSim, r *rand.MT, bb Box, ids portalIDs, moss fl
 						s.place(x, y, z, ids.magma)
 					case cold:
 						s.place(x, y, z, ids.netherrack)
-					case r.Float() < 0.2:
+					case r.Float() < lavaMagma:
 						s.place(x, y, z, ids.magma)
 					}
 				case name == "minecraft:gold_block":
-					if r.Float() < 0.3 {
+					if r.Float() < goldVanish {
 						id := l.air
 						for _, n := range [5][3]int32{{x - 1, y, z}, {x + 1, y, z}, {x, y, z - 1}, {x, y, z + 1}, {x, y + 1, z}} {
 							if s.isLava(s.get(n[0], n[1], n[2])) {
@@ -502,7 +589,7 @@ func midpoint(a0, a1 int32) int32 { return a0 + (a1-a0+1)/2 }
 // startHas reports whether the biome at the middle of the start chunk
 // (cx, cz) has tag.
 func (s *portalSim) startHas(cx, cz int32, tag string) bool {
-	return s.biomeHas(cx*16+8, s.w.StartY, cz*16+8, tag)
+	return s.biomeHas(cx*16+chunkMiddle, s.w.StartY, cz*16+chunkMiddle, tag)
 }
 
 // standing reports whether the block below (x, y, z) holds the portal up:
@@ -518,7 +605,7 @@ func (s *portalSim) standing(x, y, z int32, ocean bool) bool {
 // netherrack places netherrack, or now and then magma, at (x, y, z).
 func (s *portalSim) netherrack(r *rand.MT, ids portalIDs, x, y, z int32) {
 	id := ids.netherrack
-	if r.Float() < 0.05 {
+	if r.Float() < netherrackMagma {
 		id = ids.magma
 	}
 	s.put(x, y, z, id, false, nil)
@@ -527,7 +614,7 @@ func (s *portalSim) netherrack(r *rand.MT, ids portalIDs, x, y, z int32) {
 // drip places netherrack at (x, y, z) and a random run below it.
 func (s *portalSim) drip(r *rand.MT, ids portalIDs, x, y, z int32) {
 	s.netherrack(r, ids, x, y, z)
-	for i := int32(1); i <= 8 && r.Float() < 0.5; i++ {
+	for i := int32(1); i <= dripMax && r.Float() < dripChance; i++ {
 		s.netherrack(r, ids, x, y-i, z)
 	}
 }
@@ -543,8 +630,8 @@ func (l *Lib) vanillaDefault(name string) uint32 {
 
 // portalStairs draws a facing and a half (sub_4E8A9F0).
 func (l *Lib) portalStairs(r *rand.MT, name string) uint32 {
-	d := r.IntN(4)
-	up := r.Float() < 0.5
+	d := r.IntN(quarterTurns)
+	up := r.Float() < stairsUpChance
 	return l.state(name, map[string]any{"weirdo_direction": d, "upside_down_bit": up})
 }
 

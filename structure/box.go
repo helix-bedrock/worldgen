@@ -2,27 +2,30 @@ package structure
 
 import "strconv"
 
-// box is an inclusive block bounding box.
+// Box is an inclusive block bounding box.
 type Box struct{ X0, Y0, Z0, X1, Y1, Z1 int32 }
 
+// Contains reports whether p is in the box.
 func (b Box) Contains(p [3]int32) bool {
 	return p[0] >= b.X0 && p[0] <= b.X1 && p[1] >= b.Y0 && p[1] <= b.Y1 && p[2] >= b.Z0 && p[2] <= b.Z1
 }
 
+// Intersects reports whether the two boxes share a block.
 func (b Box) Intersects(c Box) bool {
 	return b.X0 <= c.X1 && b.X1 >= c.X0 && b.Y0 <= c.Y1 && b.Y1 >= c.Y0 && b.Z0 <= c.Z1 && b.Z1 >= c.Z0
 }
 
+// Inside reports whether b lies wholly within c.
 func (b Box) Inside(c Box) bool {
 	return b.X0 >= c.X0 && b.X1 <= c.X1 && b.Y0 >= c.Y0 && b.Y1 <= c.Y1 && b.Z0 >= c.Z0 && b.Z1 <= c.Z1
 }
 
-// raise moves the box up by dy.
+// Raise moves the box up by dy.
 func (b Box) Raise(dy int32) Box {
 	return Box{b.X0, b.Y0 + dy, b.Z0, b.X1, b.Y1 + dy, b.Z1}
 }
 
-// rotatePos rotates a template position by r quarter turns clockwise
+// RotatePos rotates a template position by r quarter turns clockwise
 // around the template origin (Java's Rotation.CLOCKWISE_90: x,z -> -z,x).
 func RotatePos(p [3]int32, r int) [3]int32 {
 	x, z := p[0], p[2]
@@ -37,6 +40,20 @@ func RotatePos(p [3]int32, r int) [3]int32 {
 	return [3]int32{x, p[1], z}
 }
 
+// Turns and Java's 16-step rotation property.
+const (
+	// quarterTurns is the number of turns a template can take.
+	quarterTurns = 4
+	// rotationSteps is a full turn of the rotation property, rotationMask
+	// wraps a step into it and stepsPerQuarter is one quarter turn.
+	rotationSteps   = 16
+	rotationMask    = rotationSteps - 1
+	stepsPerQuarter = rotationSteps / quarterTurns
+	// halfTurnSteps is a half turn: Java's LEFT_RIGHT mirror reflects the
+	// rotation about it.
+	halfTurnSteps = rotationSteps / 2
+)
+
 // Template mirrors, numbered as BDS's placement settings: mirrorZ flips z
 // (Java's LEFT_RIGHT), mirrorX flips x (Java's FRONT_BACK). A template is
 // mirrored about its origin before it is turned.
@@ -46,7 +63,11 @@ const (
 	MirrorX
 )
 
-// mirrorPos mirrors a template position about the origin.
+// mirroredTurns is the palettes a template caches: every turn, unmirrored
+// and with each mirror.
+const mirroredTurns = quarterTurns * (int(MirrorX) + 1)
+
+// MirrorPos mirrors a template position about the origin.
 func MirrorPos(p [3]int32, m uint8) [3]int32 {
 	switch m {
 	case MirrorZ:
@@ -57,17 +78,21 @@ func MirrorPos(p [3]int32, m uint8) [3]int32 {
 	return p
 }
 
-var Horizontal = []string{"north", "east", "south", "west"}
+// Horizontal is the horizontal facings in clockwise order, north first.
+func Horizontal() [4]string { return [4]string{"north", "east", "south", "west"} }
 
+// RotateFacing turns a horizontal facing r quarter turns clockwise; any
+// other facing is returned as is.
 func RotateFacing(f string, r int) string {
-	for i, h := range Horizontal {
+	for i, h := range Horizontal() {
 		if h == f {
-			return Horizontal[(i+r)&3]
+			return Horizontal()[(i+r)&3]
 		}
 	}
 	return f
 }
 
+// Opposite is the facing opposite f.
 func Opposite(f string) string {
 	switch f {
 	case "up":
@@ -78,6 +103,7 @@ func Opposite(f string) string {
 	return RotateFacing(f, 2)
 }
 
+// JigsawDir is the unit step a jigsaw facing f points along.
 func JigsawDir(f string) [3]int32 {
 	switch f {
 	case "north":
@@ -96,7 +122,7 @@ func JigsawDir(f string) [3]int32 {
 	return [3]int32{}
 }
 
-// tplBox is the box of a template placed at pos with rotation r.
+// TemplateBox is the box of a template placed at pos with rotation r.
 func TemplateBox(t *Template, pos [3]int32, r int) Box {
 	// BDS's piece box (sub_D2379D0): the size turned, then the box laid out
 	// from pos by the turn. A size of 0 (a feature element) gives an empty
@@ -120,7 +146,7 @@ func TemplateBox(t *Template, pos [3]int32, r int) Box {
 
 // mirrorPropsZ mirrors a Java block state along z (Java's LEFT_RIGHT).
 func mirrorPropsZ(p map[string]string) map[string]string {
-	return mirrorProps(p, "north", "south", 8)
+	return mirrorProps(p, "north", "south", halfTurnSteps)
 }
 
 // mirrorPropsX mirrors a Java block state along x (Java's FRONT_BACK).
@@ -156,7 +182,7 @@ func mirrorProps(p map[string]string, a, b string, half int) map[string]string {
 	}
 	if v, ok := p["rotation"]; ok {
 		if n, err := strconv.Atoi(v); err == nil {
-			out["rotation"] = strconv.Itoa((half - n + 16) & 15)
+			out["rotation"] = strconv.Itoa((half - n + rotationSteps) & rotationMask)
 		}
 	}
 	return out

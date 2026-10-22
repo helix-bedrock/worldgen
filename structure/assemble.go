@@ -1,8 +1,11 @@
+// Package structure loads structure templates and places them: jigsaw
+// assembly, Java template conversion and the structures the overworld and
+// the Nether share.
 package structure
 
 import "github.com/helix-bedrock/worldgen/rand"
 
-// cityShape is the free space of one nesting level: a piece must lie inside
+// Shape is the free space of one nesting level: a piece must lie inside
 // one of in and touch none of out.
 type Shape struct {
 	In, Out []Box
@@ -27,14 +30,14 @@ func (s *Shape) fits(bb Box) bool {
 	return true
 }
 
-// cityQueued is a placed piece waiting to have its jigsaws expanded, with
+// Queued is a placed piece waiting to have its jigsaws expanded, with
 // the nesting level it was placed in.
 type Queued struct {
 	Piece *Piece
 	Shape int
 }
 
-// cityAssembly is BDS's newer jigsaw assembler (sub_D2AB0E0), which ancient
+// Assembly is BDS's newer jigsaw assembler (sub_D2AB0E0), which ancient
 // cities and bastions share: d holds the structure's pools and maxDepth is
 // how deep it expands.
 type Assembly struct {
@@ -48,14 +51,14 @@ type Assembly struct {
 	Feature  *JigsawTemplate
 }
 
-// run expands the queued pieces first in, first out.
+// Run expands the queued pieces first in, first out.
 func (a *Assembly) Run() {
 	for i := 0; i < len(a.Queue); i++ {
 		a.expand(a.Queue[i])
 	}
 }
 
-// piecesBox is the box around every piece.
+// PiecesBox is the box around every piece.
 func PiecesBox(ps []*Piece) Box {
 	bb := ps[0].BB
 	for _, q := range ps[1:] {

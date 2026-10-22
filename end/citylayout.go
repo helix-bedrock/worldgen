@@ -42,7 +42,7 @@ type cityLayout struct {
 }
 
 // bool is BDS's nextBoolean: bit 27 of a draw (sub_ED4A020).
-func (l *cityLayout) bool() bool { return l.r.Uint32()&0x8000000 != 0 }
+func (l *cityLayout) bool() bool { return l.r.Uint32()&nextBooleanBit != 0 }
 
 // piece adds a template at pos.
 func (l *cityLayout) piece(name string, pos [3]int32, rot int, overwrite bool) cityPiece {
@@ -97,11 +97,75 @@ type cityBridge struct {
 	pos [3]int32
 }
 
-// towerBridges are a tower's (qword_F456CD0), fatTowerBridges a fat
-// tower's (qword_F456CF0).
-var (
-	towerBridges    = [4]cityBridge{{0, [3]int32{1, -1, 0}}, {1, [3]int32{6, -1, 1}}, {3, [3]int32{0, -1, 5}}, {2, [3]int32{5, -1, 6}}}
-	fatTowerBridges = [4]cityBridge{{0, [3]int32{4, -1, 0}}, {1, [3]int32{12, -1, 4}}, {3, [3]int32{0, -1, 8}}, {2, [3]int32{8, -1, 12}}}
+// towerBridges are a tower's (qword_F456CD0).
+func towerBridges() [4]cityBridge {
+	return [4]cityBridge{{0, [3]int32{1, -1, 0}}, {1, [3]int32{6, -1, 1}}, {3, [3]int32{0, -1, 5}}, {2, [3]int32{5, -1, 6}}}
+}
+
+// fatTowerBridges are a fat tower's (qword_F456CF0).
+func fatTowerBridges() [4]cityBridge {
+	return [4]cityBridge{{0, [3]int32{4, -1, 0}}, {1, [3]int32{12, -1, 4}}, {3, [3]int32{0, -1, 8}}, {2, [3]int32{8, -1, 12}}}
+}
+
+// The generators' limits and rolls (Java's EndCityPieces).
+const (
+	// cityMaxDepth is the depth no generator runs at.
+	cityMaxDepth = 9
+	// towerTopDepth is the depth at which an unbridged tower gets a top
+	// instead of a fat tower.
+	towerTopDepth = 7
+	// towerBridgeOdds is one in how many towers bridge from their first
+	// piece; towerExtraPieces bounds the pieces a tower adds on top.
+	towerBridgeOdds  = 3
+	towerExtraPieces = 3
+	// fatMiddles is the most extra middles of a fat tower, each added
+	// unless a one in fatMiddleOdds draw says stop.
+	fatMiddles    = 2
+	fatMiddleOdds = 3
+	// bridgeParts is the most parts of a bridge.
+	bridgeParts = 4
+	// shipOdds less the depth is one in how many bridges carry the ship;
+	// the ship is shifted by up to shipRangeX and shipRangeZ from shipX,
+	// shipZ.
+	shipOdds   = 10
+	shipRangeX = 8
+	shipRangeZ = 10
+	shipX      = -8
+	shipZ      = -70
+	// houseKinds is the house tower's kinds: one, two or three floors.
+	houseKinds = 3
+	// startDraws are the draws that picked the start chunk.
+	startDraws = 4
+	// quarterTurns is a full turn; halfTurn turns a bridge end back.
+	quarterTurns = 4
+	halfTurn     = 2
+	// nextBooleanBit is the bit of a draw BDS's nextBoolean reads.
+	nextBooleanBit = 1 << 27
+)
+
+// Template joints of the city pieces: where each piece sits on its parent.
+const (
+	// floorRise is a floor or tower piece; tallRise a fat middle or a
+	// tall floor; towerBaseRise the first tower piece on its base.
+	floorRise     = 4
+	tallRise      = 8
+	towerBaseRise = 7
+	// towerBaseInset places a tower base on its parent, up to one block
+	// further in, towerBaseDrop below it.
+	towerBaseInset = 3
+	towerBaseDrop  = -3
+	// fatBaseOutset centers a fat tower on the tower below, and
+	// fatTopOutset its top on the last middle.
+	fatBaseOutset = -3
+	fatTopOutset  = -2
+	// bridgeStep is a bridge piece or steep stairs, gentleStep gentle
+	// stairs, stairsRise the height stairs climb.
+	bridgeStep = 4
+	gentleStep = 8
+	stairsRise = 4
+	// houseOffsetX and houseOffsetZ place a house tower off a bridge's end.
+	houseOffsetX = -3
+	houseOffsetZ = -11
 )
 
 // tower is the tower generator (sub_4E42570): a base, two to four pieces,

@@ -13,7 +13,7 @@ import (
 	"github.com/helix-bedrock/worldgen/rand"
 )
 
-// applyRules runs a template's block rules on one block about to be placed
+// ApplyRules runs a template's block rules on one block about to be placed
 // at (x, y, z) over world: the first rule whose block matches, whose chance
 // passes and whose spot is not protected decides the block. The random is
 // fresh per block and drawn only for matching rules; a position test draws
@@ -101,7 +101,7 @@ func (l *Lib) applyLegacyRules(rules []BlockRule, cs ConvertedState, x, y, z int
 	return cs
 }
 
-// cappedRule is a capped processor: up to limit blocks of the piece that
+// CappedRule is a capped processor: up to limit blocks of the piece that
 // are block after the rules turn into output, picked in a shuffled order.
 type CappedRule struct {
 	Limit  int
@@ -110,7 +110,7 @@ type CappedRule struct {
 	Loot   string
 }
 
-// expanded is a pool's elements, each repeated weight times.
+// Expanded is a pool's elements, each repeated weight times.
 func (p *Pool) Expanded() []*Element {
 	var out []*Element
 	for _, e := range p.Entries {
@@ -121,7 +121,7 @@ func (p *Pool) Expanded() []*Element {
 	return out
 }
 
-// cappedPicks are the template blocks a piece's capped processors turn,
+// CappedPicks are the template blocks a piece's capped processors turn,
 // by block index: computed once per piece from the whole template, in an
 // order shuffled with a positional Xoroshiro at the piece's position.
 // VERIFY: Java's CappedProcessor; the random (BDS's
@@ -172,13 +172,13 @@ func (l *Lib) CappedPicks(p *Piece) map[int]CappedRule {
 	return p.capped
 }
 
-// jigsawData is the pools and elements of the jigsaw structures.
+// JigsawData is the pools and elements of the jigsaw structures.
 type JigsawData struct {
 	Pools    map[string]*Pool
 	Elements map[string]*Element
 }
 
-// blockRule is one rule of a template's block rules: a block (or one of a
+// BlockRule is one rule of a template's block rules: a block (or one of a
 // set) turns into output with a chance, unless the world already holds a
 // block of notIn there, or, with at set, only where the world holds at.
 type BlockRule struct {
@@ -226,16 +226,19 @@ func (t *axisPosTest) passes(d int32, f float32) bool {
 	return c >= f
 }
 
+// Pool is a template pool: weighted elements and the pool to fall back on.
 type Pool struct {
 	Name, Fallback string
 	Entries        []PoolEntry
 }
 
+// PoolEntry is an element of a pool with its weight.
 type PoolEntry struct {
 	Element *Element
 	Weight  int32
 }
 
+// Element is one element a pool can place.
 type Element struct {
 	ID, Template, Feature string
 	TerrainMatching       bool
@@ -250,15 +253,15 @@ type Element struct {
 	Capped []CappedRule
 }
 
-// jigsawTemplate is a template prepared for placement: its blocks converted
+// JigsawTemplate is a template prepared for placement: its blocks converted
 // per rotation lazily, and its jigsaw connectors.
 type JigsawTemplate struct {
 	Template *Template
 	Jigsaws  []JigsawBlock
 	// once and conv cache the converted palette per turn, then per turn
 	// with each mirror (index rot+4*mirror).
-	once [12]sync.Once
-	conv [12][]ConvertedState
+	once [mirroredTurns]sync.Once
+	conv [mirroredTurns][]ConvertedState
 
 	// at indexes the blocks by position, built once.
 	atOnce sync.Once
@@ -269,7 +272,7 @@ type JigsawTemplate struct {
 	chest     ChestSpot
 }
 
-// chestSpot is where an extra chest goes in a house template, in template
+// ChestSpot is where an extra chest goes in a house template, in template
 // space; ok is false when the house has a chest or no room for one.
 type ChestSpot struct {
 	Pos    [3]int32
@@ -277,7 +280,7 @@ type ChestSpot struct {
 	OK     bool
 }
 
-// houseChestSpot finds a floor spot for a chest inside a house template:
+// HouseChestSpot finds a floor spot for a chest inside a house template:
 // air with air above, a solid floor below, walls somewhere in all four
 // directions and a roof, not next to a door. When the house has a bed the
 // spot must be beside the bed. The chest faces open air.
@@ -494,12 +497,14 @@ func (h *houseScan) okNearDoor(p [3]int32) bool {
 		!h.beside(p) && h.inside(p)
 }
 
+// ConvertedState is a template state converted to a Bedrock block id.
 type ConvertedState struct {
 	ID    uint32
 	Water bool
 	OK    bool
 }
 
+// JigsawBlock is a jigsaw block of a template, with its joint settings.
 type JigsawBlock struct {
 	Pos        [3]int32
 	Facing     string
@@ -570,7 +575,7 @@ type jigsawDocRulePosition struct {
 	Axis      string
 }
 
-// loadJigsawData loads a jigsaw data file from data/bds (villages.json,
+// LoadJigsawData loads a jigsaw data file from data/bds (villages.json,
 // ancient_city.json). Rule outputs are looked up in reg.
 func LoadJigsawData(file string, reg BlockLookup) (*JigsawData, error) {
 	raw, err := worldgen.Data.ReadFile("data/bds/" + file)
@@ -648,7 +653,7 @@ func LoadJigsawData(file string, reg BlockLookup) (*JigsawData, error) {
 	return d, nil
 }
 
-// nbtInt reads an integer NBT value of any width, 0 if it is not one.
+// NBTInt reads an integer NBT value of any width, 0 if it is not one.
 func NBTInt(v any) int32 {
 	switch n := v.(type) {
 	case int32:
@@ -665,13 +670,13 @@ func NBTInt(v any) int32 {
 	return 0
 }
 
-// blockLookup finds a block's default state.
+// BlockLookup finds a block's default state.
 type BlockLookup interface {
 	Default(name string) (uint32, bool)
 	Lookup(name string, props map[string]any) (uint32, bool)
 }
 
-// lookupState finds a block written as name or name[key=value,...]: true
+// LookupState finds a block written as name or name[key=value,...]: true
 // and false are booleans, numbers numbers, anything else a string.
 func LookupState(reg BlockLookup, s string) (uint32, bool) {
 	name, rest, ok := strings.Cut(s, "[")
@@ -697,7 +702,7 @@ func LookupState(reg BlockLookup, s string) (uint32, bool) {
 	return reg.Lookup(name, props)
 }
 
-// template returns the prepared template of an element, nil if it has none
+// Template returns the prepared template of an element, nil if it has none
 // or the file does not exist (BDS references two missing village files).
 func (l *Lib) Template(path string) *JigsawTemplate {
 	if path == "" {
@@ -752,18 +757,21 @@ func (l *Lib) Template(path string) *JigsawTemplate {
 	return jt
 }
 
-// loadAnyTemplate reads a template from its .nbt file, or else from its
+// LoadAnyTemplate reads a template from its .nbt file, or else from its
 // .mcstructure file.
 func LoadAnyTemplate(path string) (*Template, error) {
 	f, err := worldgen.Data.Open("data/vanilla/structures/" + path + ".nbt")
 	if err != nil {
 		return LoadMCTemplate(path)
 	}
-	defer f.Close()
-	return LoadTemplate(f)
+	t, err := LoadTemplate(f)
+	if cerr := f.Close(); err == nil && cerr != nil {
+		err = fmt.Errorf("template %s: close: %w", path, cerr)
+	}
+	return t, err
 }
 
-// jigsawPiece is one placed element.
+// Piece is one placed element.
 type Piece struct {
 	Element  *Element
 	Template *JigsawTemplate
@@ -779,7 +787,7 @@ type Piece struct {
 	capped     map[int]CappedRule
 }
 
-// placedJigsaws returns a piece's jigsaw blocks in world space.
+// PlacedJigsaws returns a piece's jigsaw blocks in world space.
 func (p *Piece) PlacedJigsaws() []JigsawBlock {
 	out := make([]JigsawBlock, len(p.Template.Jigsaws))
 	for i, j := range p.Template.Jigsaws {
@@ -792,6 +800,7 @@ func (p *Piece) PlacedJigsaws() []JigsawBlock {
 	return out
 }
 
+// Shuffle shuffles s in place the way BDS does, drawing from r.
 func Shuffle[T any](s []T, r *rand.MT) {
 	for i := 1; i < len(s); i++ {
 		j := int(r.Uint32() % uint32(i+1))
@@ -801,7 +810,7 @@ func Shuffle[T any](s []T, r *rand.MT) {
 	}
 }
 
-// weightedShuffle is a pool's elements, each repeated weight times, shuffled.
+// WeightedShuffle is a pool's elements, each repeated weight times, shuffled.
 func (p *Pool) WeightedShuffle(r *rand.MT) []*Element {
 	var out []*Element
 	for _, e := range p.Entries {
@@ -813,7 +822,7 @@ func (p *Pool) WeightedShuffle(r *rand.MT) []*Element {
 	return out
 }
 
-// pieceWorld is what a piece is placed into: an overworld chunk, or a
+// World is what a piece is placed into: an overworld chunk, or a
 // Nether chunk for the structures the two dimensions share.
 type World interface {
 	// bounds is the world's lowest y and the y above its highest.
@@ -825,7 +834,7 @@ type World interface {
 	Entity(be BlockEntity)
 }
 
-// placePieceIn writes the blocks of a piece that fall in chunkBox into w.
+// PlacePiece writes the blocks of a piece that fall in chunkBox into w.
 func (l *Lib) PlacePiece(p *Piece, w World, chunkBox Box, height func(x, z int32) int32) {
 	t := p.Template.Template
 	rot := p.Rotation
@@ -919,16 +928,16 @@ func (l *Lib) PlacePiece(p *Piece, w World, chunkBox Box, height func(x, z int32
 	}
 }
 
-// templateStates returns a template's palette turned rot quarter turns and
+// TemplateStates returns a template's palette turned rot quarter turns and
 // converted to Bedrock states, converting it once.
 func (l *Lib) TemplateStates(jt *JigsawTemplate, rot int) []ConvertedState {
 	return l.TemplateStatesMirror(jt, rot, MirrorNone)
 }
 
-// templateStatesMirror is templateStates with the palette first mirrored
+// TemplateStatesMirror is templateStates with the palette first mirrored
 // (mirrorZ or mirrorX).
 func (l *Lib) TemplateStatesMirror(jt *JigsawTemplate, rot int, mirror uint8) []ConvertedState {
-	k := rot&3 + 4*int(min(mirror, MirrorX))
+	k := rot&3 + quarterTurns*int(min(mirror, MirrorX))
 	jt.once[k].Do(func() {
 		conv := make([]ConvertedState, len(jt.Template.Palette))
 		for i, st := range jt.Template.Palette {
@@ -947,7 +956,7 @@ func (l *Lib) TemplateStatesMirror(jt *JigsawTemplate, rot int, mirror uint8) []
 	return jt.conv[k]
 }
 
-// parseFinalState converts a jigsaw block's final_state ("minecraft:x[a=b]").
+// ParseFinalState converts a jigsaw block's final_state ("minecraft:x[a=b]").
 func (l *Lib) ParseFinalState(s string, rot int) ConvertedState {
 	if s == "" {
 		return ConvertedState{l.air, false, true}
@@ -967,7 +976,7 @@ func (l *Lib) ParseFinalState(s string, rot int) ConvertedState {
 	return ConvertedState{id, w, ok}
 }
 
-// rotateProps rotates the direction properties of a Java state.
+// RotateProps rotates the direction properties of a Java state.
 func RotateProps(p map[string]string, rot int) map[string]string {
 	if rot == 0 || len(p) == 0 {
 		return p
@@ -997,15 +1006,15 @@ func RotateProps(p map[string]string, rot int) map[string]string {
 	if r, ok := p["rotation"]; ok {
 		var n int
 		if _, err := fmt.Sscan(r, &n); err == nil {
-			out["rotation"] = fmt.Sprint((n + rot*4) & 15)
+			out["rotation"] = fmt.Sprint((n + rot*stepsPerQuarter) & rotationMask)
 		}
 	}
 	// Fence and pane connections.
 	if rot != 0 {
 		sides := [4]string{p["north"], p["east"], p["south"], p["west"]}
 		if sides != [4]string{} {
-			for i, h := range Horizontal {
-				if v := sides[(i-rot+4)&3]; v != "" {
+			for i, h := range Horizontal() {
+				if v := sides[(i-rot+quarterTurns)&3]; v != "" {
 					out[h] = v
 				}
 			}
@@ -1014,17 +1023,29 @@ func RotateProps(p map[string]string, rot int) map[string]string {
 	return out
 }
 
-// positionSeed mixes the world seed and a block position into a seed for a
+// PositionSeed mixes the world seed and a block position into a seed for a
 // container's loot (the game rolls the table with it when it is opened).
 func PositionSeed(seed int64, x, y, z int32) uint32 {
-	h := uint64(seed) ^ uint64(uint32(x))*0x9E3779B97F4A7C15 ^ uint64(uint32(y))*0xC2B2AE3D27D4EB4F ^ uint64(uint32(z))*0x165667B19E3779F9
-	h ^= h >> 31
-	h *= 0xBF58476D1CE4E5B9
-	h ^= h >> 29
+	h := uint64(seed) ^ uint64(uint32(x))*seedMulX ^ uint64(uint32(y))*seedMulY ^ uint64(uint32(z))*seedMulZ
+	h ^= h >> seedShiftA
+	h *= seedMix
+	h ^= h >> seedShiftB
 	return uint32(h)
 }
 
-// loadLiquidHolders reads the blocks that can hold a liquid source
+// The PositionSeed hash: odd 64-bit multipliers per axis (the golden ratio
+// and xxHash64's primes), then a SplitMix64-style finish, so neighbouring
+// containers get unrelated seeds.
+const (
+	seedMulX   = 0x9E3779B97F4A7C15
+	seedMulY   = 0xC2B2AE3D27D4EB4F
+	seedMulZ   = 0x165667B19E3779F9
+	seedMix    = 0xBF58476D1CE4E5B9
+	seedShiftA = 31
+	seedShiftB = 29
+)
+
+// LoadLiquidHolders reads the blocks that can hold a liquid source
 // (canContainLiquidSource, exported from BDS 1.26.52 block states).
 func LoadLiquidHolders() (map[string]bool, error) {
 	raw, err := worldgen.Data.ReadFile("data/bds/liquid_holders.json")

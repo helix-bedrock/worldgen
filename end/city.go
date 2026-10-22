@@ -22,6 +22,18 @@ const (
 	citySalt       = 10387313
 	citySpacing    = 20
 	citySeparation = 11
+	// cityMinChunks2 is the squared chunk distance from the origin a city
+	// must lie beyond (64 chunks).
+	cityMinChunks2 = 64 * 64
+	// cityMinY is the lowest ground a city starts on.
+	cityMinY = 60
+	// The columns cityHeight reads: the chunk's middle and, per turn, the
+	// near or far edge on each axis.
+	cityProbeMid  = 7
+	cityProbeNear = 2
+	cityProbeFar  = 12
+	// chunkMiddle is the middle block of a chunk.
+	chunkMiddle = 8
 )
 
 // cityRandom is city region (rx, rz)'s placement random.
@@ -49,9 +61,10 @@ func cityRot(cx, cz int32) int {
 func (e *End) cityHeight(cx, cz int32, rot int) int32 {
 	var c Chunk
 	e.baseChunk(cx, cz, &c)
-	fz, fx := [4]int{12, 12, 2, 2}[rot], [4]int{12, 2, 2, 12}[rot]
+	fz := [4]int{cityProbeFar, cityProbeFar, cityProbeNear, cityProbeNear}[rot]
+	fx := [4]int{cityProbeFar, cityProbeNear, cityProbeNear, cityProbeFar}[rot]
 	low := int32(Height)
-	for _, p := range [4][2]int{{7, 7}, {7, fz}, {fx, 7}, {fx, fz}} {
+	for _, p := range [4][2]int{{cityProbeMid, cityProbeMid}, {cityProbeMid, fz}, {fx, cityProbeMid}, {fx, fz}} {
 		h := int32(0)
 		for y := Height - 1; y >= 0; y-- {
 			if c.Block(p[0], y, p[1]) != e.ids.air {
@@ -69,12 +82,12 @@ func (e *End) cityHeight(cx, cz int32, rot int) int32 {
 // chunks from the origin, on ground at least 60 high.
 func (e *End) isCityChunk(cx, cz int32) (rot int, y int32, ok bool) {
 	px, pz := e.cityPick(structure.Region(cx, citySpacing), structure.Region(cz, citySpacing))
-	if px != cx || pz != cz || int64(cx)*int64(cx)+int64(cz)*int64(cz) <= 4096 {
+	if px != cx || pz != cz || int64(cx)*int64(cx)+int64(cz)*int64(cz) <= cityMinChunks2 {
 		return 0, 0, false
 	}
 	rot = cityRot(cx, cz)
 	y = e.cityHeight(cx, cz, rot)
-	return rot, y, y >= 60
+	return rot, y, y >= cityMinY
 }
 
 // NearestCity finds the End city nearest to block (x, z), searching
@@ -87,14 +100,14 @@ func (e *End) NearestCity(x, z, maxRegions int32) (cx, cy, cz int32, found bool)
 	for rx := rx0 - maxRegions; rx <= rx0+maxRegions; rx++ {
 		for rz := rz0 - maxRegions; rz <= rz0+maxRegions; rz++ {
 			px, pz := e.cityPick(rx, rz)
-			dx, dz := int64(px*16+8-x), int64(pz*16+8-z)
+			dx, dz := int64(px*16+chunkMiddle-x), int64(pz*16+chunkMiddle-z)
 			cands = append(cands, cityCandidate{px, pz, dx*dx + dz*dz})
 		}
 	}
 	slices.SortFunc(cands, func(a, b cityCandidate) int { return cmp.Compare(a.d, b.d) })
 	for _, c := range cands {
 		if _, y, ok := e.isCityChunk(c.cx, c.cz); ok {
-			return c.cx*16 + 8, y, c.cz*16 + 8, true
+			return c.cx*16 + chunkMiddle, y, c.cz*16 + chunkMiddle, true
 		}
 	}
 	return 0, 0, 0, false

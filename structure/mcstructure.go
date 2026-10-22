@@ -10,7 +10,7 @@ import (
 	"github.com/helix-bedrock/worldgen/blocks"
 )
 
-// mcStructure is a Bedrock .mcstructure template (the format BDS's own
+// MCStructure is a Bedrock .mcstructure template (the format BDS's own
 // structure templates use, such as the sulfur springs), resolved to
 // registry states.
 type MCStructure struct {
@@ -21,9 +21,10 @@ type MCStructure struct {
 	Blocks []uint32
 }
 
+// VoidCell marks a template cell that places no block.
 const VoidCell = ^uint32(0)
 
-// cell returns the block at a template position, or voidCell.
+// Cell returns the block at a template position, or voidCell.
 func (t *MCStructure) Cell(x, y, z int32) uint32 {
 	if x < 0 || y < 0 || z < 0 || x >= t.Size[0] || y >= t.Size[1] || z >= t.Size[2] {
 		return VoidCell
@@ -31,7 +32,7 @@ func (t *MCStructure) Cell(x, y, z int32) uint32 {
 	return t.Blocks[z+t.Size[2]*(y+t.Size[1]*x)]
 }
 
-// loadMCStructure reads an .mcstructure file from the embedded data. Palette
+// LoadMCStructure reads an .mcstructure file from the embedded data. Palette
 // states the registry does not know become void.
 func (l *Lib) LoadMCStructure(path string) (*MCStructure, error) {
 	raw, err := worldgen.Data.ReadFile("data/vanilla/structures/" + path + ".mcstructure")
@@ -85,9 +86,9 @@ func (l *Lib) LoadMCStructure(path string) (*MCStructure, error) {
 }
 
 // mcJigsawFacing names a Bedrock jigsaw's facing_direction.
-var mcJigsawFacing = [6]string{"down", "up", "north", "south", "west", "east"}
+func mcJigsawFacing() [6]string { return [6]string{"down", "up", "north", "south", "west", "east"} }
 
-// loadMCTemplate reads an .mcstructure file as a jigsaw template, with its
+// LoadMCTemplate reads an .mcstructure file as a jigsaw template, with its
 // block names and its jigsaws' block entity data, for pool elements BDS
 // keeps in that format (the bastion's mobs). The template's entities are
 // not read: worldgen places no mobs.
@@ -127,8 +128,8 @@ func LoadMCTemplate(path string) (*Template, error) {
 			// VERIFY: the rotation state read as the top, north first;
 			// the bastion's mob jigsaws are rollable, so it is unused.
 			f, r := NBTInt(props["facing_direction"]), NBTInt(props["rotation"])
-			if f >= 0 && f < 6 {
-				ts.Props["orientation"] = mcJigsawFacing[f] + "_" + Horizontal[r&3]
+			if facings := mcJigsawFacing(); f >= 0 && f < int32(len(facings)) {
+				ts.Props["orientation"] = facings[f] + "_" + Horizontal()[r&3]
 			}
 		}
 		t.Palette = append(t.Palette, ts)

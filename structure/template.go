@@ -122,7 +122,7 @@ func LoadTemplate(r io.Reader) (*Template, error) {
 	return t, nil
 }
 
-// intList reads an NBT list of n ints.
+// IntList reads an NBT list of n ints.
 func IntList(v any, n int) ([]int32, bool) {
 	l, ok := v.([]any)
 	if !ok || len(l) != n {
