@@ -260,15 +260,17 @@ func (b *builder) lowSlice(w Param) {
 	}
 }
 
-func (b *builder) valleys(w Param) {
-	riverOrShore := func(river string) string {
-		if w.Max < 0 {
-			return "stone_beach"
-		}
-		return river
+// riverOrShore is river, or stone beach where the weirdness is all negative.
+func riverOrShore(w Param, river string) string {
+	if w.Max < 0 {
+		return "stone_beach"
 	}
-	b.surface(frozen, full, coastCont, join(erosions[0], erosions[1]), w, riverOrShore("frozen_river"))
-	b.surface(unfrozen, full, coastCont, join(erosions[0], erosions[1]), w, riverOrShore("river"))
+	return river
+}
+
+func (b *builder) valleys(w Param) {
+	b.surface(frozen, full, coastCont, join(erosions[0], erosions[1]), w, riverOrShore(w, "frozen_river"))
+	b.surface(unfrozen, full, coastCont, join(erosions[0], erosions[1]), w, riverOrShore(w, "river"))
 	b.surface(frozen, full, nearCont, join(erosions[0], erosions[1]), w, "frozen_river")
 	b.surface(unfrozen, full, nearCont, join(erosions[0], erosions[1]), w, "river")
 	b.surface(frozen, full, join(coastCont, farCont), join(erosions[2], erosions[5]), w, "frozen_river")

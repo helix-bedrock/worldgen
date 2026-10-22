@@ -87,19 +87,21 @@ func centerSum(n *node) int64 {
 	return s
 }
 
+// sortKey is the centre of n on axis a, made absolute when absolute is set.
+func sortKey(n *node, a int, absolute bool) int64 {
+	c := center(n.space[a])
+	if absolute {
+		return abs64(c)
+	}
+	return c
+}
+
 // sortNodes sorts by the centre of axis, then the following axes in turn.
 func sortNodes(nodes []*node, axis int, absolute bool) {
-	key := func(n *node, a int) int64 {
-		c := center(n.space[a])
-		if absolute {
-			return abs64(c)
-		}
-		return c
-	}
 	sort.SliceStable(nodes, func(i, j int) bool {
 		for k := range 7 {
 			a := (axis + k) % 7
-			ki, kj := key(nodes[i], a), key(nodes[j], a)
+			ki, kj := sortKey(nodes[i], a, absolute), sortKey(nodes[j], a, absolute)
 			if ki != kj {
 				return ki < kj
 			}

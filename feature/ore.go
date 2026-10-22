@@ -11,12 +11,18 @@ import (
 
 // sinTable is the 65536-entry sine table BDS uses for angles. It is filled
 // once and only read.
-var sinTable = func() (t [65536]float32) {
+var sinTable = buildSinTable()
+
+// sinTableSize is the number of entries in BDS's sine table.
+const sinTableSize = 65536
+
+// buildSinTable fills the sine table, one entry per 1/65536 of a turn.
+func buildSinTable() (t [sinTableSize]float32) {
 	for i := range t {
-		t[i] = float32(math.Sin(float64(i) * math.Pi * 2 / 65536))
+		t[i] = float32(math.Sin(float64(i) * math.Pi * 2 / sinTableSize))
 	}
 	return
-}()
+}
 
 // SinTable returns BDS's sine table, indexed by angle*65536/(2*pi) wrapped
 // to 16 bits. Callers must not modify it.

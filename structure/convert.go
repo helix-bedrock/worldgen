@@ -255,32 +255,6 @@ func (l *Lib) ConvertJavaState(st TemplateState) (uint32, bool, bool) {
 	for k, v := range ds.Props {
 		props[k] = v
 	}
-	set := func(key string, v any) {
-		cur, ok := props[key]
-		if !ok {
-			return
-		}
-		switch cur.(type) {
-		case int32:
-			switch x := v.(type) {
-			case int32:
-				props[key] = x
-			case bool:
-				props[key] = b2i(x)
-			}
-		case uint8:
-			switch x := v.(type) {
-			case bool:
-				props[key] = uint8(b2i(x))
-			case int32:
-				props[key] = uint8(x)
-			}
-		case string:
-			if s, ok := v.(string); ok {
-				props[key] = s
-			}
-		}
-	}
 	water := false
 	for k, v := range st.Props {
 		switch k {
@@ -290,139 +264,168 @@ func (l *Lib) ConvertJavaState(st TemplateState) (uint32, bool, bool) {
 			if strings.HasSuffix(target, "_door") && !strings.Contains(target, "trapdoor") {
 				// Doors: the legacy direction 0 was Java east and became
 				// "south" (block upgrade schema 1.21.60), a quarter turn.
-				set("minecraft:cardinal_direction", RotateFacing(v, 1))
+				setProp(props, "minecraft:cardinal_direction", RotateFacing(v, 1))
 			} else {
-				set("minecraft:cardinal_direction", v)
+				setProp(props, "minecraft:cardinal_direction", v)
 			}
-			set("minecraft:facing_direction", v)
+			setProp(props, "minecraft:facing_direction", v)
 			if f, ok := javaFacing[v]; ok {
 				// A sideways end rod names the side it points away from.
 				if target == "end_rod" && f >= 2 {
 					f = javaFacing[Opposite(v)]
 				}
-				set("facing_direction", f)
+				setProp(props, "facing_direction", f)
 			}
 			// A wall torch's Java facing points away from its wall; Bedrock
 			// names the side it hangs on.
-			set("torch_facing_direction", Opposite(v))
+			setProp(props, "torch_facing_direction", Opposite(v))
 			switch {
 			case strings.HasSuffix(target, "_door"):
-				set("direction", dirESWN[v])
+				setProp(props, "direction", dirESWN[v])
 			case strings.HasSuffix(target, "stairs"):
-				set("weirdo_direction", dirEWSN[v])
+				setProp(props, "weirdo_direction", dirEWSN[v])
 			case strings.Contains(target, "trapdoor"):
-				set("direction", dirEWSN[v])
+				setProp(props, "direction", dirEWSN[v])
 			default:
-				set("direction", dirSWNE[v])
+				setProp(props, "direction", dirSWNE[v])
 			}
 		case "half":
 			top := v == "top" || v == "upper"
-			set("upside_down_bit", top)
-			set("upper_block_bit", top)
+			setProp(props, "upside_down_bit", top)
+			setProp(props, "upper_block_bit", top)
 			if v == "top" || v == "bottom" {
-				set("minecraft:vertical_half", v)
+				setProp(props, "minecraft:vertical_half", v)
 			}
 		case "type":
 			if v == "top" || v == "bottom" {
-				set("minecraft:vertical_half", v)
+				setProp(props, "minecraft:vertical_half", v)
 			}
 		case "north", "east", "south", "west":
 			// Panes, bars and fences (1.26: minecraft:connection_*); walls
 			// (low/tall -> short/tall).
-			set("minecraft:connection_"+k, v == "true")
+			setProp(props, "minecraft:connection_"+k, v == "true")
 			switch v {
 			case "low":
-				set("wall_connection_type_"+k, "short")
+				setProp(props, "wall_connection_type_"+k, "short")
 			case "tall":
-				set("wall_connection_type_"+k, "tall")
+				setProp(props, "wall_connection_type_"+k, "tall")
 			case "none":
-				set("wall_connection_type_"+k, "none")
+				setProp(props, "wall_connection_type_"+k, "none")
 			}
 		case "persistent":
-			set("persistent_bit", v == "true")
+			setProp(props, "persistent_bit", v == "true")
 		case "attachment":
 			// Bells.
 			switch v {
 			case "floor":
-				set("attachment", "standing")
+				setProp(props, "attachment", "standing")
 			case "ceiling":
-				set("attachment", "hanging")
+				setProp(props, "attachment", "hanging")
 			case "single_wall":
-				set("attachment", "side")
+				setProp(props, "attachment", "side")
 			case "double_wall":
-				set("attachment", "multiple")
+				setProp(props, "attachment", "multiple")
 			}
 		case "axis":
-			set("pillar_axis", v)
+			setProp(props, "pillar_axis", v)
 		case "part":
-			set("head_piece_bit", v == "head")
+			setProp(props, "head_piece_bit", v == "head")
 		case "open":
-			set("open_bit", v == "true")
+			setProp(props, "open_bit", v == "true")
 		case "hinge":
-			set("door_hinge_bit", v == "right")
+			setProp(props, "door_hinge_bit", v == "right")
 		case "occupied":
-			set("occupied_bit", v == "true")
+			setProp(props, "occupied_bit", v == "true")
 		case "powered":
-			set("powered_bit", v == "true")
+			setProp(props, "powered_bit", v == "true")
 		case "lit":
-			set("lit", v == "true")
+			setProp(props, "lit", v == "true")
 		case "hanging":
 			// Lanterns and chains hung from a ceiling.
-			set("hanging", v == "true")
+			setProp(props, "hanging", v == "true")
 		case "attached":
-			set("attached_bit", v == "true")
+			setProp(props, "attached_bit", v == "true")
 		case "has_bottle_0":
-			set("brewing_stand_slot_a_bit", v == "true")
+			setProp(props, "brewing_stand_slot_a_bit", v == "true")
 		case "has_bottle_1":
-			set("brewing_stand_slot_b_bit", v == "true")
+			setProp(props, "brewing_stand_slot_b_bit", v == "true")
 		case "has_bottle_2":
-			set("brewing_stand_slot_c_bit", v == "true")
+			setProp(props, "brewing_stand_slot_c_bit", v == "true")
 		case "age", "level", "layers", "rotation", "pickles", "bites", "moisture", "candles":
 			if n64, err := strconv.ParseInt(v, 10, 32); err == nil {
 				n := int32(n64)
 				switch k {
 				case "age":
-					set("age", n)
-					set("growth", n)
+					setProp(props, "age", n)
+					setProp(props, "growth", n)
 				case "level":
-					set("fill_level", n)
+					setProp(props, "fill_level", n)
 				case "layers":
-					set("height", n-1)
+					setProp(props, "height", n-1)
 				case "rotation":
-					set("ground_sign_direction", n)
+					setProp(props, "ground_sign_direction", n)
 				case "pickles":
-					set("cluster_count", n-1)
+					setProp(props, "cluster_count", n-1)
 				case "bites":
-					set("bite_counter", n)
+					setProp(props, "bite_counter", n)
 				case "moisture":
-					set("moisturized_amount", n)
+					setProp(props, "moisturized_amount", n)
 				case "candles":
-					set("candles", n-1)
+					setProp(props, "candles", n-1)
 				}
 			}
 		}
 	}
 	if f, ok := st.Props["facing"]; !ok || f == "up" {
-		set("torch_facing_direction", "top")
+		setProp(props, "torch_facing_direction", "top")
 	}
 	// Floor and ceiling buttons point up and down; facing only turns them.
 	if strings.HasSuffix(target, "button") {
 		switch st.Props["face"] {
 		case "floor":
-			set("facing_direction", int32(1))
+			setProp(props, "facing_direction", int32(1))
 		case "ceiling":
-			set("facing_direction", int32(0))
+			setProp(props, "facing_direction", int32(0))
 		}
 	}
 	if target == "lever" {
-		set("lever_direction", leverDirection(st.Props))
-		set("open_bit", st.Props["powered"] == "true")
+		setProp(props, "lever_direction", leverDirection(st.Props))
+		setProp(props, "open_bit", st.Props["powered"] == "true")
 	}
 	id, ok := l.reg.Lookup(full, props)
 	if !ok {
 		id = def
 	}
 	return id, water, true
+}
+
+// setProp sets key in props to v, converted to the type key already has;
+// a key the block does not have is left out.
+func setProp(props map[string]any, key string, v any) {
+	cur, ok := props[key]
+	if !ok {
+		return
+	}
+	switch cur.(type) {
+	case int32:
+		switch x := v.(type) {
+		case int32:
+			props[key] = x
+		case bool:
+			props[key] = b2i(x)
+		}
+	case uint8:
+		switch x := v.(type) {
+		case bool:
+			props[key] = uint8(b2i(x))
+		case int32:
+			props[key] = uint8(x)
+		}
+	case string:
+		if s, ok := v.(string); ok {
+			props[key] = s
+		}
+	}
 }
 
 func b2i(b bool) int32 {

@@ -282,162 +282,216 @@ type ChestSpot struct {
 // directions and a roof, not next to a door. When the house has a bed the
 // spot must be beside the bed. The chest faces open air.
 func (jt *JigsawTemplate) HouseChestSpot() ChestSpot {
-	jt.chestOnce.Do(func() {
-		t := jt.Template
-		names := map[[3]int32]string{}
-		var beds [][3]int32
-		for _, b := range t.Blocks {
-			n := t.Palette[b.State].Name
-			if strings.Contains(n, "chest") {
+	jt.chestOnce.Do(jt.findChestSpot)
+	return jt.chest
+}
+
+// findChestSpot fills jt.chest; see HouseChestSpot.
+func (jt *JigsawTemplate) findChestSpot() {
+	t := jt.Template
+	h := houseScan{names: map[[3]int32]string{}, size: t.Size}
+	var beds [][3]int32
+	for _, b := range t.Blocks {
+		n := t.Palette[b.State].Name
+		if strings.Contains(n, "chest") {
+			return
+		}
+		h.names[b.Pos] = n
+		if strings.HasSuffix(n, "_bed") {
+			beds = append(beds, b.Pos)
+		}
+	}
+	dirs := chestDirs()
+	// Beside a bed first; then, or in a house without a bed, any floor
+	// spot inside, those against a wall before the others.
+	var besideBed, floor [][3]int32
+	for _, b := range beds {
+		for _, d := range dirs {
+			besideBed = append(besideBed, [3]int32{b[0] + d.d[0], b[1], b[2] + d.d[1]})
+		}
+	}
+	for y := int32(1); y < t.Size[1]-1; y++ {
+		for z := int32(1); z < t.Size[2]-1; z++ {
+			for x := int32(1); x < t.Size[0]-1; x++ {
+				floor = append(floor, [3]int32{x, y, z})
+			}
+		}
+	}
+	passes := [...]chestPass{{besideBed, false, false}, {floor, true, false}, {floor, false, false}, {floor, false, true}}
+	for _, pass := range passes {
+		for _, p := range pass.cands {
+			fits := h.ok(p)
+			if pass.nearDoor {
+				fits = h.okNearDoor(p)
+			}
+			if fits && (!pass.wall || h.againstWall(p)) {
+				jt.chest = ChestSpot{Pos: p, Facing: h.face(p), OK: true}
 				return
 			}
-			names[b.Pos] = n
-			if strings.HasSuffix(n, "_bed") {
-				beds = append(beds, b.Pos)
+		}
+	}
+}
+
+// chestDir is a horizontal step and the chest facing that looks along it.
+type chestDir struct {
+	d      [2]int32
+	facing string
+}
+
+// chestDirs returns the four horizontal directions in the order chests try
+// them.
+func chestDirs() [4]chestDir {
+	return [4]chestDir{{[2]int32{0, -1}, "north"}, {[2]int32{0, 1}, "south"}, {[2]int32{-1, 0}, "west"}, {[2]int32{1, 0}, "east"}}
+}
+
+// wallDirs returns the four horizontal steps used to look for walls.
+func wallDirs() [4][2]int32 {
+	return [4][2]int32{{1, 0}, {-1, 0}, {0, 1}, {0, -1}}
+}
+
+// notSolidParts returns the name parts of blocks a chest may not stand on
+// or against: glass, doors, beds, plants, crops and the like.
+func notSolidParts() [23]string {
+	return [23]string{"door", "pane", "glass", "torch", "bed", "carpet", "flower", "wheat", "carrots", "potatoes",
+		"beetroots", "short_grass", "tall_grass", "fern", "sapling", "fence", "wall", "stairs", "slab", "trapdoor", "lantern", "bell", "path"}
+}
+
+// chestPass is one round of the chest search: the candidate spots, whether
+// the spot must be against a wall, and whether it may be diagonal to a door.
+type chestPass struct {
+	cands    [][3]int32
+	wall     bool
+	nearDoor bool
+}
+
+// houseScan answers block questions about a house template while looking
+// for a chest spot.
+type houseScan struct {
+	names map[[3]int32]string
+	size  [3]int32
+}
+
+// name is the block at p, air outside the template's blocks.
+func (h *houseScan) name(p [3]int32) string {
+	if n, ok := h.names[p]; ok {
+		return n
+	}
+	return "minecraft:air"
+}
+
+// air reports whether p is air, cave air or structure void.
+func (h *houseScan) air(p [3]int32) bool {
+	n := h.name(p)
+	return n == "minecraft:air" || n == "minecraft:structure_void" || n == "minecraft:cave_air"
+}
+
+// solid is a full block a chest may stand on or against: no glass,
+// doors, beds, plants, crops or structure markers.
+func (h *houseScan) solid(p [3]int32) bool {
+	n := h.name(p)
+	if h.air(p) || n == "minecraft:jigsaw" || n == "minecraft:structure_block" || n == "minecraft:farmland" {
+		return false
+	}
+	for _, s := range notSolidParts() {
+		if strings.Contains(n, s) {
+			return false
+		}
+	}
+	return true
+}
+
+// inside reports whether p has a wall in all four directions and a roof.
+func (h *houseScan) inside(p [3]int32) bool {
+	for _, d := range wallDirs() {
+		q, hit := p, false
+		for {
+			q = [3]int32{q[0] + d[0], q[1], q[2] + d[1]}
+			if q[0] < 0 || q[2] < 0 || q[0] >= h.size[0] || q[2] >= h.size[2] {
+				break
+			}
+			if h.solid(q) || strings.Contains(h.name(q), "glass") || strings.Contains(h.name(q), "door") {
+				hit = true
+				break
+			}
+			if !h.air(q) {
+				// Crops, fences and the like are not walls.
+				continue
 			}
 		}
-		name := func(p [3]int32) string {
-			if n, ok := names[p]; ok {
-				return n
-			}
-			return "minecraft:air"
+		if !hit {
+			return false
 		}
-		air := func(p [3]int32) bool {
-			n := name(p)
-			return n == "minecraft:air" || n == "minecraft:structure_void" || n == "minecraft:cave_air"
-		}
-		// solid is a full block a chest may stand on or against: no glass,
-		// doors, beds, plants, crops or structure markers.
-		solid := func(p [3]int32) bool {
-			n := name(p)
-			if air(p) || n == "minecraft:jigsaw" || n == "minecraft:structure_block" || n == "minecraft:farmland" {
-				return false
-			}
-			for _, s := range []string{"door", "pane", "glass", "torch", "bed", "carpet", "flower", "wheat", "carrots", "potatoes",
-				"beetroots", "short_grass", "tall_grass", "fern", "sapling", "fence", "wall", "stairs", "slab", "trapdoor", "lantern", "bell", "path"} {
-				if strings.Contains(n, s) {
-					return false
-				}
-			}
+	}
+	for y := p[1] + 1; y < h.size[1]; y++ {
+		if !h.air([3]int32{p[0], y, p[2]}) {
 			return true
 		}
-		inside := func(p [3]int32) bool {
-			for _, d := range [4][2]int32{{1, 0}, {-1, 0}, {0, 1}, {0, -1}} {
-				q, hit := p, false
-				for {
-					q = [3]int32{q[0] + d[0], q[1], q[2] + d[1]}
-					if q[0] < 0 || q[2] < 0 || q[0] >= t.Size[0] || q[2] >= t.Size[2] {
-						break
-					}
-					if solid(q) || strings.Contains(name(q), "glass") || strings.Contains(name(q), "door") {
-						hit = true
-						break
-					}
-					if !air(q) {
-						// Crops, fences and the like are not walls.
-						continue
-					}
-				}
-				if !hit {
-					return false
-				}
-			}
-			for y := p[1] + 1; y < t.Size[1]; y++ {
-				if !air([3]int32{p[0], y, p[2]}) {
-					return true
-				}
-			}
-			return false
-		}
-		doorNear := func(p [3]int32) bool {
-			for dx := int32(-1); dx <= 1; dx++ {
-				for dz := int32(-1); dz <= 1; dz++ {
-					if strings.Contains(name([3]int32{p[0] + dx, p[1], p[2] + dz}), "door") {
-						return true
-					}
-				}
-			}
-			return false
-		}
-		dirs := []struct {
-			d      [2]int32
-			facing string
-		}{{[2]int32{0, -1}, "north"}, {[2]int32{0, 1}, "south"}, {[2]int32{-1, 0}, "west"}, {[2]int32{1, 0}, "east"}}
-		ok := func(p [3]int32) bool {
-			return air(p) && air([3]int32{p[0], p[1] + 1, p[2]}) && solid([3]int32{p[0], p[1] - 1, p[2]}) &&
-				!doorNear(p) && inside(p)
-		}
-		// face picks the side with open air, preferring the one away from
-		// a wall or the bed.
-		face := func(p [3]int32) string {
-			for _, d := range dirs {
-				back := [3]int32{p[0] - d.d[0], p[1], p[2] - d.d[1]}
-				if air([3]int32{p[0] + d.d[0], p[1], p[2] + d.d[1]}) && !air(back) {
-					return d.facing
-				}
-			}
-			for _, d := range dirs {
-				if air([3]int32{p[0] + d.d[0], p[1], p[2] + d.d[1]}) {
-					return d.facing
-				}
-			}
-			return "north"
-		}
-		// Beside a bed first; then, or in a house without a bed, any floor
-		// spot inside, those against a wall before the others.
-		var besideBed, floor [][3]int32
-		for _, b := range beds {
-			for _, d := range dirs {
-				besideBed = append(besideBed, [3]int32{b[0] + d.d[0], b[1], b[2] + d.d[1]})
+	}
+	return false
+}
+
+// doorNear reports whether a door is in the 3x3 ring around p.
+func (h *houseScan) doorNear(p [3]int32) bool {
+	for dx := int32(-1); dx <= 1; dx++ {
+		for dz := int32(-1); dz <= 1; dz++ {
+			if strings.Contains(h.name([3]int32{p[0] + dx, p[1], p[2] + dz}), "door") {
+				return true
 			}
 		}
-		for y := int32(1); y < t.Size[1]-1; y++ {
-			for z := int32(1); z < t.Size[2]-1; z++ {
-				for x := int32(1); x < t.Size[0]-1; x++ {
-					floor = append(floor, [3]int32{x, y, z})
-				}
-			}
+	}
+	return false
+}
+
+// ok reports whether a chest fits at p with no door around it.
+func (h *houseScan) ok(p [3]int32) bool {
+	return h.air(p) && h.air([3]int32{p[0], p[1] + 1, p[2]}) && h.solid([3]int32{p[0], p[1] - 1, p[2]}) &&
+		!h.doorNear(p) && h.inside(p)
+}
+
+// face picks the side with open air, preferring the one away from
+// a wall or the bed.
+func (h *houseScan) face(p [3]int32) string {
+	dirs := chestDirs()
+	for _, d := range dirs {
+		back := [3]int32{p[0] - d.d[0], p[1], p[2] - d.d[1]}
+		if h.air([3]int32{p[0] + d.d[0], p[1], p[2] + d.d[1]}) && !h.air(back) {
+			return d.facing
 		}
-		againstWall := func(p [3]int32) bool {
-			for _, d := range dirs {
-				if solid([3]int32{p[0] + d.d[0], p[1], p[2] + d.d[1]}) {
-					return true
-				}
-			}
-			return false
+	}
+	for _, d := range dirs {
+		if h.air([3]int32{p[0] + d.d[0], p[1], p[2] + d.d[1]}) {
+			return d.facing
 		}
-		// Small houses may only have room diagonal to a door; a spot right
-		// beside a door is never used, so doorways stay clear.
-		beside := func(p [3]int32) bool {
-			for _, d := range dirs {
-				if strings.Contains(name([3]int32{p[0] + d.d[0], p[1], p[2] + d.d[1]}), "door") {
-					return true
-				}
-			}
-			return false
+	}
+	return "north"
+}
+
+// againstWall reports whether p has a solid block beside it.
+func (h *houseScan) againstWall(p [3]int32) bool {
+	for _, d := range chestDirs() {
+		if h.solid([3]int32{p[0] + d.d[0], p[1], p[2] + d.d[1]}) {
+			return true
 		}
-		okNearDoor := func(p [3]int32) bool {
-			return air(p) && air([3]int32{p[0], p[1] + 1, p[2]}) && solid([3]int32{p[0], p[1] - 1, p[2]}) &&
-				!beside(p) && inside(p)
+	}
+	return false
+}
+
+// beside reports whether p is right beside a door. Small houses may only
+// have room diagonal to a door; a spot right beside a door is never used,
+// so doorways stay clear.
+func (h *houseScan) beside(p [3]int32) bool {
+	for _, d := range chestDirs() {
+		if strings.Contains(h.name([3]int32{p[0] + d.d[0], p[1], p[2] + d.d[1]}), "door") {
+			return true
 		}
-		for _, pass := range []struct {
-			cands    []([3]int32)
-			wall     bool
-			nearDoor bool
-		}{{besideBed, false, false}, {floor, true, false}, {floor, false, false}, {floor, false, true}} {
-			for _, p := range pass.cands {
-				fits := ok(p)
-				if pass.nearDoor {
-					fits = okNearDoor(p)
-				}
-				if fits && (!pass.wall || againstWall(p)) {
-					jt.chest = ChestSpot{Pos: p, Facing: face(p), OK: true}
-					return
-				}
-			}
-		}
-	})
-	return jt.chest
+	}
+	return false
+}
+
+// okNearDoor is ok, but allows a door diagonal to p.
+func (h *houseScan) okNearDoor(p [3]int32) bool {
+	return h.air(p) && h.air([3]int32{p[0], p[1] + 1, p[2]}) && h.solid([3]int32{p[0], p[1] - 1, p[2]}) &&
+		!h.beside(p) && h.inside(p)
 }
 
 type ConvertedState struct {
@@ -460,6 +514,62 @@ type JigsawBlock struct {
 	FinalState   string
 }
 
+// jigsawDoc is a jigsaw data file in data/bds.
+type jigsawDoc struct {
+	Pools      []jigsawDocPool
+	Elements   []jigsawDocElement
+	BlockRules map[string][]jigsawDocRule `json:"block_rules"`
+	BlockSets  map[string][]string        `json:"block_sets"`
+}
+
+// jigsawDocPool is a template pool in a jigsaw data file.
+type jigsawDocPool struct {
+	Name, Fallback string
+	Elements       []jigsawDocPoolEntry
+}
+
+// jigsawDocPoolEntry is one weighted element of a pool.
+type jigsawDocPoolEntry struct {
+	Element string
+	Weight  int32
+}
+
+// jigsawDocElement is a pool element in a jigsaw data file.
+type jigsawDocElement struct {
+	ID         string `json:"id"`
+	Template   string
+	Feature    string
+	Projection string
+	BlockRules string `json:"block_rules"`
+}
+
+// jigsawDocRule is one block rule in a jigsaw data file.
+type jigsawDocRule struct {
+	Input    jigsawDocRuleInput
+	Location jigsawDocRuleLocation
+	Position *jigsawDocRulePosition
+	Output   string
+}
+
+// jigsawDocRuleInput is the input test of a block rule.
+type jigsawDocRuleInput struct {
+	Type, Block, Blocks string
+	Probability         float32
+}
+
+// jigsawDocRuleLocation is the location test of a block rule.
+type jigsawDocRuleLocation struct{ Type, Block, Blocks string }
+
+// jigsawDocRulePosition is the position test of a block rule.
+type jigsawDocRulePosition struct {
+	Type      string
+	MinChance float32 `json:"min_chance"`
+	MaxChance float32 `json:"max_chance"`
+	MinDist   int32   `json:"min_dist"`
+	MaxDist   int32   `json:"max_dist"`
+	Axis      string
+}
+
 // loadJigsawData loads a jigsaw data file from data/bds (villages.json,
 // ancient_city.json). Rule outputs are looked up in reg.
 func LoadJigsawData(file string, reg BlockLookup) (*JigsawData, error) {
@@ -467,39 +577,7 @@ func LoadJigsawData(file string, reg BlockLookup) (*JigsawData, error) {
 	if err != nil {
 		return nil, fmt.Errorf("worldgen: read %s: %w", file, err)
 	}
-	var doc struct {
-		Pools []struct {
-			Name, Fallback string
-			Elements       []struct {
-				Element string
-				Weight  int32
-			}
-		}
-		Elements []struct {
-			ID         string `json:"id"`
-			Template   string
-			Feature    string
-			Projection string
-			BlockRules string `json:"block_rules"`
-		}
-		BlockRules map[string][]struct {
-			Input struct {
-				Type, Block, Blocks string
-				Probability         float32
-			}
-			Location struct{ Type, Block, Blocks string }
-			Position *struct {
-				Type      string
-				MinChance float32 `json:"min_chance"`
-				MaxChance float32 `json:"max_chance"`
-				MinDist   int32   `json:"min_dist"`
-				MaxDist   int32   `json:"max_dist"`
-				Axis      string
-			}
-			Output string
-		} `json:"block_rules"`
-		BlockSets map[string][]string `json:"block_sets"`
-	}
+	var doc jigsawDoc
 	if err := json.Unmarshal(raw, &doc); err != nil {
 		return nil, fmt.Errorf("worldgen: parse %s: %w", file, err)
 	}

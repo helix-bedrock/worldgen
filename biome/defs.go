@@ -83,15 +83,18 @@ type Block struct {
 	States map[string]any
 }
 
+// rawBlock is the object form of a Block.
+type rawBlock struct {
+	Name   string         `json:"name"`
+	States map[string]any `json:"states"`
+}
+
 // UnmarshalJSON reads either form.
 func (b *Block) UnmarshalJSON(data []byte) error {
 	if err := json.Unmarshal(data, &b.Name); err == nil {
 		return nil
 	}
-	var v struct {
-		Name   string         `json:"name"`
-		States map[string]any `json:"states"`
-	}
+	var v rawBlock
 	if err := json.Unmarshal(data, &v); err != nil {
 		return fmt.Errorf("biome: block: %w", err)
 	}

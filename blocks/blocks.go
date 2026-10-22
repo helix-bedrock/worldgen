@@ -35,6 +35,12 @@ type Registry struct {
 	translucency []float32
 }
 
+// rawBlockType is one block type entry in the block types JSON.
+type rawBlockType struct {
+	Default uint32   `json:"defaultBlockStateHash"`
+	Tags    []string `json:"tags"`
+}
+
 // Load reads the gzipped big-endian NBT palette and the block types JSON.
 func Load(palette io.Reader, types io.Reader) (*Registry, error) {
 	gz, err := gzip.NewReader(palette)
@@ -72,10 +78,7 @@ func Load(palette io.Reader, types io.Reader) (*Registry, error) {
 		reg.byHash[Hash(s)] = idx
 	}
 
-	var typ map[string]struct {
-		Default uint32   `json:"defaultBlockStateHash"`
-		Tags    []string `json:"tags"`
-	}
+	var typ map[string]rawBlockType
 	if err := json.NewDecoder(types).Decode(&typ); err != nil {
 		return nil, fmt.Errorf("blocks: read block types: %w", err)
 	}

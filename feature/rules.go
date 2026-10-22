@@ -22,6 +22,16 @@ func RuleSeed(pop, hash uint32) uint32 {
 	return pop ^ ((pop >> 2) + (pop << 6) + hash + 0x9E3779B9)
 }
 
+// rawFilter is the object form of a biome filter.
+type rawFilter struct {
+	AnyOf    []json.RawMessage `json:"any_of"`
+	AllOf    []json.RawMessage `json:"all_of"`
+	NoneOf   []json.RawMessage `json:"none_of"`
+	Test     string            `json:"test"`
+	Operator string            `json:"operator"`
+	Value    string            `json:"value"`
+}
+
 // FilterAccepts evaluates a biome filter against a biome's tags. A list is
 // all_of; objects are any_of, all_of, none_of or a has_biome_tag test.
 func FilterAccepts(raw json.RawMessage, tags []string) (bool, error) {
@@ -38,14 +48,7 @@ func FilterAccepts(raw json.RawMessage, tags []string) (bool, error) {
 		}
 		return true, nil
 	}
-	var obj struct {
-		AnyOf    []json.RawMessage `json:"any_of"`
-		AllOf    []json.RawMessage `json:"all_of"`
-		NoneOf   []json.RawMessage `json:"none_of"`
-		Test     string            `json:"test"`
-		Operator string            `json:"operator"`
-		Value    string            `json:"value"`
-	}
+	var obj rawFilter
 	if err := json.Unmarshal(raw, &obj); err != nil {
 		return false, fmt.Errorf("biome filter %s: %w", raw, err)
 	}
