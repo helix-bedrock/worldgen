@@ -76,6 +76,7 @@ type End struct {
 	gate   *structure.Gate
 	forced map[[2]int32][2]int32
 	loot   map[string]string
+	swaps  map[uint32]uint32
 }
 
 // New builds the noises for a seed. reg must contain the vanilla blocks the
@@ -120,6 +121,7 @@ func New(seed int64, reg *blocks.Registry, biomeIDs map[string]uint32, opts ...O
 	if e.st, err = structure.NewLib(seed, reg); err != nil {
 		return nil, err
 	}
+	e.st.SetPacks(o.cfg.packs, o.cfg.Structures.templates)
 	if err := e.applyConfig(o.cfg); err != nil {
 		return nil, err
 	}

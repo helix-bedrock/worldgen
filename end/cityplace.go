@@ -37,6 +37,17 @@ func (e *End) cityAt(cx, cz int32) *city {
 // VERIFY: the chest loot seeds draw from the chunk's population random,
 // shared by every piece in the chunk, as in the woodland mansion.
 func (e *End) placeCities(cx, cz int32, c *Chunk) {
+	if e.swaps == nil {
+		e.placeCityPieces(cx, cz, c)
+		return
+	}
+	before := c.Blocks
+	e.placeCityPieces(cx, cz, c)
+	structure.SwapChanged(c.Blocks[:], before[:], e.swaps)
+}
+
+// placeCityPieces is placeCities without the block swaps.
+func (e *End) placeCityPieces(cx, cz int32, c *Chunk) {
 	box := structure.NewBox(cx*16, 0, cz*16, cx*16+15, Height-1, cz*16+15)
 	var r *rand.MT
 	for rx := structure.Region(cx-cityReach, citySpacing); rx <= structure.Region(cx+cityReach, citySpacing); rx++ {

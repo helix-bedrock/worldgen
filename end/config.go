@@ -2,6 +2,7 @@ package end
 
 import (
 	"fmt"
+	"io/fs"
 	"log/slog"
 	"maps"
 
@@ -27,10 +28,18 @@ type Config struct {
 	Skip Steps
 	// Logger receives the panics of structure filters. Nil drops them.
 	Logger *slog.Logger
+
+	packs     []fs.FS
+	packPaths []string
 }
 
 // Vanilla returns a Config that changes nothing.
 func Vanilla() *Config { return &Config{} }
+
+// AddPack adds a behaviour pack whose structures folder replaces vanilla
+// End city templates of the same path (structures/endcity/<piece>.nbt or
+// .mcstructure) and holds templates for ReplaceTemplate. Later packs win.
+func (c *Config) AddPack(fsys fs.FS) { c.packs = append(c.packs, fsys) }
 
 // Steps are End generation steps that can be turned off. The zero value
 // runs every step.
@@ -58,10 +67,27 @@ func (f StructureFilter) forGate(_ string, cx, cz int32) bool { return f(cx, cz)
 
 // StructureConfig holds the End city changes.
 type StructureConfig struct {
-	excludes []structure.Area
-	filters  []StructureFilter
-	forced   [][2]int32
-	loot     map[string]string
+	excludes  []structure.Area
+	filters   []StructureFilter
+	forced    [][2]int32
+	loot      map[string]string
+	templates map[string]string
+	swaps     [][2]string
+}
+
+// ReplaceTemplate builds instead wherever a city uses template (as
+// "endcity/fat_tower_top").
+func (s *StructureConfig) ReplaceTemplate(template, instead string) {
+	if s.templates == nil {
+		s.templates = map[string]string{}
+	}
+	s.templates[template] = instead
+}
+
+// ReplaceBlock swaps the block from for to in the blocks cities place,
+// keeping the properties both share.
+func (s *StructureConfig) ReplaceBlock(from, to string) {
+	s.swaps = append(s.swaps, [2]string{from, to})
 }
 
 // Exclude stops End cities starting in the area.
@@ -117,6 +143,17 @@ func (e *End) applyConfig(cfg *Config) error {
 		e.forced[reg] = c
 	}
 	e.loot = maps.Clone(cfg.Structures.loot)
+	if err := structure.CheckTemplates(cfg.Structures.templates, e.st); err != nil {
+		return err
+	}
+	for _, w := range cfg.Structures.swaps {
+		if e.swaps == nil {
+			e.swaps = map[uint32]uint32{}
+		}
+		if err := structure.SwapTable(e.reg, w[0], w[1], e.swaps); err != nil {
+			return err
+		}
+	}
 	return nil
 }
 

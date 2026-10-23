@@ -73,3 +73,34 @@ func TestConfigSkip(t *testing.T) {
 		t.Errorf("%d chorus blocks with chorus skipped", chorus)
 	}
 }
+
+func TestConfigJSON(t *testing.T) {
+	doc := `{
+	  "structures": {
+	    "place_at": [[110, 3]],
+	    "loot": {"loot_tables/chests/end_city_treasure.json": "loot_tables/my/city.json"},
+	    "templates": {"endcity/base_roof": "endcity/second_roof"},
+	    "blocks": [["purpur_block", "diamond_block"]]
+	  },
+	  "skip": {"chorus": true}
+	}`
+	cfg, err := ParseConfig([]byte(doc), nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	e := testEnd(t, configSeed, WithConfig(cfg))
+	if countIn(e, NewCache(e, 64), 110, 3, "diamond_block") == 0 {
+		t.Error("the placed city's purpur was not swapped")
+	}
+	saved, err := cfg.MarshalJSON()
+	if err != nil {
+		t.Fatal(err)
+	}
+	again, err := ParseConfig(saved, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if saved2, _ := again.MarshalJSON(); string(saved2) != string(saved) {
+		t.Errorf("the config does not survive a save and load:\n%s\n%s", saved, saved2)
+	}
+}

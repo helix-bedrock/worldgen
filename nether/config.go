@@ -2,6 +2,7 @@ package nether
 
 import (
 	"fmt"
+	"io/fs"
 	"log/slog"
 	"maps"
 	"path"
@@ -37,10 +38,18 @@ type Config struct {
 	Skip Steps
 	// Logger receives the panics of structure filters. Nil drops them.
 	Logger *slog.Logger
+
+	packs     []fs.FS
+	packPaths []string
 }
 
 // Vanilla returns a Config that changes nothing.
 func Vanilla() *Config { return &Config{} }
+
+// AddPack adds a behaviour pack whose structures folder replaces vanilla
+// templates of the same path (structures/<path>.mcstructure or .nbt) and
+// holds templates for ReplaceTemplate and AddToPool. Later packs win.
+func (c *Config) AddPack(fsys fs.FS) { c.packs = append(c.packs, fsys) }
 
 // Steps are generation steps that can be turned off. The zero value runs
 // every step.
@@ -132,11 +141,45 @@ func (f StructureFilter) forGate(kind string, cx, cz int32) bool {
 
 // StructureConfig holds the structure changes.
 type StructureConfig struct {
-	disabled []StructureKind
-	excludes []structExclude
-	filters  []StructureFilter
-	forced   []forcedStart
-	loot     map[string]string
+	disabled  []StructureKind
+	excludes  []structExclude
+	filters   []StructureFilter
+	forced    []forcedStart
+	loot      map[string]string
+	templates map[string]string
+	pools     []structure.PoolEdit
+	swaps     []blockSwap
+}
+
+type blockSwap struct {
+	kind     StructureKind
+	from, to string
+}
+
+// ReplaceTemplate builds instead wherever a structure uses template
+// (bastion and ruined portal templates, as "bastion/bridge/starting_pieces/entrance").
+func (s *StructureConfig) ReplaceTemplate(template, instead string) {
+	if s.templates == nil {
+		s.templates = map[string]string{}
+	}
+	s.templates[template] = instead
+}
+
+// SetPoolWeight sets the weight of an element (by ID or template path) in
+// a bastion jigsaw pool; 0 takes it out.
+func (s *StructureConfig) SetPoolWeight(pool, element string, weight int32) {
+	s.pools = append(s.pools, structure.PoolEdit{Pool: pool, Element: element, Weight: weight})
+}
+
+// AddToPool adds a template to a bastion jigsaw pool with a weight.
+func (s *StructureConfig) AddToPool(pool, template string, weight int32) {
+	s.pools = append(s.pools, structure.PoolEdit{Pool: pool, Element: template, Weight: weight, Add: true})
+}
+
+// ReplaceBlock swaps the block from for to in the blocks kind places,
+// keeping the properties both share.
+func (s *StructureConfig) ReplaceBlock(kind StructureKind, from, to string) {
+	s.swaps = append(s.swaps, blockSwap{kind, from, to})
 }
 
 type structExclude struct {
@@ -249,6 +292,30 @@ func (n *Nether) applyConfig(cfg *Config, biomeIDs map[string]uint32) error {
 		n.forced[grid][reg] = forcedAt{kind: k, chunk: [2]int32{f.cx, f.cz}}
 	}
 	n.loot = maps.Clone(sc.loot)
+	if err := structure.CheckTemplates(sc.templates, n.st); err != nil {
+		return err
+	}
+	if len(sc.pools) > 0 {
+		pools := map[string][]*structure.Pool{}
+		for name, p := range n.bastionData.Pools {
+			pools[name] = []*structure.Pool{p}
+		}
+		if err := structure.EditPools(pools, sc.pools, n.st); err != nil {
+			return err
+		}
+	}
+	for _, w := range sc.swaps {
+		k, err := structIndex(w.kind)
+		if err != nil {
+			return err
+		}
+		if n.swaps[k] == nil {
+			n.swaps[k] = map[uint32]uint32{}
+		}
+		if err := structure.SwapTable(n.reg, w.from, w.to, n.swaps[k]); err != nil {
+			return err
+		}
+	}
 	if err := n.applyBiomes(&cfg.Biomes, biomeIDs); err != nil {
 		return err
 	}
@@ -397,6 +464,18 @@ func (n *Nether) applyRules(f *FeatureConfig, biomeIDs map[string]uint32) error 
 		}
 	}
 	return nil
+}
+
+// swapped runs place, which writes structure kind k into c, then swaps
+// the blocks it changed by k's block swaps.
+func (n *Nether) swapped(k int, c *Chunk, place func()) {
+	if n.swaps[k] == nil {
+		place()
+		return
+	}
+	before := c.Blocks
+	place()
+	structure.SwapChanged(c.Blocks[:], before[:], n.swaps[k])
 }
 
 // finishChunk applies the loot table swaps to a finished chunk.

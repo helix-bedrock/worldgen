@@ -94,6 +94,7 @@ type Nether struct {
 	gate   *structure.Gate
 	forced [gridCount]map[[2]int32]forcedAt
 	loot   map[string]string
+	swaps  [structKindCount]map[uint32]uint32
 	// netherBiomeIDs are the vanilla Nether biomes' IDs.
 	netherBiomeIDs []uint32
 }
@@ -169,6 +170,7 @@ func New(seed int64, reg *blocks.Registry, biomeIDs map[string]uint32, opts ...O
 	if n.st, err = structure.NewLib(seed, reg); err != nil {
 		return nil, err
 	}
+	n.st.SetPacks(o.cfg.packs, o.cfg.Structures.templates)
 	if err := n.loadBastions(biomeIDs); err != nil {
 		return nil, err
 	}
@@ -190,9 +192,9 @@ func (n *Nether) Seed() int64 { return n.seed }
 // sets them.
 func (n *Nether) GenerateChunk(chunkX, chunkZ int32, c *Chunk) {
 	n.baseChunk(chunkX, chunkZ, c)
-	n.placePortals(chunkX, chunkZ, c)
-	n.placeBastions(chunkX, chunkZ, c)
-	n.placeFortresses(chunkX, chunkZ, c)
+	n.swapped(skPortal, c, func() { n.placePortals(chunkX, chunkZ, c) })
+	n.swapped(skBastion, c, func() { n.placeBastions(chunkX, chunkZ, c) })
+	n.swapped(skFortress, c, func() { n.placeFortresses(chunkX, chunkZ, c) })
 }
 
 // baseChunk is the chunk before its structures: the ruined portals read it.

@@ -130,9 +130,10 @@ says which step placed any block.
 
 Server owners who do not write Go can put the same changes in a JSON file:
 `overworld.ParseConfig` reads it (its doc comment shows the format) and `Config.MarshalJSON`
-writes one. The Nether and the End have their own, smaller `Config`s (`nether.WithConfig`,
-`end.WithConfig`): biomes, feature rules, structures and steps in the Nether; End cities and
-the pillars, islands, chorus and gateways in the End.
+writes one. The Nether and the End have their own `Config`s (`nether.WithConfig`, `end.WithConfig`, each
+with `ParseConfig` and `MarshalJSON` too): biomes, feature rules, structures (with templates,
+bastion pools, loot and block swaps) and steps in the Nether; End cities and the pillars,
+islands, chorus and gateways in the End.
 
 ## Features
 

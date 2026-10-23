@@ -96,3 +96,42 @@ func TestConfigSkip(t *testing.T) {
 		t.Errorf("%d quartz ore with decoration skipped", k)
 	}
 }
+
+func TestConfigJSON(t *testing.T) {
+	doc := `{
+	  "features": {"disable": ["*fungus*"], "disable_in": [{"biomes": ["hell"], "rules": ["*vines*"]}]},
+	  "biomes": {"replace": {"hell": "crimson_forest"}},
+	  "structures": {
+	    "exclude": [{"area": [-200, -200, 200, 200], "kinds": ["minecraft:bastion_remnant"]}],
+	    "place_at": [{"kind": "minecraft:fortress", "chunk": [5, 7]}],
+	    "loot": {"loot_tables/chests/nether_bridge.json": "loot_tables/my/fortress.json"},
+	    "templates": {"bastion/bridge/starting_pieces/entrance": "bastion/bridge/starting_pieces/entrance_face"},
+	    "pools": [{"pool": "minecraft:bastion/hoglin_stable/starting_pieces",
+	               "element": "minecraft:bastion_hoglin_stable_starting_pieces_starting_stairs_0", "weight": 0}],
+	    "blocks": [{"kind": "minecraft:fortress", "from": "nether_brick", "to": "red_nether_brick"}]
+	  },
+	  "skip": {"caves": true}
+	}`
+	cfg, err := ParseConfig([]byte(doc), nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	n := testNether(t, configSeed, WithConfig(cfg))
+	if countIn(n, 5, 7, "red_nether_brick") == 0 {
+		t.Error("the placed fortress's bricks were not swapped")
+	}
+	saved, err := cfg.MarshalJSON()
+	if err != nil {
+		t.Fatal(err)
+	}
+	again, err := ParseConfig(saved, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if saved2, _ := again.MarshalJSON(); string(saved2) != string(saved) {
+		t.Errorf("the config does not survive a save and load:\n%s\n%s", saved, saved2)
+	}
+	if _, err := ParseConfig([]byte(`{"skip": {"cave": true}}`), nil); err == nil {
+		t.Error("an unknown field was accepted")
+	}
+}

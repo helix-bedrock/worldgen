@@ -151,9 +151,8 @@ Not part of vanilla: these change the world on purpose. With no changes the outp
 | Overworld: replace templates, edit jigsaw pools, swap loot tables and structure blocks | Done |
 | Overworld: sea level, sea block, no deepslate, no ore veins; skip whole steps | Done |
 | Overworld: JSON config file (read and write), Explain a block | Done |
-| Nether: biomes, feature rules, structures (disable, exclude, filter, place, loot), steps | Done |
-| End: End cities (exclude, filter, place, loot), skip pillars, islands, chorus, gateways | Done |
-| Nether and End: JSON config files, block swaps, template and pool edits | Not yet |
+| Nether: biomes, feature rules, structures (disable, exclude, filter, place, loot, templates, bastion pools, block swaps), steps, JSON | Done |
+| End: End cities (exclude, filter, place, loot, templates, block swaps), skip pillars, islands, chorus, gateways, JSON | Done |
 
 ## Other dimensions
 
