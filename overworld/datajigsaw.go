@@ -912,15 +912,17 @@ func buryAt(bs []structure.Box, x, y, z int32) float32 {
 func (o *Overworld) placeDataJigsaws(cx, cz int32, c *Chunk) {
 	chunkBox := structure.NewBox(cx*16, MinY, cz*16, cx*16+15, MaxY-1, cz*16+15)
 	for _, d := range o.dataJigsaws {
-		d.near(o, cx, cz, func(s *djStructure) {
-			if !s.bb.Intersects(chunkBox) {
-				return
-			}
-			for _, p := range s.pieces {
-				if p.BB.Intersects(chunkBox) {
-					o.placePiece(p, c, chunkBox, nil)
+		o.swapped(d.sk, c, func() {
+			d.near(o, cx, cz, func(s *djStructure) {
+				if !s.bb.Intersects(chunkBox) {
+					return
 				}
-			}
+				for _, p := range s.pieces {
+					if p.BB.Intersects(chunkBox) {
+						o.placePiece(p, c, chunkBox, nil)
+					}
+				}
+			})
 		})
 	}
 }

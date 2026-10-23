@@ -64,7 +64,7 @@ func (o *Overworld) IsAncientCityChunk(cx, cz int32) bool {
 	if px != cx || pz != cz {
 		return false
 	}
-	return o.isForced(skAncientCity, cx, cz) || o.structOK(skAncientCity, cx, cz) && o.BiomeAt(cx*16, cityAnchorY+1, cz*16) == o.deepDark
+	return o.isForced(skAncientCity, cx, cz) || o.structOK(skAncientCity, cx, cz) && o.cityBiomeOK(cx, cz)
 }
 
 // cityAt assembles the city of region (rx, rz), nil if it has none.
@@ -77,7 +77,7 @@ func (o *Overworld) cityAt(rx, rz int32) *city {
 	var c *city
 	var r rand.MT
 	cx, cz := o.cityPick(rx, rz, &r)
-	if o.city != nil && (o.isForced(skAncientCity, cx, cz) || o.structOK(skAncientCity, cx, cz) && o.BiomeAt(cx*16, cityAnchorY+1, cz*16) == o.deepDark) {
+	if o.city != nil && (o.isForced(skAncientCity, cx, cz) || o.structOK(skAncientCity, cx, cz) && o.cityBiomeOK(cx, cz)) {
 		// The start is built with the start chunk's population random: of
 		// the seedings tried against BDS's city at chunk (-14, -113) it is
 		// the only one that gets every depth-1 piece right (VERIFY: the
@@ -232,7 +232,7 @@ func (o *Overworld) NearestAncientCity(x, z, maxRings int32) (AncientCity, bool)
 					continue
 				}
 				cx, cz := o.cityPick(rx, rz, &r)
-				if o.BiomeAt(cx*16, cityAnchorY+1, cz*16) != o.deepDark {
+				if !o.IsAncientCityChunk(cx, cz) {
 					continue
 				}
 				dx, dz := int64(cx*16-x), int64(cz*16-z)
@@ -257,4 +257,14 @@ func (o *Overworld) NearestAncientCity(x, z, maxRings int32) (AncientCity, bool)
 	cx, cz := o.cityPick(found[0], found[1], &r2)
 	return AncientCity{X: cx * 16, Y: cityAnchorY + 1, Z: cz * 16,
 		Min: [3]int32{c.bb.X0, c.bb.Y0, c.bb.Z0}, Max: [3]int32{c.bb.X1, c.bb.Y1, c.bb.Z1}}, true
+}
+
+// cityBiomeOK reports whether the biome at an ancient city start in chunk
+// (cx, cz) allows one: the deep dark, or the Config's list.
+func (o *Overworld) cityBiomeOK(cx, cz int32) bool {
+	b := o.BiomeAt(cx*16, cityAnchorY+1, cz*16)
+	if o.cityBiome != nil {
+		return int(b) < len(o.cityBiome) && o.cityBiome[b]
+	}
+	return b == o.deepDark
 }

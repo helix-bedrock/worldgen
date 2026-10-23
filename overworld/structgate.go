@@ -252,9 +252,6 @@ func (o *Overworld) applyPlacements(c *StructureConfig) error {
 		if err != nil {
 			return err
 		}
-		if k == skStronghold {
-			return fmt.Errorf("worldgen: strongholds cannot be placed at a position yet")
-		}
 		if o.gates.disabled[k] {
 			return fmt.Errorf("worldgen: %s is placed at chunk %d %d but disabled", f.kind, f.cx, f.cz)
 		}
@@ -275,7 +272,16 @@ func (o *Overworld) applyPlacements(c *StructureConfig) error {
 		}
 		o.forced[k][reg] = [2]int32{f.cx, f.cz}
 		o.anyForced = true
+		if k == skStronghold && !slices.Contains(o.forcedStrongholds, [2]int32{f.cx, f.cz}) {
+			o.forcedStrongholds = append(o.forcedStrongholds, [2]int32{f.cx, f.cz})
+		}
 	}
+	slices.SortFunc(o.forcedStrongholds, func(a, b [2]int32) int {
+		if a[0] != b[0] {
+			return int(a[0] - b[0])
+		}
+		return int(a[1] - b[1])
+	})
 	return nil
 }
 
@@ -307,4 +313,75 @@ func (o *Overworld) Placement(kind StructureKind) (p Placement, ok bool) {
 	}
 	g := o.place[placementSlot(k)]
 	return Placement{Spacing: g.spacing, Separation: g.separation, Salt: g.salt, Chance: g.chance}, true
+}
+
+// applyStructureBiomes applies SetBiomes, after the vanilla biome sets are
+// built.
+func (o *Overworld) applyStructureBiomes(c *StructureConfig, biomeIDs map[string]uint32) error {
+	n := uint32(len(o.biomeTags))
+	for _, kb := range c.biomes {
+		k, err := structIndex(kb.kind)
+		if err != nil {
+			return err
+		}
+		mask := make([]bool, n)
+		for _, name := range kb.biomes {
+			id, ok := biomeIDs[biomeName(name)]
+			if !ok {
+				return unknownName("biome", biomeName(name), sortedKeys(biomeIDs))
+			}
+			mask[id] = true
+		}
+		switch k {
+		case skVillage:
+			o.villageBiome = mask
+		case skAncientCity:
+			o.cityBiome = mask
+		case skDesertPyramid, skJungleTemple, skSwampHut, skIgloo:
+			sk := scatterKindOf(k)
+			for b := range o.scatterKind {
+				if o.scatterKind[b] == sk {
+					o.scatterKind[b] = scatterNone
+				}
+				if mask[b] {
+					o.scatterKind[b] = sk
+				}
+			}
+		case skOutpost:
+			o.outpostBiome = mask
+		case skMansion:
+			o.mansionBiome = mask
+		case skBuriedTreasure:
+			o.treasureBiome = mask
+		case skShipwreck:
+			o.shipBiome = mask
+		case skMonument:
+			o.monumentDeep, o.monumentWater = mask, mask
+		case skOceanRuin:
+			table := make([]ruinBiome, n)
+			for b := range table {
+				if !mask[b] {
+					continue
+				}
+				table[b] = o.ruinOcean
+				if b < len(o.ruinBiome) && o.ruinBiome[b].ok {
+					table[b] = o.ruinBiome[b]
+				}
+			}
+			o.ruinBiome = table
+		case skTrailRuins, skTrialChambers, skAbandonedCamp:
+			for _, d := range o.dataJigsaws {
+				if d.sk != k {
+					continue
+				}
+				d.biomes, d.biomeTags = mask, nil
+				for _, v := range d.variants {
+					v.d.biomes, v.d.biomeTags = mask, nil
+				}
+			}
+		default:
+			return fmt.Errorf("worldgen: %s has no biome list", kb.kind)
+		}
+	}
+	return nil
 }

@@ -322,3 +322,117 @@ func TestConfigReadme(t *testing.T) {
 	var c Chunk
 	NewTerrainCache(o, 256).Generate(2, 3, &c)
 }
+
+func TestConfigStructureBiomes(t *testing.T) {
+	cfg := Vanilla()
+	cfg.Structures.SetBiomes(StructureMansion, "plains")
+	o := newConfigured(t, cfg)
+	_, ids := testRegistry(t)
+	s, ok := o.NearestMansion(0, 0, 20)
+	if !ok {
+		t.Fatal("no mansion in plains")
+	}
+	if b := o.SurfaceBiomeAt(s.X, s.Z); b != ids["plains"] {
+		t.Errorf("mansion in biome %d, want plains", b)
+	}
+	cfg = Vanilla()
+	cfg.Structures.SetBiomes(StructurePillagerOutpost, "deep_ocean")
+	if _, err := NewOverworld(configSeed, o.reg, ids, WithConfig(cfg)); err != nil {
+		t.Error(err)
+	}
+	cfg = Vanilla()
+	cfg.Structures.SetBiomes(StructureRuinedPortal, "plains")
+	if _, err := NewOverworld(configSeed, o.reg, ids, WithConfig(cfg)); err == nil {
+		t.Error("ruined portals took a biome list")
+	}
+}
+
+func TestConfigStrongholds(t *testing.T) {
+	vanilla := newConfigured(t, Vanilla())
+	want, ok := vanilla.NearestStronghold(0, 0, 3)
+	if !ok {
+		t.Fatal("no vanilla stronghold")
+	}
+	cfg := Vanilla()
+	cfg.Structures.Disable(StructureVillage)
+	cfg.Structures.PlaceAt(StructureStronghold, 3, 4)
+	o := newConfigured(t, cfg)
+	if got, ok := o.NearestStronghold(want.X, want.Z, 3); !ok || got != want {
+		t.Errorf("stronghold at %+v with villages off, want %+v", got, want)
+	}
+	if got, ok := o.NearestStronghold(3*16, 4*16, 0); !ok || got.X>>4 < -5 || got.X>>4 > 11 || got.Z>>4 < -4 || got.Z>>4 > 12 {
+		t.Errorf("placed stronghold at %+v (%v), want near chunk 3 4", got, ok)
+	}
+}
+
+func TestConfigStructureContents(t *testing.T) {
+	vanilla := newConfigured(t, Vanilla())
+	vx, _, vz, ok := vanilla.NearestVillage(0, 0, "plains", 40)
+	if !ok {
+		t.Fatal("no vanilla village")
+	}
+	cx, cz := vx>>4, vz>>4
+	// The vanilla village's pieces and a chunk of it with loot.
+	pieces := vanilla.VillagePieces(cx, cz)
+	if len(pieces) < 2 {
+		t.Fatal("a village of one piece")
+	}
+	cache := NewTerrainCache(vanilla, 256)
+	var c Chunk
+	loot := map[string]bool{}
+	var lootChunk [2]int32
+	for dx := int32(-4); dx <= 4 && len(loot) == 0; dx++ {
+		for dz := int32(-4); dz <= 4 && len(loot) == 0; dz++ {
+			cache.Generate(cx+dx, cz+dz, &c)
+			for _, be := range c.BlockEntities {
+				if be.LootTable != "" {
+					loot[be.LootTable] = true
+					lootChunk = [2]int32{cx + dx, cz + dz}
+				}
+			}
+		}
+	}
+	if len(loot) == 0 {
+		t.Fatal("no village chest")
+	}
+	cobble := countBlocks(vanilla, cx, cz, "cobblestone")
+
+	cfg := Vanilla()
+	for lt := range loot {
+		cfg.Structures.ReplaceLoot(lt, "loot_tables/test/custom.json")
+	}
+	cfg.Structures.ReplaceBlock(StructureVillage, "cobblestone", "diamond_block")
+	o := newConfigured(t, cfg)
+	NewTerrainCache(o, 256).Generate(lootChunk[0], lootChunk[1], &c)
+	for _, be := range c.BlockEntities {
+		if be.LootTable != "" && be.LootTable != "loot_tables/test/custom.json" {
+			t.Errorf("chest with loot %s", be.LootTable)
+		}
+	}
+	if cobble > 0 && countBlocks(o, cx, cz, "diamond_block") == 0 {
+		t.Error("the village's cobblestone was not swapped")
+	}
+	cfg = Vanilla()
+	cfg.Structures.SetPoolWeight("minecraft:village/plains/houses", "village/plains/houses/plains_small_house_1", 0)
+	o = newConfigured(t, cfg)
+	for _, p := range o.VillagePieces(cx, cz) {
+		if strings.HasSuffix(p.Template, "plains_small_house_1") {
+			t.Error("a house of weight 0 was built")
+		}
+	}
+
+	reg, ids := testRegistry(t)
+	for want, set := range map[string]func(c *Config){
+		"jigsaw pool":    func(c *Config) { c.Structures.SetPoolWeight("minecraft:village/plains/housez", "x", 1) },
+		"element":        func(c *Config) { c.Structures.SetPoolWeight("minecraft:village/plains/houses", "nope", 1) },
+		"vanilla templ":  func(c *Config) { c.Structures.ReplaceTemplate("no/such/template", "village/plains/houses/plains_small_house_1") },
+		"unknown block":  func(c *Config) { c.Structures.ReplaceBlock(StructureVillage, "cobblestone", "no_such_block") },
+		"not in the pac": func(c *Config) { c.Structures.AddToPool("minecraft:village/plains/houses", "my/missing", 1) },
+	} {
+		cfg := Vanilla()
+		set(cfg)
+		if _, err := NewOverworld(configSeed, reg, ids, WithConfig(cfg)); err == nil || !strings.Contains(err.Error(), want) {
+			t.Errorf("want an error with %q, got %v", want, err)
+		}
+	}
+}

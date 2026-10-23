@@ -411,18 +411,18 @@ func (o *Overworld) surfaceHeight(terrain func(cx, cz int32) *PackedChunk, x, z 
 // VERIFY: the order of structure types (sub_C970F80 walks the registry).
 func (o *Overworld) placeStructures(cx, cz int32, c *Chunk, height func(x, z int32) int32, raw func(cx, cz int32) *PackedChunk) {
 	o.placeDataJigsaws(cx, cz, c)
-	o.placeVillages(cx, cz, c, height)
-	o.placeMineshafts(cx, cz, c, raw)
-	o.placeStrongholds(cx, cz, c)
-	o.placeCities(cx, cz, c)
+	o.swapped(skVillage, c, func() { o.placeVillages(cx, cz, c, height) })
+	o.swapped(skMineshaft, c, func() { o.placeMineshafts(cx, cz, c, raw) })
+	o.swapped(skStronghold, c, func() { o.placeStrongholds(cx, cz, c) })
+	o.swapped(skAncientCity, c, func() { o.placeCities(cx, cz, c) })
 	o.placeScattered(cx, cz, c, raw)
-	o.placeOutposts(cx, cz, c, raw)
-	o.placeMansions(cx, cz, c, raw)
-	o.placeMonuments(cx, cz, c)
-	o.placeRuins(cx, cz, c, raw)
-	o.placeShips(cx, cz, c, raw)
-	o.placeTreasure(cx, cz, c, raw(cx, cz))
-	o.placePortals(cx, cz, c, raw)
+	o.swapped(skOutpost, c, func() { o.placeOutposts(cx, cz, c, raw) })
+	o.swapped(skMansion, c, func() { o.placeMansions(cx, cz, c, raw) })
+	o.swapped(skMonument, c, func() { o.placeMonuments(cx, cz, c) })
+	o.swapped(skOceanRuin, c, func() { o.placeRuins(cx, cz, c, raw) })
+	o.swapped(skShipwreck, c, func() { o.placeShips(cx, cz, c, raw) })
+	o.swapped(skBuriedTreasure, c, func() { o.placeTreasure(cx, cz, c, raw(cx, cz)) })
+	o.swapped(skRuinedPortal, c, func() { o.placePortals(cx, cz, c, raw) })
 }
 
 // structuresReach reports whether a structure has a piece in chunk

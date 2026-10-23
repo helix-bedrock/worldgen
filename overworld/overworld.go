@@ -101,6 +101,14 @@ type Overworld struct {
 	// forced are the PlaceAt starts by kind and placement region.
 	forced    [structKindCount]map[[2]int32][2]int32
 	anyForced bool
+	// forcedStrongholds are the placed strongholds, sorted, so they are
+	// visited in the same order on every run.
+	forcedStrongholds [][2]int32
+	// loot maps loot tables to the Config's replacements; swaps are each
+	// kind's block swaps, by state; snapshots pools blockSnapshots.
+	loot      map[string]string
+	swaps     [structKindCount]map[uint32]uint32
+	snapshots sync.Pool
 
 	// overlays pools featureWorld overlay arrays (about 500 KB each).
 	overlays sync.Pool
@@ -130,7 +138,9 @@ type Overworld struct {
 	// villageBiome marks the biomes with a minecraft:village_type;
 	// villageType holds its type.
 	villageBiome []bool
-	villageType  []string
+	// vanillaVillageBiome is villageBiome before the Config's SetBiomes.
+	vanillaVillageBiome []bool
+	villageType         []string
 	// scatterKind is each biome's scattered feature kind (scattered.go).
 	scatterKind []uint8
 	// ruinBiome is each biome's ocean ruin settings; monumentDeep and
@@ -191,6 +201,9 @@ type Overworld struct {
 	// deepDark is the deep dark's biome ID; no mineshaft piece is built
 	// there.
 	deepDark uint32
+	// cityBiome, when set by the Config, replaces the deep dark as the
+	// ancient cities' biomes.
+	cityBiome []bool
 	// soilPlant is soilPlants by state, for applying placements.
 	soilPlant []bool
 	// blockTags are block tags by block name, without "minecraft:".
@@ -440,6 +453,7 @@ func NewOverworld(seed int64, reg *blocks.Registry, biomeIDs map[string]uint32, 
 	if o.st, err = structure.NewLib(seed, reg); err != nil {
 		return nil, err
 	}
+	o.st.SetPacks(cfg.packs, cfg.Structures.templates)
 	if o.jigsaw, err = structure.LoadJigsawData("villages.json", reg); err != nil {
 		return nil, err
 	}
@@ -470,6 +484,13 @@ func NewOverworld(seed int64, reg *blocks.Registry, biomeIDs map[string]uint32, 
 		return nil, err
 	}
 	if err := o.applyRules(cfg, defs, biomeIDs); err != nil {
+		return nil, err
+	}
+	if err := o.applyStructureContents(&cfg.Structures); err != nil {
+		return nil, err
+	}
+	o.vanillaVillageBiome = o.villageBiome
+	if err := o.applyStructureBiomes(&cfg.Structures, biomeIDs); err != nil {
 		return nil, err
 	}
 	return o, nil

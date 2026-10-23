@@ -738,6 +738,7 @@ func (o *Overworld) Decorate(chunkX, chunkZ int32, c *Chunk, neighbour func(cx, 
 		return o.originFeatures(ox, oz, structured)
 	})
 	o.connectBlocks(c, chunkX, chunkZ, structured)
+	o.finishChunk(c)
 }
 
 // decorate applies the placements of the origins that reach chunk

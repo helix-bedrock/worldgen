@@ -1,8 +1,11 @@
 package structure
 
 import (
+	"fmt"
+	"io/fs"
 	"sync"
 
+	"github.com/helix-bedrock/worldgen"
 	"github.com/helix-bedrock/worldgen/blocks"
 	"github.com/helix-bedrock/worldgen/rand"
 )
@@ -32,6 +35,42 @@ type Lib struct {
 	templates                  sync.Map
 	// popA and popB are the population seed's chunk multipliers.
 	popA, popB uint32
+	// packs are behaviour packs whose structures folder replaces vanilla
+	// templates of the same path, later packs first; alias maps a template
+	// path to the one used instead.
+	packs []fs.FS
+	alias map[string]string
+}
+
+// SetPacks makes templates come from the packs' structures folders first
+// (as "structures/village/plains/houses/plains_small_house_1.mcstructure"
+// or .nbt), the last pack winning, and alias replace template paths by
+// others. It must be called before any template is used.
+func (l *Lib) SetPacks(packs []fs.FS, alias map[string]string) {
+	l.packs, l.alias = packs, alias
+}
+
+// readStructure reads a template file, from the packs or the embedded
+// vanilla data. ext is ".nbt" or ".mcstructure".
+func (l *Lib) readStructure(path, ext string) ([]byte, error) {
+	for i := len(l.packs) - 1; i >= 0; i-- {
+		if b, err := fs.ReadFile(l.packs[i], "structures/"+path+ext); err == nil {
+			return b, nil
+		}
+	}
+	b, err := worldgen.Data.ReadFile("data/vanilla/structures/" + path + ext)
+	if err != nil {
+		return nil, fmt.Errorf("template %s%s: %w", path, ext, err)
+	}
+	return b, nil
+}
+
+// resolve is the template path used for path.
+func (l *Lib) resolve(path string) string {
+	if to, ok := l.alias[path]; ok {
+		return to
+	}
+	return path
 }
 
 // NewLib prepares structure templates for a world seed and block list.

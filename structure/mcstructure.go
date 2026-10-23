@@ -5,8 +5,6 @@ import (
 	"fmt"
 	"strconv"
 
-	"github.com/helix-bedrock/worldgen"
-
 	"github.com/helix-bedrock/worldgen/blocks"
 )
 
@@ -35,7 +33,8 @@ func (t *MCStructure) Cell(x, y, z int32) uint32 {
 // LoadMCStructure reads an .mcstructure file from the embedded data. Palette
 // states the registry does not know become void.
 func (l *Lib) LoadMCStructure(path string) (*MCStructure, error) {
-	raw, err := worldgen.Data.ReadFile("data/vanilla/structures/" + path + ".mcstructure")
+	path = l.resolve(path)
+	raw, err := l.readStructure(path, ".mcstructure")
 	if err != nil {
 		return nil, fmt.Errorf("mcstructure %s: %w", path, err)
 	}
@@ -92,8 +91,11 @@ func mcJigsawFacing() [6]string { return [6]string{"down", "up", "north", "south
 // block names and its jigsaws' block entity data, for pool elements BDS
 // keeps in that format (the bastion's mobs). The template's entities are
 // not read: worldgen places no mobs.
-func LoadMCTemplate(path string) (*Template, error) {
-	raw, err := worldgen.Data.ReadFile("data/vanilla/structures/" + path + ".mcstructure")
+func LoadMCTemplate(path string) (*Template, error) { return (&Lib{}).loadMCTemplate(path) }
+
+// loadMCTemplate is LoadMCTemplate reading from the Lib's packs first.
+func (l *Lib) loadMCTemplate(path string) (*Template, error) {
+	raw, err := l.readStructure(path, ".mcstructure")
 	if err != nil {
 		return nil, fmt.Errorf("mcstructure %s: %w", path, err)
 	}

@@ -366,6 +366,72 @@ type StructureConfig struct {
 	filters    []StructureFilter
 	placements []kindPlacement
 	forced     []forcedStart
+	biomes     []kindBiomes
+	templates  map[string]string
+	pools      []poolEdit
+	loot       map[string]string
+	swaps      []blockSwap
+}
+
+type poolEdit struct {
+	pool, element string
+	weight        int32
+	add           bool
+}
+
+type blockSwap struct {
+	kind     StructureKind
+	from, to string
+}
+
+// ReplaceTemplate builds template with instead wherever a structure uses
+// it (paths as "village/plains/houses/plains_small_house_1"). instead may
+// be a vanilla template or one from a pack's structures folder: AddPack
+// also replaces a vanilla template outright when the pack has a file of
+// the same path (structures/<path>.mcstructure or .nbt).
+func (s *StructureConfig) ReplaceTemplate(template, instead string) {
+	if s.templates == nil {
+		s.templates = map[string]string{}
+	}
+	s.templates[template] = instead
+}
+
+// SetPoolWeight sets the weight of an element in a jigsaw pool (village,
+// ancient city, trail ruins, trial chambers and camp pools, as
+// "minecraft:village/plains/houses"). The element is named by its ID
+// ("minecraft:plains_small_house_1") or template path. Weight 0 takes it
+// out: a village without blacksmiths, say.
+func (s *StructureConfig) SetPoolWeight(pool, element string, weight int32) {
+	s.pools = append(s.pools, poolEdit{pool: pool, element: element, weight: weight})
+}
+
+// AddToPool adds a template (vanilla, or from a pack's structures folder)
+// to a jigsaw pool with a weight, so it can be picked like the pool's own
+// pieces. It is placed like the pool's first element (rigid or terrain
+// matching), with no block rules. Its jigsaw blocks connect it like any
+// other piece.
+func (s *StructureConfig) AddToPool(pool, template string, weight int32) {
+	s.pools = append(s.pools, poolEdit{pool: pool, element: template, weight: weight, add: true})
+}
+
+// ReplaceLoot gives the containers that would get loot table from the
+// loot table to instead (Bedrock paths, as
+// "loot_tables/chests/village/village_plains_house.json").
+func (s *StructureConfig) ReplaceLoot(from, to string) {
+	if s.loot == nil {
+		s.loot = map[string]string{}
+	}
+	s.loot[from] = to
+}
+
+// ReplaceBlock swaps the block from for to in the blocks kind places
+// ("minecraft:cobblestone" for "minecraft:mossy_cobblestone"); states
+// keep the properties both blocks share (stairs keep their facing). It
+// covers what the structure itself writes, not the features it grows
+// (village trees), and a block the structure places over the same block
+// is left as it is.
+func (s *StructureConfig) ReplaceBlock(kind StructureKind, from, to string) {
+	s.swaps = append(s.swaps, blockSwap{kind, from, to})
 }
 
 type kindPlacement struct {
@@ -393,6 +459,19 @@ type Placement struct {
 	Chance                    float32
 }
 
+// SetBiomes replaces the biomes a kind may start in (biome names as
+// "plains"). Villages in a biome without a village type are plains
+// villages; ocean ruins in a biome without ruins are a plain ocean's.
+// Ruined portals, mineshafts and strongholds have no biome list.
+func (s *StructureConfig) SetBiomes(kind StructureKind, biomes ...string) {
+	s.biomes = append(s.biomes, kindBiomes{kind, biomes})
+}
+
+type kindBiomes struct {
+	kind   StructureKind
+	biomes []string
+}
+
 // SetPlacement changes a kind's placement grid.
 func (s *StructureConfig) SetPlacement(kind StructureKind, p Placement) {
 	s.placements = append(s.placements, kindPlacement{kind, p})
@@ -404,7 +483,7 @@ func (s *StructureConfig) SetPlacement(kind StructureKind, p Placement) {
 // a village placed in a desert is a desert village, one placed in an
 // ocean is a plains village built on the sea floor. Exclusions and filters
 // do not apply to it; a disabled kind is an error. Mineshafts may be
-// placed anywhere; strongholds cannot be placed yet.
+// placed anywhere; a placed stronghold is one more stronghold.
 func (s *StructureConfig) PlaceAt(kind StructureKind, chunkX, chunkZ int32) {
 	s.forced = append(s.forced, forcedStart{kind, chunkX, chunkZ})
 }

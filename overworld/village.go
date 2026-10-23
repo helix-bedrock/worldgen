@@ -118,3 +118,25 @@ func (r *rawChunks) get(cx, cz int32) *PackedChunk {
 	r.chunks[k] = pc
 	return pc
 }
+
+// vanillaVillageChunk is IsVillageChunk without the Config's village
+// changes, for the first strongholds, which BDS places next to villages:
+// changing villages must not move them.
+func (o *Overworld) vanillaVillageChunk(chunkX, chunkZ int32) bool {
+	var r rand.MT
+	rx, rz := structure.Region(chunkX, villageSpacing), structure.Region(chunkZ, villageSpacing)
+	structureSeed(&r, o.seed, rx, rz, villageSalt)
+	n := int32(villageSpacing - villageSeparation)
+	a := r.IntN(n)
+	x := rx*villageSpacing + (a+r.IntN(n))/2
+	b := r.IntN(n)
+	z := rz*villageSpacing + (b+r.IntN(n))/2
+	if x != chunkX || z != chunkZ {
+		return false
+	}
+	y := prelimSurface(o.column(chunkX*quartsPerChunk, chunkZ*quartsPerChunk))
+	if y == noSurface {
+		y = villageNoSurfaceY
+	}
+	return o.biomesOnly(chunkX*16+8, y, chunkZ*16+8, villageBiomeReach, o.vanillaVillageBiome)
+}

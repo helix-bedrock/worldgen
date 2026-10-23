@@ -92,6 +92,7 @@ func (t *TerrainCache) Generate(chunkX, chunkZ int32, c *Chunk) {
 	base.Unpack(c)
 	t.gen.decorate(chunkX, chunkZ, c, base, t.originFeatures)
 	t.gen.connectBlocks(c, chunkX, chunkZ, t.Get)
+	t.gen.finishChunk(c)
 }
 
 // Spawner is a monster spawner block a structure or feature placed.

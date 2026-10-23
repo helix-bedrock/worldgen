@@ -287,25 +287,7 @@ func (o *Overworld) placeScattered(cx, cz int32, c *Chunk, raw func(cx, cz int32
 		if start == nil {
 			return
 		}
-		b := scBuild{o: o, c: c, cbox: structure.NewBox(cx*16, MinY, cz*16, cx*16+15, MaxY-1, cz*16+15),
-			x0: sx * 16, y0: o.scatteredY(kind, sx, sz, start), z0: sz * 16}
-		b.ids()
-		if kind == scatterIgloo {
-			// Only the start chunk builds the igloo (its piece fits in
-			// it), writing its templates whole.
-			b.r.Seed(populationSeed(o.seed, sx, sz))
-			b.igloo(o.topSolid(start, sx*16, sz*16, false) - 1)
-			return
-		}
-		b.r.Seed(populationSeed(o.seed, cx, cz))
-		switch kind {
-		case scatterDesert:
-			b.desertPyramid()
-		case scatterJungle:
-			b.jungleTemple()
-		case scatterHut:
-			b.swampHut()
-		}
+		o.swapped(scatterStructKind(kind), c, func() { o.buildScattered(cx, cz, sx, sz, kind, c, start) })
 	})
 }
 
@@ -1131,5 +1113,29 @@ func (b *scBuild) susSand(xr *rand.Xoroshiro, sus uint32, p [3]int32) {
 	// The loot seed is drawn only when the block entity is there.
 	if d := b.entity(p[0], p[1], p[2], "loot_tables/entities/desert_pyramid_brushable_block.json"); d != nil {
 		d["LootTableSeed"] = int32(uint32(xr.Uint64()))
+	}
+}
+
+// buildScattered writes the part of the scattered feature of kind starting
+// in chunk (sx, sz) that is inside chunk (cx, cz) into c.
+func (o *Overworld) buildScattered(cx, cz, sx, sz int32, kind uint8, c *Chunk, start *PackedChunk) {
+	b := scBuild{o: o, c: c, cbox: structure.NewBox(cx*16, MinY, cz*16, cx*16+15, MaxY-1, cz*16+15),
+		x0: sx * 16, y0: o.scatteredY(kind, sx, sz, start), z0: sz * 16}
+	b.ids()
+	if kind == scatterIgloo {
+		// Only the start chunk builds the igloo (its piece fits in it),
+		// writing its templates whole.
+		b.r.Seed(populationSeed(o.seed, sx, sz))
+		b.igloo(o.topSolid(start, sx*16, sz*16, false) - 1)
+		return
+	}
+	b.r.Seed(populationSeed(o.seed, cx, cz))
+	switch kind {
+	case scatterDesert:
+		b.desertPyramid()
+	case scatterJungle:
+		b.jungleTemple()
+	case scatterHut:
+		b.swampHut()
 	}
 }

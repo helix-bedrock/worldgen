@@ -1,6 +1,7 @@
 package structure
 
 import (
+	"bytes"
 	"encoding/json"
 	"fmt"
 	"strconv"
@@ -713,7 +714,7 @@ func (l *Lib) Template(path string) *JigsawTemplate {
 		return jt
 	}
 	var jt *JigsawTemplate
-	tpl, err := LoadAnyTemplate(path)
+	tpl, err := l.loadAnyTemplate(l.resolve(path))
 	if err == nil {
 		jt = &JigsawTemplate{Template: tpl}
 		for _, b := range tpl.Blocks {
@@ -759,16 +760,15 @@ func (l *Lib) Template(path string) *JigsawTemplate {
 
 // LoadAnyTemplate reads a template from its .nbt file, or else from its
 // .mcstructure file.
-func LoadAnyTemplate(path string) (*Template, error) {
-	f, err := worldgen.Data.Open("data/vanilla/structures/" + path + ".nbt")
+func LoadAnyTemplate(path string) (*Template, error) { return (&Lib{}).loadAnyTemplate(path) }
+
+// loadAnyTemplate is LoadAnyTemplate reading from the Lib's packs first.
+func (l *Lib) loadAnyTemplate(path string) (*Template, error) {
+	raw, err := l.readStructure(path, ".nbt")
 	if err != nil {
-		return LoadMCTemplate(path)
+		return l.loadMCTemplate(path)
 	}
-	t, err := LoadTemplate(f)
-	if cerr := f.Close(); err == nil && cerr != nil {
-		err = fmt.Errorf("template %s: close: %w", path, cerr)
-	}
-	return t, err
+	return LoadTemplate(bytes.NewReader(raw))
 }
 
 // Piece is one placed element.

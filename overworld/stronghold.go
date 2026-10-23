@@ -2,6 +2,7 @@ package overworld
 
 import (
 	"math"
+	"slices"
 
 	"github.com/helix-bedrock/worldgen/internal/mathx"
 
@@ -111,7 +112,7 @@ func (o *Overworld) strongholdFirst() [][2]int32 {
 			found := false
 			for x := cx - 8; x <= cx+7 && !found; x++ {
 				for z := cz - 8; z <= cz+7; z++ {
-					if o.IsVillageChunk(x, z) {
+					if o.vanillaVillageChunk(x, z) {
 						o.shFirst = append(o.shFirst, [2]int32{x, z})
 						found = true
 						break
@@ -146,8 +147,24 @@ func (o *Overworld) strongholdCell(cx, cz int32) (int32, int32, bool) {
 	return x, z, r.Float64() < 0.25
 }
 
+// vanillaStronghold reports whether a vanilla stronghold starts in chunk
+// (cx, cz).
+func (o *Overworld) vanillaStronghold(cx, cz int32) bool {
+	if slices.Contains(o.strongholdFirst(), [2]int32{cx, cz}) {
+		return true
+	}
+	if uint32(cx*cx+cz*cz) < 100 {
+		return false
+	}
+	x, z, ok := o.strongholdCell(cx, cz)
+	return ok && x == cx && z == cz
+}
+
 // isStrongholdChunk is the placement test. There is no biome check.
 func (o *Overworld) isStrongholdChunk(cx, cz int32) bool {
+	if o.isForced(skStronghold, cx, cz) {
+		return true
+	}
 	for _, c := range o.strongholdFirst() {
 		if c == [2]int32{cx, cz} {
 			return true
@@ -163,6 +180,11 @@ func (o *Overworld) isStrongholdChunk(cx, cz int32) bool {
 // strongholdsNear calls f with every stronghold start within reach chunks
 // of chunk (cx, cz).
 func (o *Overworld) strongholdsNear(cx, cz, reach int32, f func(sx, sz int32)) {
+	for _, c := range o.forcedStrongholds {
+		if mathx.Abs(c[0]-cx) <= reach && mathx.Abs(c[1]-cz) <= reach && !o.vanillaStronghold(c[0], c[1]) {
+			f(c[0], c[1])
+		}
+	}
 	for _, c := range o.strongholdFirst() {
 		if mathx.Abs(c[0]-cx) <= reach && mathx.Abs(c[1]-cz) <= reach {
 			f(c[0], c[1])
@@ -189,7 +211,7 @@ func (o *Overworld) strongholdsNear(cx, cz, reach int32, f func(sx, sz int32)) {
 
 // strongholdAt assembles the stronghold starting in chunk (cx, cz), if any.
 func (o *Overworld) strongholdAt(cx, cz int32) *stronghold {
-	if !o.isStrongholdChunk(cx, cz) || !o.structOK(skStronghold, cx, cz) {
+	if !o.isStrongholdChunk(cx, cz) || !o.isForced(skStronghold, cx, cz) && !o.structOK(skStronghold, cx, cz) {
 		return nil
 	}
 	if v, ok := o.strongholds.Load([2]int32{cx, cz}); ok {
@@ -1262,6 +1284,9 @@ func (b *shBuild) buildFiller() {
 func (o *Overworld) NearestStronghold(x, z, maxCells int32) (Scattered, bool) {
 	n := nearestChunk{x: x, z: z, best: -1}
 	for _, c := range o.strongholdFirst() {
+		n.try(c[0], c[1])
+	}
+	for _, c := range o.forcedStrongholds {
 		n.try(c[0], c[1])
 	}
 	gx0, gz0 := int32(math.Floor(float64(x>>4)/200)), int32(math.Floor(float64(z>>4)/200))
