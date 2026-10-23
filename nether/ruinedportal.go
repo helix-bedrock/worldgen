@@ -44,7 +44,7 @@ func (n *Nether) placePortals(cx, cz int32, c *Chunk) {
 
 // portalPick is the start chunk of the portal of placement region (rx, rz).
 func (n *Nether) portalPick(rx, rz int32) (int32, int32) {
-	return structure.PortalPick(n.seed, rx, rz, structure.NetherPortalSpacing, structure.NetherPortalSeparation)
+	return structure.PortalPick(n.seed, rx, rz, structure.NetherPortalSpacing, structure.NetherPortalSeparation, structure.PortalSalt)
 }
 
 // portalsReach calls f with the start chunk of each portal that may have

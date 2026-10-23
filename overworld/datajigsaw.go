@@ -463,6 +463,9 @@ func (o *Overworld) loadTrialChambers() (*djDef, error) {
 // spread drawn with Java's random seeded as Java's setLargeFeatureWithSalt
 // does (sub_D1D2570), x then z.
 func (d *djDef) pick(o *Overworld, rx, rz int32) (int32, int32) {
+	if x, z, ok := o.forcedPick(d.sk, rx, rz); ok {
+		return x, z
+	}
 	var r rand.Java
 	r.Seed(int64(d.salt) + o.seed + 341873128712*int64(rx) + 132897987541*int64(rz))
 	n := d.spacing - d.separation
@@ -475,7 +478,7 @@ func (d *djDef) at(o *Overworld, cx, cz int32) *djStructure {
 	if x, z := d.pick(o, structure.Region(cx, d.spacing), structure.Region(cz, d.spacing)); x != cx || z != cz {
 		return nil
 	}
-	if !o.structOK(d.sk, cx, cz) {
+	if !o.isForced(d.sk, cx, cz) && !o.structOK(d.sk, cx, cz) {
 		return nil
 	}
 	if v, ok := d.starts.Load([2]int32{cx, cz}); ok {
@@ -652,15 +655,18 @@ func (d *djDef) assembleOne(o *Overworld, cx, cz int32) *djStructure {
 	if p.BB.Y0 < MinY+d.padBottom || p.BB.Y1 > MaxY-1-d.padTop {
 		return nil
 	}
-	// The biome is checked at the start position.
-	b := o.BiomeAt(mx, y, mz)
-	for _, t := range d.biomeTags {
-		if !o.biomeHas(b, t) {
+	// The biome is checked at the start position, unless the Config
+	// placed the start.
+	if !o.isForced(d.sk, cx, cz) {
+		b := o.BiomeAt(mx, y, mz)
+		for _, t := range d.biomeTags {
+			if !o.biomeHas(b, t) {
+				return nil
+			}
+		}
+		if d.biomes != nil && (int(b) >= len(d.biomes) || !d.biomes[b]) {
 			return nil
 		}
-	}
-	if d.biomes != nil && (int(b) >= len(d.biomes) || !d.biomes[b]) {
-		return nil
 	}
 	a := &djAssembly{o: o, d: d, r: &r, pieces: []*structure.Piece{p}, pools: map[string]string{}}
 	if len(d.aliases) > 0 {

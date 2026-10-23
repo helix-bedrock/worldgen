@@ -134,17 +134,26 @@ type shipwreck struct {
 
 // shipPick is the chunk a shipwreck region picks.
 func (o *Overworld) shipPick(rx, rz int32) (int32, int32) {
+	if x, z, ok := o.forcedPick(skShipwreck, rx, rz); ok {
+		return x, z
+	}
 	var r rand.MT
-	structureSeed(&r, o.seed, rx, rz, shipSalt)
-	n := int32(shipSpacing - shipSeparation)
-	x := rx*shipSpacing + r.IntN(n)
-	return x, rz*shipSpacing + r.IntN(n)
+	structureSeed(&r, o.seed, rx, rz, o.place[skShipwreck].salt)
+	n := o.place[skShipwreck].spacing - o.place[skShipwreck].separation
+	x := rx*o.place[skShipwreck].spacing + r.IntN(n)
+	return x, rz*o.place[skShipwreck].spacing + r.IntN(n)
 }
 
 // isShipChunk reports whether a shipwreck starts in chunk (cx, cz).
 func (o *Overworld) isShipChunk(cx, cz int32) bool {
-	x, z := o.shipPick(structure.Region(cx, shipSpacing), structure.Region(cz, shipSpacing))
-	if x != cx || z != cz || !o.structOK(skShipwreck, cx, cz) {
+	x, z := o.shipPick(structure.Region(cx, o.place[skShipwreck].spacing), structure.Region(cz, o.place[skShipwreck].spacing))
+	if x != cx || z != cz {
+		return false
+	}
+	if o.isForced(skShipwreck, cx, cz) {
+		return true
+	}
+	if !o.structOK(skShipwreck, cx, cz) {
 		return false
 	}
 	y := o.structureY(cx, cz, noSurfaceY)
@@ -269,8 +278,8 @@ func (o *Overworld) shipY(s *shipwreck, raw func(cx, cz int32) *PackedChunk) int
 // Ships reach at most 2 chunks from their start.
 func (o *Overworld) shipsReach(cx, cz int32, f func(s *shipwreck)) {
 	chunk := structure.NewBox(cx*16, MinY, cz*16, cx*16+15, MaxY-1, cz*16+15)
-	for rx := structure.Region(cx-shipReachChunks, shipSpacing); rx <= structure.Region(cx+shipReachChunks, shipSpacing); rx++ {
-		for rz := structure.Region(cz-shipReachChunks, shipSpacing); rz <= structure.Region(cz+shipReachChunks, shipSpacing); rz++ {
+	for rx := structure.Region(cx-shipReachChunks, o.place[skShipwreck].spacing); rx <= structure.Region(cx+shipReachChunks, o.place[skShipwreck].spacing); rx++ {
+		for rz := structure.Region(cz-shipReachChunks, o.place[skShipwreck].spacing); rz <= structure.Region(cz+shipReachChunks, o.place[skShipwreck].spacing); rz++ {
 			sx, sz := o.shipPick(rx, rz)
 			if sx < cx-shipReachChunks || sx > cx+shipReachChunks || sz < cz-shipReachChunks || sz > cz+shipReachChunks {
 				continue
@@ -457,7 +466,7 @@ func (o *Overworld) shipWood(id uint32, woods [2]uint8) uint32 {
 // concurrent use.
 func (o *Overworld) NearestShipwreck(x, z int32, maxRegions int32) (Scattered, bool) {
 	var cands []locateCand
-	rx0, rz0 := structure.Region(x>>4, shipSpacing), structure.Region(z>>4, shipSpacing)
+	rx0, rz0 := structure.Region(x>>4, o.place[skShipwreck].spacing), structure.Region(z>>4, o.place[skShipwreck].spacing)
 	for rx := rx0 - maxRegions; rx <= rx0+maxRegions; rx++ {
 		for rz := rz0 - maxRegions; rz <= rz0+maxRegions; rz++ {
 			cx, cz := o.shipPick(rx, rz)

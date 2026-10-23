@@ -47,8 +47,14 @@ func treasureBiomes() []string {
 // isTreasureChunk reports whether a buried treasure starts in chunk
 // (cx, cz).
 func (o *Overworld) isTreasureChunk(cx, cz int32) bool {
-	x, z := o.treasurePick(structure.Region(cx, treasureSpacing), structure.Region(cz, treasureSpacing))
-	if x != cx || z != cz || !o.structOK(skBuriedTreasure, cx, cz) {
+	x, z := o.treasurePick(structure.Region(cx, o.place[skBuriedTreasure].spacing), structure.Region(cz, o.place[skBuriedTreasure].spacing))
+	if x != cx || z != cz {
+		return false
+	}
+	if o.isForced(skBuriedTreasure, cx, cz) {
+		return true
+	}
+	if !o.structOK(skBuriedTreasure, cx, cz) {
 		return false
 	}
 	return o.biomesOnly(cx*16+8, o.structureY(cx, cz, noSurfaceY), cz*16+8, treasureBiomeReach, o.treasureBiome)
@@ -56,13 +62,16 @@ func (o *Overworld) isTreasureChunk(cx, cz int32) bool {
 
 // treasurePick is the chunk a buried treasure region picks.
 func (o *Overworld) treasurePick(rx, rz int32) (int32, int32) {
+	if x, z, ok := o.forcedPick(skBuriedTreasure, rx, rz); ok {
+		return x, z
+	}
 	var r rand.MT
-	structureSeed(&r, o.seed, rx, rz, treasureSalt)
-	n := int32(treasureSpacing - treasureSeparation)
+	structureSeed(&r, o.seed, rx, rz, o.place[skBuriedTreasure].salt)
+	n := o.place[skBuriedTreasure].spacing - o.place[skBuriedTreasure].separation
 	a := r.IntN(n)
-	x := rx*treasureSpacing + (a+r.IntN(n))/2
+	x := rx*o.place[skBuriedTreasure].spacing + (a+r.IntN(n))/2
 	b := r.IntN(n)
-	return x, rz*treasureSpacing + (b+r.IntN(n))/2
+	return x, rz*o.place[skBuriedTreasure].spacing + (b+r.IntN(n))/2
 }
 
 // treasureSpot is where the chest of chunk (cx, cz) goes, read from c and
@@ -119,7 +128,7 @@ func (o *Overworld) placeTreasure(cx, cz int32, c *Chunk, raw *PackedChunk) {
 // returns its chest. It is safe for concurrent use.
 func (o *Overworld) NearestBuriedTreasure(x, z int32, maxRegions int32) (Scattered, bool) {
 	var cands []locateCand
-	rx0, rz0 := structure.Region(x>>4, treasureSpacing), structure.Region(z>>4, treasureSpacing)
+	rx0, rz0 := structure.Region(x>>4, o.place[skBuriedTreasure].spacing), structure.Region(z>>4, o.place[skBuriedTreasure].spacing)
 	for rx := rx0 - maxRegions; rx <= rx0+maxRegions; rx++ {
 		for rz := rz0 - maxRegions; rz <= rz0+maxRegions; rz++ {
 			cx, cz := o.treasurePick(rx, rz)

@@ -985,20 +985,29 @@ func (c mansionRooms) secret2x2() string { return "2x2_s1" }
 
 // mansionPick is the chunk a mansion region picks.
 func (o *Overworld) mansionPick(rx, rz int32) (int32, int32) {
+	if x, z, ok := o.forcedPick(skMansion, rx, rz); ok {
+		return x, z
+	}
 	var r rand.MT
-	structureSeed(&r, o.seed, rx, rz, mansionSalt)
-	n := int32(mansionSpacing - mansionSeparation)
+	structureSeed(&r, o.seed, rx, rz, o.place[skMansion].salt)
+	n := o.place[skMansion].spacing - o.place[skMansion].separation
 	a := r.IntN(n)
-	x := rx*mansionSpacing + (a+r.IntN(n))/2
+	x := rx*o.place[skMansion].spacing + (a+r.IntN(n))/2
 	b := r.IntN(n)
-	return x, rz*mansionSpacing + (b+r.IntN(n))/2
+	return x, rz*o.place[skMansion].spacing + (b+r.IntN(n))/2
 }
 
 // isMansionChunk reports whether a woodland mansion starts in chunk
 // (cx, cz).
 func (o *Overworld) isMansionChunk(cx, cz int32) bool {
-	x, z := o.mansionPick(structure.Region(cx, mansionSpacing), structure.Region(cz, mansionSpacing))
-	if x != cx || z != cz || !o.structOK(skMansion, cx, cz) {
+	x, z := o.mansionPick(structure.Region(cx, o.place[skMansion].spacing), structure.Region(cz, o.place[skMansion].spacing))
+	if x != cx || z != cz {
+		return false
+	}
+	if o.isForced(skMansion, cx, cz) {
+		return true
+	}
+	if !o.structOK(skMansion, cx, cz) {
 		return false
 	}
 	return o.biomesOnly(cx*16+8, o.structureY(cx, cz, noSurfaceY), cz*16+8, mansionBiomeReach, o.mansionBiome)
@@ -1063,8 +1072,8 @@ const mansionReach = 8
 // mansionsReach calls f for each mansion with a piece in chunk (cx, cz).
 func (o *Overworld) mansionsReach(cx, cz int32, raw func(cx, cz int32) *PackedChunk, f func(m *mansion)) {
 	chunk := structure.NewBox(cx*16, MinY, cz*16, cx*16+15, MaxY-1, cz*16+15)
-	for rx := structure.Region(cx-mansionReach, mansionSpacing); rx <= structure.Region(cx+mansionReach, mansionSpacing); rx++ {
-		for rz := structure.Region(cz-mansionReach, mansionSpacing); rz <= structure.Region(cz+mansionReach, mansionSpacing); rz++ {
+	for rx := structure.Region(cx-mansionReach, o.place[skMansion].spacing); rx <= structure.Region(cx+mansionReach, o.place[skMansion].spacing); rx++ {
+		for rz := structure.Region(cz-mansionReach, o.place[skMansion].spacing); rz <= structure.Region(cz+mansionReach, o.place[skMansion].spacing); rz++ {
 			sx, sz := o.mansionPick(rx, rz)
 			if sx < cx-mansionReach || sx > cx+mansionReach || sz < cz-mansionReach || sz > cz+mansionReach {
 				continue
@@ -1275,7 +1284,7 @@ func (b *scBuild) stepRun(pos [3]int32, dir int32, st uint32) {
 // for concurrent use.
 func (o *Overworld) NearestMansion(x, z int32, maxRegions int32) (Scattered, bool) {
 	var cands []locateCand
-	rx0, rz0 := structure.Region(x>>4, mansionSpacing), structure.Region(z>>4, mansionSpacing)
+	rx0, rz0 := structure.Region(x>>4, o.place[skMansion].spacing), structure.Region(z>>4, o.place[skMansion].spacing)
 	for rx := rx0 - maxRegions; rx <= rx0+maxRegions; rx++ {
 		for rz := rz0 - maxRegions; rz <= rz0+maxRegions; rz++ {
 			cx, cz := o.mansionPick(rx, rz)

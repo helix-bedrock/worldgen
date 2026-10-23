@@ -61,6 +61,9 @@ const msReach = 7
 // chunk in with XOR and multipliers that are not made odd, unlike the
 // population seed.
 func (o *Overworld) isMineshaftChunk(r *rand.MT, cx, cz int32) bool {
+	if o.isForced(skMineshaft, cx, cz) {
+		return true
+	}
 	s := uint32(o.seed)
 	r.Seed(s)
 	a := r.Uint32() >> 1
@@ -69,7 +72,7 @@ func (o *Overworld) isMineshaftChunk(r *rand.MT, cx, cz int32) bool {
 	r.Uint32()
 	f := r.Float()
 	n := r.IntN(80)
-	return f < 0.004 && n < max(mathx.Abs(cx), mathx.Abs(cz)) && o.structOK(skMineshaft, cx, cz)
+	return f < o.place[skMineshaft].chance && n < max(mathx.Abs(cx), mathx.Abs(cz)) && o.structOK(skMineshaft, cx, cz)
 }
 
 // mineshaftAt assembles the mineshaft starting in chunk (cx, cz), if any.

@@ -361,9 +361,52 @@ func StructureKinds() []StructureKind {
 
 // StructureConfig holds the structure changes.
 type StructureConfig struct {
-	disabled []StructureKind
-	excludes []structExclude
-	filters  []StructureFilter
+	disabled   []StructureKind
+	excludes   []structExclude
+	filters    []StructureFilter
+	placements []kindPlacement
+	forced     []forcedStart
+}
+
+type kindPlacement struct {
+	kind StructureKind
+	p    Placement
+}
+
+type forcedStart struct {
+	kind   StructureKind
+	cx, cz int32
+}
+
+// Placement is a structure kind's placement grid. The world is cut into
+// regions of Spacing x Spacing chunks; each region has one start, drawn
+// from a random salted with Salt, at least Separation chunks from the
+// region's far edges. Larger spacing makes the kind rarer, larger
+// separation keeps starts further apart. Mineshafts have no grid: Chance
+// is their chance in each chunk. A zero field keeps the vanilla value.
+//
+// The four scattered kinds (desert pyramids, jungle temples, swamp huts,
+// igloos) share one grid: setting any of them sets it for all four.
+// Strongholds are placed in rings and have no Placement.
+type Placement struct {
+	Spacing, Separation, Salt int32
+	Chance                    float32
+}
+
+// SetPlacement changes a kind's placement grid.
+func (s *StructureConfig) SetPlacement(kind StructureKind, p Placement) {
+	s.placements = append(s.placements, kindPlacement{kind, p})
+}
+
+// PlaceAt starts a structure of kind in chunk (chunkX, chunkZ). It takes
+// the place of the vanilla start of the chunk's placement region (so it
+// keeps the kind's spacing), and it skips the biome and terrain checks:
+// a village placed in a desert is a desert village, one placed in an
+// ocean is a plains village built on the sea floor. Exclusions and filters
+// do not apply to it; a disabled kind is an error. Mineshafts may be
+// placed anywhere; strongholds cannot be placed yet.
+func (s *StructureConfig) PlaceAt(kind StructureKind, chunkX, chunkZ int32) {
+	s.forced = append(s.forced, forcedStart{kind, chunkX, chunkZ})
 }
 
 type structExclude struct {

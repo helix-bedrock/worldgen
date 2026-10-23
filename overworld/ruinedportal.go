@@ -12,22 +12,25 @@ import (
 
 // portalPick is the chunk a ruined portal region picks.
 func (o *Overworld) portalPick(rx, rz int32) (int32, int32) {
-	return structure.PortalPick(o.seed, rx, rz, structure.PortalSpacing, structure.PortalSeparation)
+	if x, z, ok := o.forcedPick(skRuinedPortal, rx, rz); ok {
+		return x, z
+	}
+	return structure.PortalPick(o.seed, rx, rz, o.place[skRuinedPortal].spacing, o.place[skRuinedPortal].separation, o.place[skRuinedPortal].salt)
 }
 
 // isPortalChunk reports whether a ruined portal starts in chunk (cx, cz).
 // Every region has one.
 func (o *Overworld) isPortalChunk(cx, cz int32) bool {
-	x, z := o.portalPick(structure.Region(cx, structure.PortalSpacing), structure.Region(cz, structure.PortalSpacing))
-	return x == cx && z == cz && o.structOK(skRuinedPortal, cx, cz)
+	x, z := o.portalPick(structure.Region(cx, o.place[skRuinedPortal].spacing), structure.Region(cz, o.place[skRuinedPortal].spacing))
+	return x == cx && z == cz && (o.isForced(skRuinedPortal, cx, cz) || o.structOK(skRuinedPortal, cx, cz))
 }
 
 // portalsReach calls f for each portal start whose blocks may reach chunk
 // (cx, cz): the box is within 16 blocks of the start chunk's corner and
 // the netherrack spreads 14 past its middle.
 func (o *Overworld) portalsReach(cx, cz int32, f func(sx, sz int32)) {
-	for rx := structure.Region(cx-2, structure.PortalSpacing); rx <= structure.Region(cx+2, structure.PortalSpacing); rx++ {
-		for rz := structure.Region(cz-2, structure.PortalSpacing); rz <= structure.Region(cz+2, structure.PortalSpacing); rz++ {
+	for rx := structure.Region(cx-2, o.place[skRuinedPortal].spacing); rx <= structure.Region(cx+2, o.place[skRuinedPortal].spacing); rx++ {
+		for rz := structure.Region(cz-2, o.place[skRuinedPortal].spacing); rz <= structure.Region(cz+2, o.place[skRuinedPortal].spacing); rz++ {
 			sx, sz := o.portalPick(rx, rz)
 			if sx >= cx-2 && sx <= cx+2 && sz >= cz-2 && sz <= cz+2 {
 				f(sx, sz)
@@ -119,7 +122,7 @@ func (o *Overworld) portalWorld(cx, cz int32, raw func(cx, cz int32) *PackedChun
 // (Kind "buried ruined_portal"). It is safe for concurrent use.
 func (o *Overworld) NearestRuinedPortal(x, z int32, maxRegions int32) (Scattered, bool) {
 	var cands []locateCand
-	rx0, rz0 := structure.Region(x>>4, structure.PortalSpacing), structure.Region(z>>4, structure.PortalSpacing)
+	rx0, rz0 := structure.Region(x>>4, o.place[skRuinedPortal].spacing), structure.Region(z>>4, o.place[skRuinedPortal].spacing)
 	for rx := rx0 - maxRegions; rx <= rx0+maxRegions; rx++ {
 		for rz := rz0 - maxRegions; rz <= rz0+maxRegions; rz++ {
 			cx, cz := o.portalPick(rx, rz)

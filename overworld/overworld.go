@@ -96,6 +96,11 @@ type Overworld struct {
 	// skip and gates are the Config's step and structure changes.
 	skip  Steps
 	gates structGates
+	// place is each structure kind's placement grid (see placementSlot).
+	place [structKindCount]startGrid
+	// forced are the PlaceAt starts by kind and placement region.
+	forced    [structKindCount]map[[2]int32][2]int32
+	anyForced bool
 
 	// overlays pools featureWorld overlay arrays (about 500 KB each).
 	overlays sync.Pool
@@ -131,7 +136,10 @@ type Overworld struct {
 	// ruinBiome is each biome's ocean ruin settings; monumentDeep and
 	// monumentWater the monument biome sets; holdsLiquid the blocks that
 	// can be waterlogged (oceanruin.go).
-	ruinBiome                   []ruinBiome
+	ruinBiome []ruinBiome
+	// ruinOcean is a plain ocean's ruin settings, for ruins the Config
+	// places outside the ruin biomes.
+	ruinOcean                   ruinBiome
 	monumentDeep, monumentWater []bool
 	holdsLiquid                 map[string]bool
 	// topSupport marks the states whose top face holds plants.
@@ -270,6 +278,7 @@ func NewOverworld(seed int64, reg *blocks.Registry, biomeIDs map[string]uint32, 
 	if o.gates, err = newStructGates(&cfg.Structures, cfg.Skip.Structures, cfg.Logger); err != nil {
 		return nil, err
 	}
+	o.place = vanillaPlacements()
 	entries, err := cfg.biomeEntries(biome.Entries(), biomeIDs)
 	if err != nil {
 		return nil, err
@@ -445,6 +454,9 @@ func NewOverworld(seed int64, reg *blocks.Registry, biomeIDs map[string]uint32, 
 		}
 		d.sk = djStructKind(d.kind)
 		o.dataJigsaws = append(o.dataJigsaws, d)
+	}
+	if err := o.applyPlacements(&cfg.Structures); err != nil {
+		return nil, err
 	}
 	features, err := o.loadFeatures(worldgen.Data, "data/vanilla/features", cfg.packs)
 	if err != nil {

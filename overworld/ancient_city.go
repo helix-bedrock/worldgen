@@ -44,12 +44,15 @@ type city struct {
 // cityPick is the chunk a region's city would start in, and the random
 // after the pick, which the start continues.
 func (o *Overworld) cityPick(rx, rz int32, r *rand.MT) (int32, int32) {
-	structureSeed(r, o.seed, rx, rz, citySalt)
-	n := int32(citySpacing - citySeparation)
+	if x, z, ok := o.forcedPick(skAncientCity, rx, rz); ok {
+		return x, z
+	}
+	structureSeed(r, o.seed, rx, rz, o.place[skAncientCity].salt)
+	n := o.place[skAncientCity].spacing - o.place[skAncientCity].separation
 	a := r.IntN(n)
-	x := rx*citySpacing + (a+r.IntN(n))/2
+	x := rx*o.place[skAncientCity].spacing + (a+r.IntN(n))/2
 	b := r.IntN(n)
-	z := rz*citySpacing + (b+r.IntN(n))/2
+	z := rz*o.place[skAncientCity].spacing + (b+r.IntN(n))/2
 	return x, z
 }
 
@@ -57,8 +60,11 @@ func (o *Overworld) cityPick(rx, rz int32, r *rand.MT) (int32, int32) {
 // (cx, cz).
 func (o *Overworld) IsAncientCityChunk(cx, cz int32) bool {
 	var r rand.MT
-	px, pz := o.cityPick(structure.Region(cx, citySpacing), structure.Region(cz, citySpacing), &r)
-	return px == cx && pz == cz && o.structOK(skAncientCity, cx, cz) && o.BiomeAt(cx*16, cityAnchorY+1, cz*16) == o.deepDark
+	px, pz := o.cityPick(structure.Region(cx, o.place[skAncientCity].spacing), structure.Region(cz, o.place[skAncientCity].spacing), &r)
+	if px != cx || pz != cz {
+		return false
+	}
+	return o.isForced(skAncientCity, cx, cz) || o.structOK(skAncientCity, cx, cz) && o.BiomeAt(cx*16, cityAnchorY+1, cz*16) == o.deepDark
 }
 
 // cityAt assembles the city of region (rx, rz), nil if it has none.
@@ -71,7 +77,7 @@ func (o *Overworld) cityAt(rx, rz int32) *city {
 	var c *city
 	var r rand.MT
 	cx, cz := o.cityPick(rx, rz, &r)
-	if o.city != nil && o.structOK(skAncientCity, cx, cz) && o.BiomeAt(cx*16, cityAnchorY+1, cz*16) == o.deepDark {
+	if o.city != nil && (o.isForced(skAncientCity, cx, cz) || o.structOK(skAncientCity, cx, cz) && o.BiomeAt(cx*16, cityAnchorY+1, cz*16) == o.deepDark) {
 		// The start is built with the start chunk's population random: of
 		// the seedings tried against BDS's city at chunk (-14, -113) it is
 		// the only one that gets every depth-1 piece right (VERIFY: the
@@ -187,8 +193,8 @@ func (o *Overworld) forCityPieces(cx, cz int32, f func(*structure.Piece) bool) {
 		return
 	}
 	chunkBox := structure.NewBox(cx*16, MinY, cz*16, cx*16+15, MaxY-1, cz*16+15)
-	r0x, r1x := structure.Region(cx-cityReach, citySpacing), structure.Region(cx+cityReach, citySpacing)
-	r0z, r1z := structure.Region(cz-cityReach, citySpacing), structure.Region(cz+cityReach, citySpacing)
+	r0x, r1x := structure.Region(cx-cityReach, o.place[skAncientCity].spacing), structure.Region(cx+cityReach, o.place[skAncientCity].spacing)
+	r0z, r1z := structure.Region(cz-cityReach, o.place[skAncientCity].spacing), structure.Region(cz+cityReach, o.place[skAncientCity].spacing)
 	for rx := r0x; rx <= r1x; rx++ {
 		for rz := r0z; rz <= r1z; rz++ {
 			c := o.cityAt(rx, rz)
@@ -216,7 +222,7 @@ type AncientCity struct {
 // (x, z), searching placement regions ring by ring up to maxRings out. It
 // is safe for concurrent use.
 func (o *Overworld) NearestAncientCity(x, z, maxRings int32) (AncientCity, bool) {
-	rx0, rz0 := structure.Region(x>>4, citySpacing), structure.Region(z>>4, citySpacing)
+	rx0, rz0 := structure.Region(x>>4, o.place[skAncientCity].spacing), structure.Region(z>>4, o.place[skAncientCity].spacing)
 	var r rand.MT
 	best, found := int64(-1), [2]int32{}
 	for ring := int32(0); ring <= maxRings; ring++ {

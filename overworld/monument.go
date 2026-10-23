@@ -126,7 +126,7 @@ func (o *Overworld) monumentAt(cx, cz int32) *monument {
 	var m *monument
 	// Gated here, not in isMonumentChunk: ruins and shipwrecks keep their
 	// distance from a disabled monument, as from a vanilla one.
-	if o.isMonumentChunk(cx, cz) && o.structOK(skMonument, cx, cz) {
+	if o.isMonumentChunk(cx, cz) && (o.isForced(skMonument, cx, cz) || o.structOK(skMonument, cx, cz)) {
 		m = o.layMonument(cx, cz)
 	}
 	o.monuments.Store(k, m)
@@ -330,8 +330,8 @@ func (m *monument) roomBox(rm *monRoom, sx, sy, sz int32) structure.Box {
 // (cx, cz). A building spans chunks sx-2..sx+2 of its start.
 func (o *Overworld) monumentsReach(cx, cz int32, f func(m *monument)) {
 	chunk := structure.NewBox(cx*16, MinY, cz*16, cx*16+15, MaxY-1, cz*16+15)
-	for rx := structure.Region(cx-2, monumentSpacing); rx <= structure.Region(cx+2, monumentSpacing); rx++ {
-		for rz := structure.Region(cz-2, monumentSpacing); rz <= structure.Region(cz+2, monumentSpacing); rz++ {
+	for rx := structure.Region(cx-2, o.place[skMonument].spacing); rx <= structure.Region(cx+2, o.place[skMonument].spacing); rx++ {
+		for rz := structure.Region(cz-2, o.place[skMonument].spacing); rz <= structure.Region(cz+2, o.place[skMonument].spacing); rz++ {
 			sx, sz := o.monumentPick(rx, rz)
 			if sx < cx-2 || sx > cx+2 || sz < cz-2 || sz > cz+2 {
 				continue
@@ -1505,7 +1505,7 @@ func (b *monBuild) penthouse() {
 // use.
 func (o *Overworld) NearestMonument(x, z int32, maxRegions int32) (Scattered, bool) {
 	var cands []locateCand
-	rx0, rz0 := structure.Region(x>>4, monumentSpacing), structure.Region(z>>4, monumentSpacing)
+	rx0, rz0 := structure.Region(x>>4, o.place[skMonument].spacing), structure.Region(z>>4, o.place[skMonument].spacing)
 	for rx := rx0 - maxRegions; rx <= rx0+maxRegions; rx++ {
 		for rz := rz0 - maxRegions; rz <= rz0+maxRegions; rz++ {
 			cx, cz := o.monumentPick(rx, rz)

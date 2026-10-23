@@ -46,7 +46,7 @@ import (
 // Ruined portal placement (sub_4E87A80): linear spread. The Nether uses
 // the same salt on a smaller grid.
 const (
-	portalSalt             = 40552231
+	PortalSalt             = 40552231
 	PortalSpacing          = 40
 	PortalSeparation       = 15
 	NetherPortalSpacing    = 25
@@ -56,9 +56,9 @@ const (
 // PortalPick is the start chunk of the ruined portal of placement region
 // (rx, rz) on a grid of the given spacing and separation, in chunks. Every
 // region has one.
-func PortalPick(seed int64, rx, rz, spacing, separation int32) (cx, cz int32) {
+func PortalPick(seed int64, rx, rz, spacing, separation, salt int32) (cx, cz int32) {
 	var r rand.MT
-	r.Seed(RegionSeed(seed, portalSalt, rx, rz))
+	r.Seed(RegionSeed(seed, uint32(salt), rx, rz))
 	n := spacing - separation
 	cx = rx*spacing + r.IntN(n)
 	return cx, rz*spacing + r.IntN(n)

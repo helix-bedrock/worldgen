@@ -215,3 +215,79 @@ func TestConfigSkip(t *testing.T) {
 		t.Error("found a village with structures skipped")
 	}
 }
+
+func TestConfigPlaceAt(t *testing.T) {
+	cfg := Vanilla()
+	cfg.Structures.PlaceAt(StructureVillage, 0, 0)
+	cfg.Structures.PlaceAt(StructureDesertPyramid, 40, 40)
+	cfg.Structures.PlaceAt(StructureMansion, -20, 30)
+	o := newConfigured(t, cfg)
+	if !o.IsVillageChunk(0, 0) || len(o.VillagePieces(0, 0)) == 0 {
+		t.Error("no village at the placed chunk")
+	}
+	if s, ok := o.NearestScattered(40*16, 40*16, "desert_pyramid", 1); !ok || s.X>>4 != 40 || s.Z>>4 != 40 {
+		t.Errorf("desert pyramid at %+v (%v), want chunk 40 40", s, ok)
+	}
+	if s, ok := o.NearestMansion(-20*16, 30*16, 1); !ok || s.X>>4 < -22 || s.X>>4 > -18 || s.Z>>4 < 28 || s.Z>>4 > 32 {
+		t.Errorf("mansion at %+v (%v), want near chunk -20 30", s, ok)
+	}
+	// The placed chunks generate.
+	var c Chunk
+	cache := NewTerrainCache(o, 256)
+	for _, p := range [][2]int32{{0, 0}, {40, 40}, {-20, 30}} {
+		cache.Generate(p[0], p[1], &c)
+	}
+}
+
+func TestConfigPlacementErrors(t *testing.T) {
+	reg, ids := testRegistry(t)
+	cases := map[string]func(c *Config){
+		"above separation": func(c *Config) {
+			c.Structures.SetPlacement(StructureVillage, Placement{Spacing: 8, Separation: 8})
+		},
+		"disabled": func(c *Config) {
+			c.Structures.Disable(StructureIgloo)
+			c.Structures.PlaceAt(StructureIgloo, 1, 1)
+		},
+		"shares its placement region": func(c *Config) {
+			c.Structures.PlaceAt(StructureIgloo, 1, 1)
+			c.Structures.PlaceAt(StructureSwampHut, 2, 2)
+		},
+		"rings": func(c *Config) { c.Structures.SetPlacement(StructureStronghold, Placement{Spacing: 10}) },
+	}
+	for want, set := range cases {
+		cfg := Vanilla()
+		set(cfg)
+		_, err := NewOverworld(configSeed, reg, ids, WithConfig(cfg))
+		if err == nil || !strings.Contains(err.Error(), want) {
+			t.Errorf("want an error with %q, got %v", want, err)
+		}
+	}
+}
+
+func TestConfigPlacement(t *testing.T) {
+	vanilla := newConfigured(t, Vanilla())
+	cfg := Vanilla()
+	cfg.Structures.SetPlacement(StructureVillage, Placement{Spacing: 12, Separation: 4})
+	o := newConfigured(t, cfg)
+	count := func(o *Overworld) int {
+		n := 0
+		for cx := int32(-96); cx < 96; cx++ {
+			for cz := int32(-96); cz < 96; cz++ {
+				if o.IsVillageChunk(cx, cz) {
+					n++
+				}
+			}
+		}
+		return n
+	}
+	if a, b := count(vanilla), count(o); b <= a {
+		t.Errorf("%d villages with spacing 12, %d in vanilla", b, a)
+	}
+	cfg = Vanilla()
+	cfg.Structures.SetPlacement(StructureMineshaft, Placement{Chance: 1e-9})
+	o = newConfigured(t, cfg)
+	if _, ok := o.NearestMineshaft(0, 0, 30); ok {
+		t.Error("found a mineshaft with a near-zero chance")
+	}
+}

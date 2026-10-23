@@ -11,7 +11,7 @@ import (
 // (called from sub_523B5C0) and a chunk is checked by sub_4FBB850.
 const (
 	villageSalt = 10387312
-	// villageSpacing and villageSeparation are the values for worlds of base
+	// o.place[skVillage].spacing and o.place[skVillage].separation are the values for worlds of base
 	// game version 1.18.0 and later; older worlds use 27 and 10
 	// (sub_523B5C0, version constant written by sub_6C01520).
 	villageSpacing    = 34
@@ -35,7 +35,13 @@ func structureSeed(r *rand.MT, seed int64, rx, rz, salt int32) {
 // preliminary surface level of the chunk's corner column, all have a
 // village type.
 func (o *Overworld) IsVillageChunk(chunkX, chunkZ int32) bool {
-	if !o.isVillageSpreadPick(chunkX, chunkZ) || !o.structOK(skVillage, chunkX, chunkZ) {
+	if !o.isVillageSpreadPick(chunkX, chunkZ) {
+		return false
+	}
+	if o.isForced(skVillage, chunkX, chunkZ) {
+		return true
+	}
+	if !o.structOK(skVillage, chunkX, chunkZ) {
 		return false
 	}
 	y := prelimSurface(o.column(chunkX*quartsPerChunk, chunkZ*quartsPerChunk))
@@ -49,13 +55,16 @@ func (o *Overworld) IsVillageChunk(chunkX, chunkZ int32) bool {
 // pick, before the biome check.
 func (o *Overworld) isVillageSpreadPick(chunkX, chunkZ int32) bool {
 	var r rand.MT
-	rx, rz := structure.Region(chunkX, villageSpacing), structure.Region(chunkZ, villageSpacing)
-	structureSeed(&r, o.seed, rx, rz, villageSalt)
-	n := int32(villageSpacing - villageSeparation)
+	rx, rz := structure.Region(chunkX, o.place[skVillage].spacing), structure.Region(chunkZ, o.place[skVillage].spacing)
+	if x, z, ok := o.forcedPick(skVillage, rx, rz); ok {
+		return x == chunkX && z == chunkZ
+	}
+	structureSeed(&r, o.seed, rx, rz, o.place[skVillage].salt)
+	n := o.place[skVillage].spacing - o.place[skVillage].separation
 	a := r.IntN(n)
-	x := rx*villageSpacing + (a+r.IntN(n))/2
+	x := rx*o.place[skVillage].spacing + (a+r.IntN(n))/2
 	b := r.IntN(n)
-	z := rz*villageSpacing + (b+r.IntN(n))/2
+	z := rz*o.place[skVillage].spacing + (b+r.IntN(n))/2
 	return x == chunkX && z == chunkZ
 }
 

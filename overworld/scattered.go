@@ -89,6 +89,19 @@ func scatterStructKind(kind uint8) structKind {
 	return skSwampHut
 }
 
+// scatterKindOf is the scattered feature kind of a structure kind.
+func scatterKindOf(k structKind) uint8 {
+	switch k {
+	case skDesertPyramid:
+		return scatterDesert
+	case skJungleTemple:
+		return scatterJungle
+	case skIgloo:
+		return scatterIgloo
+	}
+	return scatterHut
+}
+
 // djStructKind is the structure kind of a data-driven jigsaw kind.
 func djStructKind(kind string) structKind {
 	switch kind {
@@ -100,15 +113,34 @@ func djStructKind(kind string) structKind {
 	return skAbandonedCamp
 }
 
+// scatterPick is the start chunk of scattered feature region (rx, rz),
+// with its kind when the Config placed it there (scatterNone otherwise:
+// the biome decides).
+func (o *Overworld) scatterPick(rx, rz int32) (int32, int32, uint8) {
+	for _, k := range [...]structKind{skDesertPyramid, skJungleTemple, skSwampHut, skIgloo} {
+		// A start the Config placed replaces the region's vanilla one.
+		if x, z, ok := o.forcedPick(k, rx, rz); ok {
+			return x, z, scatterKindOf(k)
+		}
+	}
+	g := o.place[skDesertPyramid]
+	var r rand.MT
+	structureSeed(&r, o.seed, rx, rz, g.salt)
+	n := g.spacing - g.separation
+	x := rx*g.spacing + r.IntN(n)
+	return x, rz*g.spacing + r.IntN(n), scatterNone
+}
+
 // scatteredAt returns the kind of the scattered feature that starts in
 // chunk (cx, cz), scatterNone if none does.
 func (o *Overworld) scatteredAt(cx, cz int32) uint8 {
-	var r rand.MT
-	rx, rz := structure.Region(cx, scatterSpacing), structure.Region(cz, scatterSpacing)
-	structureSeed(&r, o.seed, rx, rz, scatterSalt)
-	n := int32(scatterSpacing - scatterSeparation)
-	if rx*scatterSpacing+r.IntN(n) != cx || rz*scatterSpacing+r.IntN(n) != cz {
+	g := o.place[skDesertPyramid]
+	x, z, forced := o.scatterPick(structure.Region(cx, g.spacing), structure.Region(cz, g.spacing))
+	if x != cx || z != cz {
 		return scatterNone
+	}
+	if forced != scatterNone {
+		return forced
 	}
 	// The test reads the biome at the preliminary surface (0 if there is
 	// none), the start at the same level (1 if there is none).
@@ -1054,14 +1086,10 @@ func (o *Overworld) NearestIglooBasement(x, z int32, maxRegions int32) (Scattere
 // regions within maxRegions of block (x, z), nearest first.
 func (o *Overworld) scatterCandidates(x, z int32, maxRegions int32) [][2]int32 {
 	var cands []locateCand
-	rx0, rz0 := structure.Region(x>>4, scatterSpacing), structure.Region(z>>4, scatterSpacing)
+	rx0, rz0 := structure.Region(x>>4, o.place[skDesertPyramid].spacing), structure.Region(z>>4, o.place[skDesertPyramid].spacing)
 	for rx := rx0 - maxRegions; rx <= rx0+maxRegions; rx++ {
 		for rz := rz0 - maxRegions; rz <= rz0+maxRegions; rz++ {
-			var r rand.MT
-			structureSeed(&r, o.seed, rx, rz, scatterSalt)
-			n := int32(scatterSpacing - scatterSeparation)
-			cx := rx*scatterSpacing + r.IntN(n)
-			cz := rz*scatterSpacing + r.IntN(n)
+			cx, cz, _ := o.scatterPick(rx, rz)
 			dx, dz := int64(cx*16+8-x), int64(cz*16+8-z)
 			cands = append(cands, locateCand{cx, cz, dx*dx + dz*dz})
 		}

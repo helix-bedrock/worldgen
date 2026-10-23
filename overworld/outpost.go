@@ -94,20 +94,29 @@ type outpostPiece struct {
 
 // outpostPick is the chunk an outpost region picks.
 func (o *Overworld) outpostPick(rx, rz int32) (int32, int32) {
+	if x, z, ok := o.forcedPick(skOutpost, rx, rz); ok {
+		return x, z
+	}
 	var r rand.MT
-	structureSeed(&r, o.seed, rx, rz, outpostSalt)
-	n := int32(outpostSpacing - outpostSeparation)
+	structureSeed(&r, o.seed, rx, rz, o.place[skOutpost].salt)
+	n := o.place[skOutpost].spacing - o.place[skOutpost].separation
 	a := r.IntN(n)
-	x := rx*outpostSpacing + (a+r.IntN(n))/2
+	x := rx*o.place[skOutpost].spacing + (a+r.IntN(n))/2
 	b := r.IntN(n)
-	return x, rz*outpostSpacing + (b+r.IntN(n))/2
+	return x, rz*o.place[skOutpost].spacing + (b+r.IntN(n))/2
 }
 
 // isOutpostChunk reports whether a pillager outpost starts in chunk
 // (cx, cz).
 func (o *Overworld) isOutpostChunk(cx, cz int32) bool {
-	x, z := o.outpostPick(structure.Region(cx, outpostSpacing), structure.Region(cz, outpostSpacing))
-	if x != cx || z != cz || !o.structOK(skOutpost, cx, cz) {
+	x, z := o.outpostPick(structure.Region(cx, o.place[skOutpost].spacing), structure.Region(cz, o.place[skOutpost].spacing))
+	if x != cx || z != cz {
+		return false
+	}
+	if o.isForced(skOutpost, cx, cz) {
+		return true
+	}
+	if !o.structOK(skOutpost, cx, cz) {
 		return false
 	}
 	b := o.BiomeAt(cx*16+8, o.structureY(cx, cz, noSurfaceY), cz*16+8)
@@ -127,9 +136,9 @@ func (o *Overworld) outpostAt(cx, cz int32) []outpostPiece {
 		// The start continues the region's random after the spread draws,
 		// as villages do (the rotation matches BDS's outposts).
 		var r rand.MT
-		structureSeed(&r, o.seed, structure.Region(cx, outpostSpacing), structure.Region(cz, outpostSpacing), outpostSalt)
+		structureSeed(&r, o.seed, structure.Region(cx, o.place[skOutpost].spacing), structure.Region(cz, o.place[skOutpost].spacing), o.place[skOutpost].salt)
 		for range outpostSpreadDraws {
-			r.IntN(outpostSpacing - outpostSeparation)
+			r.IntN(o.place[skOutpost].spacing - o.place[skOutpost].separation)
 		}
 		rot := int(r.IntN(structRotations))
 		x, z := cx*16, cz*16
@@ -172,8 +181,8 @@ func (o *Overworld) outpostBox(p outpostPiece) (structure.Box, *structure.Jigsaw
 // Pieces reach at most 3 chunks from the start.
 func (o *Overworld) outpostsReach(cx, cz int32, f func(pieces []outpostPiece)) {
 	chunk := structure.NewBox(cx*16, MinY, cz*16, cx*16+15, MaxY-1, cz*16+15)
-	for rx := structure.Region(cx-outpostReachChunks, outpostSpacing); rx <= structure.Region(cx+outpostReachChunks, outpostSpacing); rx++ {
-		for rz := structure.Region(cz-outpostReachChunks, outpostSpacing); rz <= structure.Region(cz+outpostReachChunks, outpostSpacing); rz++ {
+	for rx := structure.Region(cx-outpostReachChunks, o.place[skOutpost].spacing); rx <= structure.Region(cx+outpostReachChunks, o.place[skOutpost].spacing); rx++ {
+		for rz := structure.Region(cz-outpostReachChunks, o.place[skOutpost].spacing); rz <= structure.Region(cz+outpostReachChunks, o.place[skOutpost].spacing); rz++ {
 			sx, sz := o.outpostPick(rx, rz)
 			if sx < cx-outpostReachChunks || sx > cx+outpostReachChunks || sz < cz-outpostReachChunks || sz > cz+outpostReachChunks {
 				continue
@@ -325,7 +334,7 @@ func (b *scBuild) outpostPiece(p outpostPiece, raw func(cx, cz int32) *PackedChu
 // use.
 func (o *Overworld) NearestOutpost(x, z int32, maxRegions int32) (Scattered, bool) {
 	var cands []locateCand
-	rx0, rz0 := structure.Region(x>>4, outpostSpacing), structure.Region(z>>4, outpostSpacing)
+	rx0, rz0 := structure.Region(x>>4, o.place[skOutpost].spacing), structure.Region(z>>4, o.place[skOutpost].spacing)
 	for rx := rx0 - maxRegions; rx <= rx0+maxRegions; rx++ {
 		for rz := rz0 - maxRegions; rz <= rz0+maxRegions; rz++ {
 			cx, cz := o.outpostPick(rx, rz)

@@ -220,6 +220,7 @@ type ruinPiece struct {
 // initOceanStructures fills the per-biome ocean structure tables.
 func (o *Overworld) initOceanStructures(biomeIDs map[string]uint32, n uint32) error {
 	o.ruinBiome = make([]ruinBiome, n)
+	o.ruinOcean = ruinBiomes()["ocean"]
 	for name, rb := range ruinBiomes() {
 		if id, ok := biomeIDs[name]; ok {
 			o.ruinBiome[id] = rb
@@ -270,21 +271,27 @@ func (o *Overworld) structureY(cx, cz, none int32) int32 {
 
 // monumentPick is the chunk a monument region picks.
 func (o *Overworld) monumentPick(rx, rz int32) (int32, int32) {
+	if x, z, ok := o.forcedPick(skMonument, rx, rz); ok {
+		return x, z
+	}
 	var r rand.MT
-	structureSeed(&r, o.seed, rx, rz, monumentSalt)
-	n := int32(monumentSpacing - monumentSeparation)
+	structureSeed(&r, o.seed, rx, rz, o.place[skMonument].salt)
+	n := o.place[skMonument].spacing - o.place[skMonument].separation
 	a := r.IntN(n)
-	x := rx*monumentSpacing + (a+r.IntN(n))/2
+	x := rx*o.place[skMonument].spacing + (a+r.IntN(n))/2
 	b := r.IntN(n)
-	return x, rz*monumentSpacing + (b+r.IntN(n))/2
+	return x, rz*o.place[skMonument].spacing + (b+r.IntN(n))/2
 }
 
 // isMonumentChunk reports whether an ocean monument starts in chunk
 // (cx, cz).
 func (o *Overworld) isMonumentChunk(cx, cz int32) bool {
-	x, z := o.monumentPick(structure.Region(cx, monumentSpacing), structure.Region(cz, monumentSpacing))
+	x, z := o.monumentPick(structure.Region(cx, o.place[skMonument].spacing), structure.Region(cz, o.place[skMonument].spacing))
 	if x != cx || z != cz {
 		return false
+	}
+	if o.isForced(skMonument, cx, cz) {
+		return true
 	}
 	y := o.structureY(cx, cz, noSurfaceY)
 	return o.biomesOnly(cx*16+8, y, cz*16+8, monumentDeepReach, o.monumentDeep) &&
@@ -294,8 +301,8 @@ func (o *Overworld) isMonumentChunk(cx, cz int32) bool {
 // monumentNear reports whether a monument starts in chunks cx0..cx1,
 // cz0..cz1 (the ruin test asks each chunk; only region picks can answer).
 func (o *Overworld) monumentNear(cx0, cz0, cx1, cz1 int32) bool {
-	for rx := structure.Region(cx0, monumentSpacing); rx <= structure.Region(cx1, monumentSpacing); rx++ {
-		for rz := structure.Region(cz0, monumentSpacing); rz <= structure.Region(cz1, monumentSpacing); rz++ {
+	for rx := structure.Region(cx0, o.place[skMonument].spacing); rx <= structure.Region(cx1, o.place[skMonument].spacing); rx++ {
+		for rz := structure.Region(cz0, o.place[skMonument].spacing); rz <= structure.Region(cz1, o.place[skMonument].spacing); rz++ {
 			x, z := o.monumentPick(rx, rz)
 			if x >= cx0 && x <= cx1 && z >= cz0 && z <= cz1 && o.isMonumentChunk(x, z) {
 				return true
@@ -307,18 +314,27 @@ func (o *Overworld) monumentNear(cx0, cz0, cx1, cz1 int32) bool {
 
 // ruinPick is the chunk a ruin region picks.
 func (o *Overworld) ruinPick(rx, rz int32) (int32, int32) {
+	if x, z, ok := o.forcedPick(skOceanRuin, rx, rz); ok {
+		return x, z
+	}
 	var r rand.MT
-	structureSeed(&r, o.seed, rx, rz, ruinSalt)
-	n := int32(ruinSpacing - ruinSeparation)
-	x := rx*ruinSpacing + r.IntN(n)
-	return x, rz*ruinSpacing + r.IntN(n)
+	structureSeed(&r, o.seed, rx, rz, o.place[skOceanRuin].salt)
+	n := o.place[skOceanRuin].spacing - o.place[skOceanRuin].separation
+	x := rx*o.place[skOceanRuin].spacing + r.IntN(n)
+	return x, rz*o.place[skOceanRuin].spacing + r.IntN(n)
 }
 
 // ruinAt returns the settings of the ocean ruin starting in chunk (cx, cz);
 // ok is false if none does.
 func (o *Overworld) ruinAt(cx, cz int32) ruinBiome {
-	x, z := o.ruinPick(structure.Region(cx, ruinSpacing), structure.Region(cz, ruinSpacing))
-	if x != cx || z != cz || !o.structOK(skOceanRuin, cx, cz) {
+	x, z := o.ruinPick(structure.Region(cx, o.place[skOceanRuin].spacing), structure.Region(cz, o.place[skOceanRuin].spacing))
+	if x != cx || z != cz {
+		return ruinBiome{}
+	}
+	if o.isForced(skOceanRuin, cx, cz) {
+		return o.forcedRuin(cx, cz)
+	}
+	if !o.structOK(skOceanRuin, cx, cz) {
 		return ruinBiome{}
 	}
 	b := o.BiomeAt(cx*16+8, o.structureY(cx, cz, noSurfaceY), cz*16+8)
@@ -429,8 +445,8 @@ func (o *Overworld) ruinBox(p ruinPiece) (structure.Box, *structure.JigsawTempla
 // with its pieces. Pieces reach at most 3 chunks from the start.
 func (o *Overworld) ruinsReach(cx, cz int32, f func(sx, sz int32, pieces []ruinPiece)) {
 	chunk := structure.NewBox(cx*16, MinY, cz*16, cx*16+15, MaxY-1, cz*16+15)
-	for rx := structure.Region(cx-ruinReachChunks, ruinSpacing); rx <= structure.Region(cx+ruinReachChunks, ruinSpacing); rx++ {
-		for rz := structure.Region(cz-ruinReachChunks, ruinSpacing); rz <= structure.Region(cz+ruinReachChunks, ruinSpacing); rz++ {
+	for rx := structure.Region(cx-ruinReachChunks, o.place[skOceanRuin].spacing); rx <= structure.Region(cx+ruinReachChunks, o.place[skOceanRuin].spacing); rx++ {
+		for rz := structure.Region(cz-ruinReachChunks, o.place[skOceanRuin].spacing); rz <= structure.Region(cz+ruinReachChunks, o.place[skOceanRuin].spacing); rz++ {
 			sx, sz := o.ruinPick(rx, rz)
 			if sx < cx-ruinReachChunks || sx > cx+ruinReachChunks || sz < cz-ruinReachChunks || sz > cz+ruinReachChunks {
 				continue
@@ -611,7 +627,7 @@ func (b *scBuild) ruinChest(p ruinPiece, pos [3]int32) {
 // is safe for concurrent use.
 func (o *Overworld) NearestOceanRuin(x, z int32, maxRegions int32) (Scattered, bool) {
 	var cands []locateCand
-	rx0, rz0 := structure.Region(x>>4, ruinSpacing), structure.Region(z>>4, ruinSpacing)
+	rx0, rz0 := structure.Region(x>>4, o.place[skOceanRuin].spacing), structure.Region(z>>4, o.place[skOceanRuin].spacing)
 	for rx := rx0 - maxRegions; rx <= rx0+maxRegions; rx++ {
 		for rz := rz0 - maxRegions; rz <= rz0+maxRegions; rz++ {
 			cx, cz := o.ruinPick(rx, rz)
@@ -667,4 +683,14 @@ func ruinLayer(name, kind string, x, z int32, rot int, integrity float32, big, w
 		path = fmt.Sprintf(name, kind)
 	}
 	return ruinPiece{"ruin/" + path, x, z, rot, integrity, big, warm}
+}
+
+// forcedRuin is the settings of a ruin the Config placed: its biome's, or a
+// plain ocean's when its biome has no ruins.
+func (o *Overworld) forcedRuin(cx, cz int32) ruinBiome {
+	b := o.BiomeAt(cx*16+8, o.structureY(cx, cz, 0), cz*16+8)
+	if int(b) < len(o.ruinBiome) && o.ruinBiome[b].ok {
+		return o.ruinBiome[b]
+	}
+	return o.ruinOcean
 }

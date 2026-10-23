@@ -226,10 +226,10 @@ func (o *Overworld) villageAt(cx, cz int32) *village {
 		var r rand.MT
 		// The start is built with the region's random after the spread
 		// draws (VERIFY: sub_4FBBAD0's caller).
-		rx, rz := structure.Region(cx, villageSpacing), structure.Region(cz, villageSpacing)
-		structureSeed(&r, o.seed, rx, rz, villageSalt)
+		rx, rz := structure.Region(cx, o.place[skVillage].spacing), structure.Region(cz, o.place[skVillage].spacing)
+		structureSeed(&r, o.seed, rx, rz, o.place[skVillage].salt)
 		for range 4 {
-			r.IntN(villageSpacing - villageSeparation)
+			r.IntN(o.place[skVillage].spacing - o.place[skVillage].separation)
 		}
 		rotation := int(r.IntN(4))
 		abandoned := r.Float() < 0.02
@@ -261,15 +261,12 @@ func (o *Overworld) placeVillages(cx, cz int32, c *Chunk, height func(x, z int32
 		return
 	}
 	// Villages reach up to 80 blocks from their start chunk.
-	r0x, r1x := structure.Region(cx-6, villageSpacing), structure.Region(cx+6, villageSpacing)
-	r0z, r1z := structure.Region(cz-6, villageSpacing), structure.Region(cz+6, villageSpacing)
+	r0x, r1x := structure.Region(cx-6, o.place[skVillage].spacing), structure.Region(cx+6, o.place[skVillage].spacing)
+	r0z, r1z := structure.Region(cz-6, o.place[skVillage].spacing), structure.Region(cz+6, o.place[skVillage].spacing)
 	chunkBox := structure.NewBox(cx*16, MinY, cz*16, cx*16+15, MaxY-1, cz*16+15)
 	for rx := r0x; rx <= r1x; rx++ {
 		for rz := r0z; rz <= r1z; rz++ {
-			sx, sz, ok := o.villagePick(rx, rz)
-			if !ok {
-				continue
-			}
+			sx, sz := o.villagePick(rx, rz)
 			v := o.villageAt(sx, sz)
 			if v == nil || !v.bb.Intersects(chunkBox) {
 				continue
@@ -287,15 +284,18 @@ func (o *Overworld) placeVillages(cx, cz int32, c *Chunk, height func(x, z int32
 }
 
 // villagePick is the chunk a region's village would start in.
-func (o *Overworld) villagePick(rx, rz int32) (int32, int32, bool) {
+func (o *Overworld) villagePick(rx, rz int32) (int32, int32) {
+	if x, z, ok := o.forcedPick(skVillage, rx, rz); ok {
+		return x, z
+	}
 	var r rand.MT
-	structureSeed(&r, o.seed, rx, rz, villageSalt)
-	n := int32(villageSpacing - villageSeparation)
+	structureSeed(&r, o.seed, rx, rz, o.place[skVillage].salt)
+	n := o.place[skVillage].spacing - o.place[skVillage].separation
 	a := r.IntN(n)
-	x := rx*villageSpacing + (a+r.IntN(n))/2
+	x := rx*o.place[skVillage].spacing + (a+r.IntN(n))/2
 	b := r.IntN(n)
-	z := rz*villageSpacing + (b+r.IntN(n))/2
-	return x, z, true
+	z := rz*o.place[skVillage].spacing + (b+r.IntN(n))/2
+	return x, z
 }
 
 // placePiece writes the blocks of a piece that fall in chunkBox into c.
@@ -443,11 +443,11 @@ func (o *Overworld) villagesReach(cx, cz int32) bool {
 		return false
 	}
 	chunkBox := structure.NewBox(cx*16, MinY, cz*16, cx*16+15, MaxY-1, cz*16+15)
-	r0x, r1x := structure.Region(cx-6, villageSpacing), structure.Region(cx+6, villageSpacing)
-	r0z, r1z := structure.Region(cz-6, villageSpacing), structure.Region(cz+6, villageSpacing)
+	r0x, r1x := structure.Region(cx-6, o.place[skVillage].spacing), structure.Region(cx+6, o.place[skVillage].spacing)
+	r0z, r1z := structure.Region(cz-6, o.place[skVillage].spacing), structure.Region(cz+6, o.place[skVillage].spacing)
 	for rx := r0x; rx <= r1x; rx++ {
 		for rz := r0z; rz <= r1z; rz++ {
-			sx, sz, _ := o.villagePick(rx, rz)
+			sx, sz := o.villagePick(rx, rz)
 			if v := o.villageAt(sx, sz); v != nil && v.bb.Intersects(chunkBox) {
 				for _, p := range v.pieces {
 					if p.BB.Intersects(chunkBox) {
@@ -508,7 +508,7 @@ func (o *Overworld) villageKind(cx, cz int32) string {
 // takes any. It returns the centre of the start chunk and its preliminary
 // surface height.
 func (o *Overworld) NearestVillage(x, z int32, kind string, maxRings int32) (vx, vy, vz int32, ok bool) {
-	rx0, rz0 := structure.Region(x>>4, villageSpacing), structure.Region(z>>4, villageSpacing)
+	rx0, rz0 := structure.Region(x>>4, o.place[skVillage].spacing), structure.Region(z>>4, o.place[skVillage].spacing)
 	best := int64(-1)
 	for ring := int32(0); ring <= maxRings; ring++ {
 		for rx := rx0 - ring; rx <= rx0+ring; rx++ {
@@ -516,7 +516,7 @@ func (o *Overworld) NearestVillage(x, z int32, kind string, maxRings int32) (vx,
 				if max(mathx.Abs(rx-rx0), mathx.Abs(rz-rz0)) != ring {
 					continue
 				}
-				cx, cz, _ := o.villagePick(rx, rz)
+				cx, cz := o.villagePick(rx, rz)
 				if !o.IsVillageChunk(cx, cz) || (kind != "" && o.villageKind(cx, cz) != kind) {
 					continue
 				}
@@ -549,11 +549,11 @@ func (o *Overworld) villageFeatures(w *featureWorld, ox, oz int32, pop uint32) {
 	}
 	chunkBox := structure.NewBox(ox*16, MinY, oz*16, ox*16+15, MaxY-1, oz*16+15)
 	var r *rand.MT
-	r0x, r1x := structure.Region(ox-6, villageSpacing), structure.Region(ox+6, villageSpacing)
-	r0z, r1z := structure.Region(oz-6, villageSpacing), structure.Region(oz+6, villageSpacing)
+	r0x, r1x := structure.Region(ox-6, o.place[skVillage].spacing), structure.Region(ox+6, o.place[skVillage].spacing)
+	r0z, r1z := structure.Region(oz-6, o.place[skVillage].spacing), structure.Region(oz+6, o.place[skVillage].spacing)
 	for rx := r0x; rx <= r1x; rx++ {
 		for rz := r0z; rz <= r1z; rz++ {
-			sx, sz, _ := o.villagePick(rx, rz)
+			sx, sz := o.villagePick(rx, rz)
 			v := o.villageAt(sx, sz)
 			if v == nil || !v.bb.Intersects(chunkBox) {
 				continue
@@ -602,7 +602,7 @@ func (o *Overworld) VillagePieces(cx, cz int32) []PieceInfo {
 	if o.jigsaw == nil {
 		return nil
 	}
-	sx, sz, _ := o.villagePick(structure.Region(cx, villageSpacing), structure.Region(cz, villageSpacing))
+	sx, sz := o.villagePick(structure.Region(cx, o.place[skVillage].spacing), structure.Region(cz, o.place[skVillage].spacing))
 	v := o.villageAt(sx, sz)
 	if v == nil {
 		return nil
