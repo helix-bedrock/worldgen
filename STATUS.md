@@ -139,19 +139,21 @@ world seed and the template instead, so the same seed always gives the same colo
 Structure chests, dispensers and suspicious sand carry their loot table, but the loot is not filled in yet, so chests are empty in
 game.
 
-## Customizing (Overworld Config)
+## Customizing (Config)
 
 Not part of vanilla: these change the world on purpose. With no changes the output is BDS's.
 
 | What | Status |
 | --- | --- |
-| Disable, re-weight or replace feature rules and features; Go features and rules; add-on packs | Done |
-| Remove, replace, scale and add biomes; change biome tags | Done |
-| Disable structures, exclude areas, filters, placement grids, fixed positions | Done (no fixed strongholds) |
-| Skip caves, canyons, bedrock floor, surfaces, structures, decoration, freezing | Done |
-| Structure biome lists, templates, jigsaw pools, loot tables, block swaps | Not yet |
-| Sea level, deepslate and other terrain settings; a JSON config file | Not yet |
-| Nether and End Config | Not yet |
+| Overworld: disable, re-weight or replace feature rules and features; Go features and rules; add-on packs | Done |
+| Overworld: remove, replace, scale and add biomes; change biome tags | Done |
+| Overworld: disable structures, exclude areas, filters, placement grids, biome lists, fixed positions (strongholds too) | Done |
+| Overworld: replace templates, edit jigsaw pools, swap loot tables and structure blocks | Done |
+| Overworld: sea level, sea block, no deepslate, no ore veins; skip whole steps | Done |
+| Overworld: JSON config file (read and write), Explain a block | Done |
+| Nether: biomes, feature rules, structures (disable, exclude, filter, place, loot), steps | Done |
+| End: End cities (exclude, filter, place, loot), skip pillars, islands, chorus, gateways | Done |
+| Nether and End: JSON config files, block swaps, template and pool edits | Not yet |
 
 ## Other dimensions
 

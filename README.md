@@ -36,8 +36,8 @@ Most parts match BDS block for block; the rest are close. What is left:
 - **Mobs in structures:** worldgen hands them to the engine as spawn records; only the End crystals
   so far.
 - **Loot:** chests get their loot table and seed; filling them is up to the server.
-- **The API is not stable yet.** Names and behaviour may still change between commits. The new
-  Overworld `Config` (see below) is the newest part.
+- **The API is not stable yet.** Names and behaviour may still change between commits. The world
+  `Config`s (see below) are the newest part.
 
 ## How it is checked
 
@@ -102,13 +102,22 @@ cfg.Features.AddRule(overworld.Rule{ID: "myserver:crystals", Places: "myserver:c
 	Pass: overworld.SurfacePass, Tags: []string{"plains"}, Iterations: 2})
 cfg.AddPack(os.DirFS("my_addon")) // features/ and feature_rules/ in Mojang's add-on format
 
-// Structures
+// Structures: where...
 cfg.Structures.Disable(overworld.StructureMansion)
 cfg.Structures.Exclude(overworld.Box(-500, -500, 500, 500)) // nothing near spawn
 cfg.Structures.SetPlacement(overworld.StructureVillage, overworld.Placement{Spacing: 20, Separation: 6})
+cfg.Structures.SetBiomes(overworld.StructureMansion, "plains", "forest")
 cfg.Structures.PlaceAt(overworld.StructureVillage, 2, 3)  // a village in chunk (2, 3)
+cfg.Structures.PlaceAt(overworld.StructureStronghold, 0, 0)
+// ...and what
+cfg.Structures.SetPoolWeight("minecraft:village/plains/houses", "village/plains/houses/plains_small_house_1", 0)
+cfg.Structures.AddToPool("minecraft:village/plains/houses", "myserver/house", 3) // from a pack
+cfg.Structures.ReplaceTemplate("village/plains/houses/plains_big_house_1", "myserver/big_house")
+cfg.Structures.ReplaceLoot("loot_tables/chests/village/village_plains_house.json", "loot_tables/my/house.json")
+cfg.Structures.ReplaceBlock(overworld.StructureVillage, "cobblestone", "mossy_cobblestone")
 
-// Whole steps
+// Terrain and whole steps
+cfg.Terrain = overworld.Terrain{SeaLevel: 70, SeaBlock: "lava", NoDeepslate: true}
 cfg.Skip.Caves = true
 
 gen, err := overworld.NewOverworld(seed, reg, biomeIDs, overworld.WithConfig(cfg))
@@ -116,8 +125,14 @@ gen, err := overworld.NewOverworld(seed, reg, biomeIDs, overworld.WithConfig(cfg
 
 What a change does not touch stays as in vanilla: a disabled rule still makes its random
 draws, so the features around it do not move. `FeatureRuleIDs`, `FeatureIDs`,
-`StructureKinds` and `Placement` list what there is to change. Only the Overworld has a
-`Config` so far.
+`StructureKinds` and `Placement` list what there is to change, and `TerrainCache.Explain`
+says which step placed any block.
+
+Server owners who do not write Go can put the same changes in a JSON file:
+`overworld.ParseConfig` reads it (its doc comment shows the format) and `Config.MarshalJSON`
+writes one. The Nether and the End have their own, smaller `Config`s (`nether.WithConfig`,
+`end.WithConfig`): biomes, feature rules, structures and steps in the Nether; End cities and
+the pillars, islands, chorus and gateways in the End.
 
 ## Features
 
