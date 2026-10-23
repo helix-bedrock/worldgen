@@ -69,12 +69,26 @@ type End struct {
 	// start chunk (nil where none starts).
 	st     *structure.Lib
 	cities sync.Map
+
+	// The Config's changes: steps skipped, the city gate, the placed city
+	// starts by placement region, and the loot swaps.
+	skip   Steps
+	gate   *structure.Gate
+	forced map[[2]int32][2]int32
+	loot   map[string]string
 }
 
 // New builds the noises for a seed. reg must contain the vanilla blocks the
 // generator places; biomeIDs maps biome names (no "minecraft:" prefix) to
 // numeric IDs, as from biome.LoadIDs.
-func New(seed int64, reg *blocks.Registry, biomeIDs map[string]uint32) (*End, error) {
+func New(seed int64, reg *blocks.Registry, biomeIDs map[string]uint32, opts ...Option) (*End, error) {
+	var o options
+	for _, opt := range opts {
+		opt(&o)
+	}
+	if o.cfg == nil {
+		o.cfg = Vanilla()
+	}
 	if reg.Len() > 1<<16 {
 		return nil, fmt.Errorf("worldgen: %d block states do not fit the 16-bit chunk storage", reg.Len())
 	}
@@ -104,6 +118,9 @@ func New(seed int64, reg *blocks.Registry, biomeIDs map[string]uint32) (*End, er
 	e.spikes = spikes(seed)
 	var err error
 	if e.st, err = structure.NewLib(seed, reg); err != nil {
+		return nil, err
+	}
+	if err := e.applyConfig(o.cfg); err != nil {
 		return nil, err
 	}
 	return e, nil

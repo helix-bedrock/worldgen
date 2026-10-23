@@ -89,6 +89,10 @@ type region struct {
 	// slots holds the placements in each of the 3x3 chunks, in order.
 	slots [9]writeList
 	be    []structure.BlockEntity
+	// hidden makes writes land in blocks, where later features see them,
+	// but not in slots: a skipped feature still affects the draws and
+	// reads of the features after it, as in vanilla, but places nothing.
+	hidden bool
 }
 
 // writeList is an origin's placements in one chunk: the Chunk index and
@@ -126,6 +130,9 @@ func (r *region) set(x, y, z int32, b uint32) {
 	}
 	r.load()
 	r.blocks[i] = uint16(b)
+	if r.hidden {
+		return
+	}
 	lx, lz := x-r.x0, z-r.z0
 	l := &r.slots[(lx>>4)*3+(lz>>4)]
 	l.pos = append(l.pos, uint32(y)<<8|uint32(lz&15)<<4|uint32(lx&15))
@@ -339,9 +346,12 @@ func (e *End) decorate(r *region, ox, oz int32) {
 	// VERIFY: where it comes from is not traced; the biome decoration step
 	// (sub_5194680) runs first, though the End has no feature rules.
 	mt.Uint32()
+	r.hidden = false
 	for _, s := range e.spikes {
 		if (s.x-s.radius)&^15 == ox*16 && (s.z-s.radius)&^15 == oz*16 {
+			r.hidden = e.skip.Pillars
 			e.placeSpike(r, s)
+			r.hidden = false
 		}
 	}
 	if int64(ox)*int64(ox)+int64(oz)*int64(oz) <= outerIslandChunks2 {
@@ -353,10 +363,12 @@ func (e *End) decorate(r *region, ox, oz int32) {
 		x := int32(mt.Uint32()&15) + x0 + 8
 		y := int32(mt.Uint32()&15) + smallIslandY
 		z := int32(mt.Uint32()&15) + z0 + 8
+		r.hidden = e.skip.SmallIslands
 		e.smallIsland(r, x, y, z, mt)
 		if mt.Uint32()&3 == 0 {
 			e.smallIsland(r, x, y, z, mt)
 		}
+		r.hidden = false
 	}
 	if h <= highGround {
 		return
@@ -368,15 +380,19 @@ func (e *End) decorate(r *region, ox, oz int32) {
 		if y <= 0 || r.at(x, y, z) != e.ids.air || r.at(x, y-1, z) != e.ids.endStone {
 			continue
 		}
+		r.hidden = e.skip.Chorus
 		r.set(x, y, z, e.deco.chorusPlant)
 		e.growChorus(r, x, y, z, x, z, mt, chorusSpread, 0)
+		r.hidden = false
 	}
 	if mt.Uint32()%gatewayChance == 0 {
 		x := int32(mt.Uint32()&15) + x0 + 8
 		z := int32(mt.Uint32()&15) + z0 + 8
 		if y := r.height(x, z); y > 0 {
 			y += gatewayRise + int32(mt.Uint32()%gatewayRiseRange)
+			r.hidden = e.skip.Gateways
 			e.gateway(r, x, y, z)
+			r.hidden = false
 		}
 	}
 }
@@ -545,7 +561,7 @@ func (e *End) gateway(r *region, x, y, z int32) {
 			}
 		}
 	}
-	if _, ok := r.index(x, y, z); ok {
+	if _, ok := r.index(x, y, z); ok && !r.hidden {
 		r.be = append(r.be, structure.BlockEntity{X: x, Y: y, Z: z, Data: map[string]any{
 			"id": "EndGateway", "x": x, "y": y, "z": z, "Age": int32(0),
 			"ExitPortal": []any{gatewayExit[0], gatewayExit[1], gatewayExit[2]},
@@ -576,6 +592,7 @@ func (e *End) Decorate(chunkX, chunkZ int32, c *Chunk, neighbour func(cx, cz int
 	e.decorateWith(chunkX, chunkZ, c, func(ox, oz int32) *originWrites { return e.originWrites(ox, oz, neighbour) })
 	e.placeCities(chunkX, chunkZ, c)
 	e.placeCrystals(chunkX, chunkZ, c)
+	e.finishChunk(c)
 }
 
 // decorateWith applies the placements of the nine origins around chunk
@@ -639,4 +656,5 @@ func (c *Cache) Generate(chunkX, chunkZ int32, out *Chunk) {
 	})
 	c.e.placeCities(chunkX, chunkZ, out)
 	c.e.placeCrystals(chunkX, chunkZ, out)
+	c.e.finishChunk(out)
 }

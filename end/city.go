@@ -43,6 +43,9 @@ func (e *End) cityRandom(rx, rz int32) *rand.MT {
 
 // cityPick is the chunk city region (rx, rz) picks.
 func (e *End) cityPick(rx, rz int32) (int32, int32) {
+	if at, ok := e.forced[[2]int32{rx, rz}]; ok {
+		return at[0], at[1]
+	}
 	r := e.cityRandom(rx, rz)
 	n := int32(citySpacing - citySeparation)
 	x := (r.IntN(n)+r.IntN(n))/2 + rx*citySpacing
@@ -82,7 +85,14 @@ func (e *End) cityHeight(cx, cz int32, rot int) int32 {
 // chunks from the origin, on ground at least 60 high.
 func (e *End) isCityChunk(cx, cz int32) (rot int, y int32, ok bool) {
 	px, pz := e.cityPick(structure.Region(cx, citySpacing), structure.Region(cz, citySpacing))
-	if px != cx || pz != cz || int64(cx)*int64(cx)+int64(cz)*int64(cz) <= cityMinChunks2 {
+	if px != cx || pz != cz {
+		return 0, 0, false
+	}
+	if e.isForced(cx, cz) {
+		rot = cityRot(cx, cz)
+		return rot, max(e.cityHeight(cx, cz, rot), cityMinY), true
+	}
+	if int64(cx)*int64(cx)+int64(cz)*int64(cz) <= cityMinChunks2 || !e.gate.OK(0, cx, cz) {
 		return 0, 0, false
 	}
 	rot = cityRot(cx, cz)

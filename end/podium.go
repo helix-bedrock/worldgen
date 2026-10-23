@@ -30,6 +30,9 @@ const crystalIdentifier = "minecraft:ender_crystal"
 // VERIFY: BDS turns each crystal by a draw from the chunk's random (yaws
 // seen: 47 to 108 degrees); the crystals here face yaw 0.
 func (e *End) placeCrystals(cx, cz int32, c *Chunk) {
+	if e.skip.Pillars {
+		return
+	}
 	for _, s := range e.spikes {
 		if s.x>>4 != cx || s.z>>4 != cz {
 			continue

@@ -9,7 +9,7 @@ import (
 	"github.com/helix-bedrock/worldgen/blocks"
 )
 
-func testEnd(t testing.TB, seed int64) *End {
+func testEnd(t testing.TB, seed int64, opts ...Option) *End {
 	t.Helper()
 	dir := filepath.Join("..", "overworld", "testdata")
 	p, err := os.Open(filepath.Join(dir, "block_palette.nbt"))
@@ -35,7 +35,7 @@ func testEnd(t testing.TB, seed int64) *End {
 	if err != nil {
 		t.Fatal(err)
 	}
-	e, err := New(seed, reg, ids)
+	e, err := New(seed, reg, ids, opts...)
 	if err != nil {
 		t.Fatal(err)
 	}
