@@ -42,6 +42,8 @@ type Config struct {
 	Logger *slog.Logger
 
 	packs []fs.FS
+	// packPaths are the packs' folder paths when read by ParseConfig.
+	packPaths []string
 }
 
 // Vanilla returns a Config that changes nothing: the world BDS generates.
@@ -474,8 +476,10 @@ type forcedStart struct {
 // igloos) share one grid: setting any of them sets it for all four.
 // Strongholds are placed in rings and have no Placement.
 type Placement struct {
-	Spacing, Separation, Salt int32
-	Chance                    float32
+	Spacing    int32   `json:"spacing,omitempty"`
+	Separation int32   `json:"separation,omitempty"`
+	Salt       int32   `json:"salt,omitempty"`
+	Chance     float32 `json:"chance,omitempty"`
 }
 
 // SetBiomes replaces the biomes a kind may start in (biome names as

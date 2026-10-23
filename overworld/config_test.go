@@ -506,3 +506,63 @@ func TestConfigExplain(t *testing.T) {
 		t.Error("Explain changed the cache's output")
 	}
 }
+
+func TestConfigJSON(t *testing.T) {
+	doc := `{
+	  "packs": ["pack"],
+	  "features": {
+	    "disable": ["birch_forest_surface_trees_feature"],
+	    "disable_in": [{"biomes": ["plains"], "rules": ["*flower*"]}],
+	    "disable_features": ["*birch*"],
+	    "chance": {"plains_surface_trees_feature": 50},
+	    "iterations": {"plains_surface_trees_feature": 3},
+	    "replace": {"forest_surface_trees_feature": "minecraft:oak_tree_feature"},
+	    "weights": [{"mix": "random_roofed_forest_feature", "feature": "minecraft:huge_mushroom_feature", "weight": 0}],
+	    "rules": [{"id": "myserver:oaks", "places": "minecraft:oak_tree_feature", "pass": "surface_pass",
+	               "tags": ["plains"], "iterations": 1, "percent": 10, "x": [0, 16], "y": "heightmap", "z": 4}]
+	  },
+	  "biomes": {
+	    "remove": ["mushroom_island"], "replace": {"roofed_forest": "forest"},
+	    "scale": {"cherry_grove": 1.5}, "tags": {"plains": ["overworld", "plains"]},
+	    "add": [{"name": "myserver:crystal_plains", "like": "plains", "climate": {"temperature": [0.2, 0.55]}}]
+	  },
+	  "structures": {
+	    "disable": ["minecraft:mansion"],
+	    "exclude": [{"area": [-500, -500, 500, 500], "kinds": ["minecraft:village"]}],
+	    "placement": {"minecraft:village": {"spacing": 20, "separation": 6}},
+	    "place_at": [{"kind": "minecraft:village", "chunk": [2, 3]}],
+	    "biomes": {"minecraft:igloo": ["plains"]},
+	    "templates": {"village/plains/houses/plains_small_house_1": "village/plains/houses/plains_small_house_2"},
+	    "pools": [{"pool": "minecraft:village/plains/houses", "element": "village/plains/houses/plains_small_house_3", "weight": 3}],
+	    "loot": {"loot_tables/chests/village/village_plains_house.json": "loot_tables/my/house.json"},
+	    "blocks": [{"kind": "minecraft:village", "from": "cobblestone", "to": "mossy_cobblestone"}]
+	  },
+	  "skip": {"caves": true},
+	  "terrain": {"sea_level": 70, "sea_block": "lava", "no_deepslate": true, "no_ore_veins": true}
+	}`
+	root := fstest.MapFS{"pack/features/.keep": {Data: nil}}
+	cfg, err := ParseConfig([]byte(doc), root)
+	if err != nil {
+		t.Fatal(err)
+	}
+	reg, ids := testRegistry(t)
+	ids["myserver:crystal_plains"] = 10000
+	if _, err := NewOverworld(configSeed, reg, ids, WithConfig(cfg)); err != nil {
+		t.Fatal(err)
+	}
+	saved, err := cfg.MarshalJSON()
+	if err != nil {
+		t.Fatal(err)
+	}
+	again, err := ParseConfig(saved, root)
+	if err != nil {
+		t.Fatal(err)
+	}
+	saved2, err := again.MarshalJSON()
+	if err != nil || string(saved2) != string(saved) {
+		t.Errorf("the config does not survive a save and load:\n%s\n%s", saved, saved2)
+	}
+	if _, err := ParseConfig([]byte(`{"structures": {"disabel": []}}`), nil); err == nil {
+		t.Error("an unknown field was accepted")
+	}
+}
