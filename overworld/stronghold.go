@@ -189,7 +189,7 @@ func (o *Overworld) strongholdsNear(cx, cz, reach int32, f func(sx, sz int32)) {
 
 // strongholdAt assembles the stronghold starting in chunk (cx, cz), if any.
 func (o *Overworld) strongholdAt(cx, cz int32) *stronghold {
-	if !o.isStrongholdChunk(cx, cz) {
+	if !o.isStrongholdChunk(cx, cz) || !o.structOK(skStronghold, cx, cz) {
 		return nil
 	}
 	if v, ok := o.strongholds.Load([2]int32{cx, cz}); ok {

@@ -318,7 +318,7 @@ func (o *Overworld) ruinPick(rx, rz int32) (int32, int32) {
 // ok is false if none does.
 func (o *Overworld) ruinAt(cx, cz int32) ruinBiome {
 	x, z := o.ruinPick(structure.Region(cx, ruinSpacing), structure.Region(cz, ruinSpacing))
-	if x != cx || z != cz {
+	if x != cx || z != cz || !o.structOK(skOceanRuin, cx, cz) {
 		return ruinBiome{}
 	}
 	b := o.BiomeAt(cx*16+8, o.structureY(cx, cz, noSurfaceY), cz*16+8)

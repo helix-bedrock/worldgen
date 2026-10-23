@@ -85,9 +85,14 @@ type featureRule struct {
 	iterations int32
 	// iterMolang, when set, computes the iterations per chunk.
 	iterMolang molang
-	// drawOnly rules have a feature the runtime does not build yet: they
-	// only evaluate iterMolang, for its math.random draws.
+	// drawOnly rules have a feature the runtime does not build yet, or are
+	// disabled: they only evaluate iterMolang, for its math.random draws.
 	drawOnly bool
+	// forceN makes iterations replace the Molang count after it is
+	// evaluated (Config SetIterations).
+	forceN bool
+	// off marks a rule Config disabled.
+	off bool
 	// scatter chance: either a fraction num/den, or a percent.
 	num, den int32
 	percent  float32
@@ -126,6 +131,12 @@ func defaultOrder() [3]int {
 type featureRules struct {
 	// byBiome[id][pass] lists a biome's rules for a pass in load order.
 	byBiome [][][]*featureRule
+	// byID holds every loaded rule by identifier, and order their
+	// identifiers in load order.
+	byID  map[string]*featureRule
+	order []string
+	// read are the identifiers of every rule read, loaded or not.
+	read []string
 }
 
 type rawRule struct {
@@ -155,30 +166,63 @@ func filterAccepts(raw json.RawMessage, tags []string) (bool, error) {
 	return feature.FilterAccepts(raw, tags)
 }
 
-// loadFeatureRules reads every rule under dir and attaches it to the biomes
-// its filter accepts. Rules whose feature type is not implemented are left
-// out.
-func (o *Overworld) loadFeatureRules(fsys fs.FS, dir string, defs map[string]*biome.Def, biomeIDs map[string]uint32, features *featureSet) error {
-	files, err := fs.Glob(fsys, path.Join(dir, "*.json"))
-	if err != nil {
-		return fmt.Errorf("worldgen: list feature rules: %w", err)
+// readRules reads the rules under dir, in file name order, and then each
+// pack's feature_rules folder: a pack rule with a rule's identifier takes
+// its place, other pack rules go at the end.
+func readRules(fsys fs.FS, dir string, packs []fs.FS) ([]rawRule, error) {
+	var out []rawRule
+	index := map[string]int{}
+	read := func(src fs.FS, dir string) error {
+		files, err := fs.Glob(src, path.Join(dir, "*.json"))
+		if err != nil {
+			return fmt.Errorf("worldgen: list feature rules: %w", err)
+		}
+		slices.Sort(files)
+		for _, f := range files {
+			data, err := fs.ReadFile(src, f)
+			if err != nil {
+				return fmt.Errorf("worldgen: read %s: %w", f, err)
+			}
+			var raw rawRule
+			if err := json.Unmarshal(stripComments(data), &raw); err != nil {
+				return fmt.Errorf("worldgen: decode %s: %w", f, err)
+			}
+			id := raw.Rules.Description.Identifier
+			if i, ok := index[id]; ok {
+				out[i] = raw
+				continue
+			}
+			index[id] = len(out)
+			out = append(out, raw)
+		}
+		return nil
 	}
-	slices.Sort(files)
+	if err := read(fsys, dir); err != nil {
+		return nil, err
+	}
+	for _, p := range packs {
+		if err := read(p, "feature_rules"); err != nil {
+			return nil, err
+		}
+	}
+	return out, nil
+}
+
+// loadFeatureRules reads every rule under dir and in the packs, and
+// attaches it to the biomes its filter accepts. Rules whose feature type is
+// not implemented are left out.
+func (o *Overworld) loadFeatureRules(fsys fs.FS, dir string, packs []fs.FS, defs map[string]*biome.Def, biomeIDs map[string]uint32, features *featureSet) error {
+	raws, err := readRules(fsys, dir, packs)
+	if err != nil {
+		return err
+	}
 	var maxID uint32
 	for _, id := range biomeIDs {
 		maxID = max(maxID, id)
 	}
-	fr := &featureRules{byBiome: make([][][]*featureRule, maxID+1)}
+	fr := &featureRules{byBiome: make([][][]*featureRule, maxID+1), byID: map[string]*featureRule{}}
 	passNames := passOrder()
-	for _, f := range files {
-		data, err := fs.ReadFile(fsys, f)
-		if err != nil {
-			return fmt.Errorf("worldgen: read %s: %w", f, err)
-		}
-		var raw rawRule
-		if err := json.Unmarshal(data, &raw); err != nil {
-			return fmt.Errorf("worldgen: decode %s: %w", f, err)
-		}
+	for _, raw := range raws {
 		r := raw.Rules
 		pass := slices.Index(passNames[:], r.Conditions.Pass)
 		if pass < 0 {
@@ -266,6 +310,11 @@ func (o *Overworld) loadFeatureRules(fsys fs.FS, dir string, defs map[string]*bi
 				fr.byBiome[id][pass] = append(fr.byBiome[id][pass], rule)
 			}
 		}
+		fr.byID[rule.id] = rule
+		fr.order = append(fr.order, rule.id)
+	}
+	for _, raw := range raws {
+		fr.read = append(fr.read, raw.Rules.Description.Identifier)
 	}
 	// Rules keep file name order. BDS reads pack rules first, then the
 	// definitions/feature_rules folder in directory order (sub_D403EB0);
@@ -566,7 +615,7 @@ type featureWrites struct {
 // when neighbour cannot provide the origin.
 func (o *Overworld) originFeatures(ox, oz int32, neighbour func(cx, cz int32) *PackedChunk) *featureWrites {
 	origin := neighbour(ox, oz)
-	if origin == nil || o.rules == nil {
+	if origin == nil || o.rules == nil || o.skip.Decoration {
 		return nil
 	}
 	w := &featureWorld{o: o, ox: ox, oz: oz, neighbour: neighbour, lastX: math.MaxInt32,
@@ -704,7 +753,9 @@ func (o *Overworld) decorate(chunkX, chunkZ int32, c *Chunk, base *PackedChunk, 
 			o.applyWrites(c, base, writes(ox, oz), int(chunkX-ox+1)*4+int(chunkZ-oz+1))
 		}
 	}
-	o.freeze(chunkX, chunkZ, c)
+	if !o.skip.Freeze {
+		o.freeze(chunkX, chunkZ, c)
+	}
 	o.bubbleColumns(c)
 	o.keepWater(c, base)
 	o.dropOverwrittenBlockEntities(c)
@@ -808,6 +859,9 @@ func (o *Overworld) decorateFrom(w *featureWorld, ox, oz int32, origin *PackedCh
 				if r.iterMolang != nil {
 					env := &molangEnv{originX: float32(ox * 16), originZ: float32(oz * 16), noise: o.queryNoise, random: popMT.Float}
 					n = int32(math.Round(float64(r.iterMolang.eval(env))))
+					if r.forceN {
+						n = r.iterations
+					}
 				}
 				if r.drawOnly {
 					continue

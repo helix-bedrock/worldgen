@@ -124,7 +124,9 @@ func (o *Overworld) monumentAt(cx, cz int32) *monument {
 		return m
 	}
 	var m *monument
-	if o.isMonumentChunk(cx, cz) {
+	// Gated here, not in isMonumentChunk: ruins and shipwrecks keep their
+	// distance from a disabled monument, as from a vanilla one.
+	if o.isMonumentChunk(cx, cz) && o.structOK(skMonument, cx, cz) {
 		m = o.layMonument(cx, cz)
 	}
 	o.monuments.Store(k, m)

@@ -69,7 +69,7 @@ func (o *Overworld) isMineshaftChunk(r *rand.MT, cx, cz int32) bool {
 	r.Uint32()
 	f := r.Float()
 	n := r.IntN(80)
-	return f < 0.004 && n < max(mathx.Abs(cx), mathx.Abs(cz))
+	return f < 0.004 && n < max(mathx.Abs(cx), mathx.Abs(cz)) && o.structOK(skMineshaft, cx, cz)
 }
 
 // mineshaftAt assembles the mineshaft starting in chunk (cx, cz), if any.

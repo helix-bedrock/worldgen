@@ -58,7 +58,7 @@ func (o *Overworld) cityPick(rx, rz int32, r *rand.MT) (int32, int32) {
 func (o *Overworld) IsAncientCityChunk(cx, cz int32) bool {
 	var r rand.MT
 	px, pz := o.cityPick(structure.Region(cx, citySpacing), structure.Region(cz, citySpacing), &r)
-	return px == cx && pz == cz && o.BiomeAt(cx*16, cityAnchorY+1, cz*16) == o.deepDark
+	return px == cx && pz == cz && o.structOK(skAncientCity, cx, cz) && o.BiomeAt(cx*16, cityAnchorY+1, cz*16) == o.deepDark
 }
 
 // cityAt assembles the city of region (rx, rz), nil if it has none.
@@ -71,7 +71,7 @@ func (o *Overworld) cityAt(rx, rz int32) *city {
 	var c *city
 	var r rand.MT
 	cx, cz := o.cityPick(rx, rz, &r)
-	if o.city != nil && o.BiomeAt(cx*16, cityAnchorY+1, cz*16) == o.deepDark {
+	if o.city != nil && o.structOK(skAncientCity, cx, cz) && o.BiomeAt(cx*16, cityAnchorY+1, cz*16) == o.deepDark {
 		// The start is built with the start chunk's population random: of
 		// the seedings tried against BDS's city at chunk (-14, -113) it is
 		// the only one that gets every depth-1 piece right (VERIFY: the

@@ -48,7 +48,7 @@ func treasureBiomes() []string {
 // (cx, cz).
 func (o *Overworld) isTreasureChunk(cx, cz int32) bool {
 	x, z := o.treasurePick(structure.Region(cx, treasureSpacing), structure.Region(cz, treasureSpacing))
-	if x != cx || z != cz {
+	if x != cx || z != cz || !o.structOK(skBuriedTreasure, cx, cz) {
 		return false
 	}
 	return o.biomesOnly(cx*16+8, o.structureY(cx, cz, noSurfaceY), cz*16+8, treasureBiomeReach, o.treasureBiome)

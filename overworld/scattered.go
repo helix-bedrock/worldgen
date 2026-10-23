@@ -76,6 +76,30 @@ func (o *Overworld) scatterKindAt(x, y, z int32) uint8 {
 	return scatterNone
 }
 
+// scatterStructKind is the structure kind of a scattered feature kind.
+func scatterStructKind(kind uint8) structKind {
+	switch kind {
+	case scatterDesert:
+		return skDesertPyramid
+	case scatterJungle:
+		return skJungleTemple
+	case scatterIgloo:
+		return skIgloo
+	}
+	return skSwampHut
+}
+
+// djStructKind is the structure kind of a data-driven jigsaw kind.
+func djStructKind(kind string) structKind {
+	switch kind {
+	case "trail_ruins":
+		return skTrailRuins
+	case "trial_chambers":
+		return skTrialChambers
+	}
+	return skAbandonedCamp
+}
+
 // scatteredAt returns the kind of the scattered feature that starts in
 // chunk (cx, cz), scatterNone if none does.
 func (o *Overworld) scatteredAt(cx, cz int32) uint8 {
@@ -100,7 +124,11 @@ func (o *Overworld) scatteredAt(cx, cz int32) uint8 {
 	if o.filledMinHeight(cx, cz) < SeaLevel {
 		return scatterNone
 	}
-	return o.scatterKindAt(cx*16+8, start, cz*16+8)
+	kind := o.scatterKindAt(cx*16+8, start, cz*16+8)
+	if kind != scatterNone && !o.structOK(scatterStructKind(kind), cx, cz) {
+		return scatterNone
+	}
+	return kind
 }
 
 // filledMinHeight is the lowest height-map value of a chunk's terrain fill,

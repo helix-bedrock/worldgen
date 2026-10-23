@@ -428,6 +428,9 @@ func (o *Overworld) placeStructures(cx, cz int32, c *Chunk, height func(x, z int
 // structuresReach reports whether a structure has a piece in chunk
 // (cx, cz).
 func (o *Overworld) structuresReach(cx, cz int32, raw func(cx, cz int32) *PackedChunk) bool {
+	if o.skip.Structures {
+		return false
+	}
 	return o.dataJigsawsReach(cx, cz) || o.villagesReach(cx, cz) || o.mineshaftReaches(cx, cz) || o.strongholdReaches(cx, cz) || o.citiesReach(cx, cz) ||
 		o.scatteredReaches(cx, cz) || o.ruinReaches(cx, cz) ||
 		o.shipReaches(cx, cz) || o.isTreasureChunk(cx, cz) || o.monumentReaches(cx, cz) ||

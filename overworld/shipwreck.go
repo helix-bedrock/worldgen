@@ -144,7 +144,7 @@ func (o *Overworld) shipPick(rx, rz int32) (int32, int32) {
 // isShipChunk reports whether a shipwreck starts in chunk (cx, cz).
 func (o *Overworld) isShipChunk(cx, cz int32) bool {
 	x, z := o.shipPick(structure.Region(cx, shipSpacing), structure.Region(cz, shipSpacing))
-	if x != cx || z != cz {
+	if x != cx || z != cz || !o.structOK(skShipwreck, cx, cz) {
 		return false
 	}
 	y := o.structureY(cx, cz, noSurfaceY)

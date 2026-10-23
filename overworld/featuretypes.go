@@ -83,21 +83,43 @@ type rawFeatureHeader struct {
 
 // loadFeatures reads every feature under dir and keeps the types the runtime
 // implements.
-func (o *Overworld) loadFeatures(fsys fs.FS, dir string) (*featureSet, error) {
+func (o *Overworld) loadFeatures(fsys fs.FS, dir string, packs []fs.FS) (*featureSet, error) {
+	set := &featureSet{byID: map[string]placer{}}
+	if err := o.readFeatures(set, fsys, dir, false); err != nil {
+		return nil, err
+	}
+	for id, lt := range legacyTrees() {
+		set.byID[id] = &legacyTreeFeature{def: lt, set: set}
+	}
+	set.byID["minecraft:legacy:swamp_foliage_feature"] = &swampFoliageFeature{set: set}
+	o.builtinFeatures(set)
+	// Pack features come last, so they replace vanilla ones of the same
+	// identifier.
+	for _, p := range packs {
+		if err := o.readFeatures(set, p, "features", true); err != nil {
+			return nil, err
+		}
+	}
+	return set, nil
+}
+
+// readFeatures reads the features under dir into set. Strict (for packs)
+// makes a feature type the runtime does not build an error rather than
+// leaving the feature out.
+func (o *Overworld) readFeatures(set *featureSet, fsys fs.FS, dir string, strict bool) error {
 	files, err := fs.Glob(fsys, path.Join(dir, "*.json"))
 	if err != nil {
-		return nil, fmt.Errorf("worldgen: list features: %w", err)
+		return fmt.Errorf("worldgen: list features: %w", err)
 	}
-	set := &featureSet{byID: map[string]placer{}}
 	for _, f := range files {
 		data, err := fs.ReadFile(fsys, f)
 		if err != nil {
-			return nil, fmt.Errorf("worldgen: read %s: %w", f, err)
+			return fmt.Errorf("worldgen: read %s: %w", f, err)
 		}
 		data = stripComments(data)
 		var top map[string]json.RawMessage
 		if err := json.Unmarshal(data, &top); err != nil {
-			return nil, fmt.Errorf("worldgen: decode %s: %w", f, err)
+			return fmt.Errorf("worldgen: decode %s: %w", f, err)
 		}
 		for typ, raw := range top {
 			if !strings.HasPrefix(typ, "minecraft:") {
@@ -105,23 +127,20 @@ func (o *Overworld) loadFeatures(fsys fs.FS, dir string) (*featureSet, error) {
 			}
 			var d rawFeatureHeader
 			if err := json.Unmarshal(raw, &d); err != nil {
-				return nil, fmt.Errorf("worldgen: %s: %w", f, err)
+				return fmt.Errorf("worldgen: %s: %w", f, err)
 			}
 			p, err := o.parseFeature(typ, raw, set)
 			if err != nil {
-				return nil, fmt.Errorf("worldgen: %s: %w", f, err)
+				return fmt.Errorf("worldgen: %s: %w", f, err)
 			}
 			if p != nil {
 				set.byID[d.Description.Identifier] = p
+			} else if strict {
+				return fmt.Errorf("worldgen: %s: feature %s: type %s is not supported yet", f, d.Description.Identifier, typ)
 			}
 		}
 	}
-	for id, lt := range legacyTrees() {
-		set.byID[id] = &legacyTreeFeature{def: lt, set: set}
-	}
-	set.byID["minecraft:legacy:swamp_foliage_feature"] = &swampFoliageFeature{set: set}
-	o.builtinFeatures(set)
-	return set, nil
+	return nil
 }
 
 // rawAggregateFeature is the JSON of a minecraft:aggregate_feature.

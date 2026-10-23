@@ -107,7 +107,7 @@ func (o *Overworld) outpostPick(rx, rz int32) (int32, int32) {
 // (cx, cz).
 func (o *Overworld) isOutpostChunk(cx, cz int32) bool {
 	x, z := o.outpostPick(structure.Region(cx, outpostSpacing), structure.Region(cz, outpostSpacing))
-	if x != cx || z != cz {
+	if x != cx || z != cz || !o.structOK(skOutpost, cx, cz) {
 		return false
 	}
 	b := o.BiomeAt(cx*16+8, o.structureY(cx, cz, noSurfaceY), cz*16+8)

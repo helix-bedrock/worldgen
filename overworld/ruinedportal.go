@@ -19,7 +19,7 @@ func (o *Overworld) portalPick(rx, rz int32) (int32, int32) {
 // Every region has one.
 func (o *Overworld) isPortalChunk(cx, cz int32) bool {
 	x, z := o.portalPick(structure.Region(cx, structure.PortalSpacing), structure.Region(cz, structure.PortalSpacing))
-	return x == cx && z == cz
+	return x == cx && z == cz && o.structOK(skRuinedPortal, cx, cz)
 }
 
 // portalsReach calls f for each portal start whose blocks may reach chunk

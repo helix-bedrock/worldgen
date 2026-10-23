@@ -998,7 +998,7 @@ func (o *Overworld) mansionPick(rx, rz int32) (int32, int32) {
 // (cx, cz).
 func (o *Overworld) isMansionChunk(cx, cz int32) bool {
 	x, z := o.mansionPick(structure.Region(cx, mansionSpacing), structure.Region(cz, mansionSpacing))
-	if x != cx || z != cz {
+	if x != cx || z != cz || !o.structOK(skMansion, cx, cz) {
 		return false
 	}
 	return o.biomesOnly(cx*16+8, o.structureY(cx, cz, noSurfaceY), cz*16+8, mansionBiomeReach, o.mansionBiome)

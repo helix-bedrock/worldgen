@@ -35,7 +35,7 @@ func structureSeed(r *rand.MT, seed int64, rx, rz, salt int32) {
 // preliminary surface level of the chunk's corner column, all have a
 // village type.
 func (o *Overworld) IsVillageChunk(chunkX, chunkZ int32) bool {
-	if !o.isVillageSpreadPick(chunkX, chunkZ) {
+	if !o.isVillageSpreadPick(chunkX, chunkZ) || !o.structOK(skVillage, chunkX, chunkZ) {
 		return false
 	}
 	y := prelimSurface(o.column(chunkX*quartsPerChunk, chunkZ*quartsPerChunk))

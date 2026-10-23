@@ -42,7 +42,9 @@ import (
 
 // djDef is one data-driven jigsaw structure.
 type djDef struct {
-	id                  string
+	id string
+	// sk is the structure kind, for the Config's gates.
+	sk                  structKind
 	pools               map[string]*structure.Pool
 	start               string
 	maxDepth            int
@@ -471,6 +473,9 @@ func (d *djDef) pick(o *Overworld, rx, rz int32) (int32, int32) {
 // at assembles the structure starting in chunk (cx, cz), nil if none does.
 func (d *djDef) at(o *Overworld, cx, cz int32) *djStructure {
 	if x, z := d.pick(o, structure.Region(cx, d.spacing), structure.Region(cz, d.spacing)); x != cx || z != cz {
+		return nil
+	}
+	if !o.structOK(d.sk, cx, cz) {
 		return nil
 	}
 	if v, ok := d.starts.Load([2]int32{cx, cz}); ok {

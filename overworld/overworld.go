@@ -74,6 +74,7 @@ type Option func(*options)
 type options struct {
 	houseChests     bool
 	houseChestsPick func(house string) bool
+	cfg             *Config
 }
 
 // WithHouseChests gives village houses that have no chest in vanilla a
@@ -92,6 +93,9 @@ func WithHouseChests(pick func(house string) bool) Option {
 // be called from many goroutines at once.
 type Overworld struct {
 	opts options
+	// skip and gates are the Config's step and structure changes.
+	skip  Steps
+	gates structGates
 
 	// overlays pools featureWorld overlay arrays (about 500 KB each).
 	overlays sync.Pool
@@ -257,13 +261,25 @@ func NewOverworld(seed int64, reg *blocks.Registry, biomeIDs map[string]uint32, 
 	for _, opt := range opts {
 		opt(&o.opts)
 	}
-	entries := biome.Entries()
+	if o.opts.cfg == nil {
+		o.opts.cfg = Vanilla()
+	}
+	cfg := o.opts.cfg
+	o.skip = cfg.Skip
+	var err error
+	if o.gates, err = newStructGates(&cfg.Structures, cfg.Skip.Structures, cfg.Logger); err != nil {
+		return nil, err
+	}
+	entries, err := cfg.biomeEntries(biome.Entries(), biomeIDs)
+	if err != nil {
+		return nil, err
+	}
 	for name, id := range biomeIDs {
 		if id >= 1<<16 {
 			return nil, fmt.Errorf("worldgen: biome %s has ID %d, over the 16 bits PackedChunk stores", name, id)
 		}
 	}
-	if miss := biome.Missing(entries, biomeIDs); len(miss) > 0 {
+	if miss := biome.Missing(biome.Entries(), biomeIDs); len(miss) > 0 {
 		return nil, fmt.Errorf("worldgen: biomes missing from the biome list: %v", miss)
 	}
 	o.biomes = biome.NewTree(entries, biomeIDs)
@@ -338,7 +354,6 @@ func NewOverworld(seed int64, reg *blocks.Registry, biomeIDs map[string]uint32, 
 		}
 		o.ids.canyonCarvable[id] = setMember{}
 	}
-	var err error
 	if o.ids.veins[0], err = resolveVein(reg, "copper_ore", "raw_copper_block", "granite", 0, 50); err != nil {
 		return nil, err
 	}
@@ -352,6 +367,9 @@ func NewOverworld(seed int64, reg *blocks.Registry, biomeIDs map[string]uint32, 
 
 	defs, err := biome.LoadDefs(worldgen.Data, "data/vanilla/biomes")
 	if err != nil {
+		return nil, err
+	}
+	if err := cfg.biomeDefs(defs); err != nil {
 		return nil, err
 	}
 	o.surfNoise = newSurfaceNoises(seed, world)
@@ -425,14 +443,21 @@ func NewOverworld(seed int64, reg *blocks.Registry, biomeIDs map[string]uint32, 
 		if err != nil {
 			return nil, err
 		}
+		d.sk = djStructKind(d.kind)
 		o.dataJigsaws = append(o.dataJigsaws, d)
 	}
-	features, err := o.loadFeatures(worldgen.Data, "data/vanilla/features")
+	features, err := o.loadFeatures(worldgen.Data, "data/vanilla/features", cfg.packs)
 	if err != nil {
 		return nil, err
 	}
+	if err := o.applyFeatures(cfg, features); err != nil {
+		return nil, err
+	}
 	o.features = features
-	if err := o.loadFeatureRules(worldgen.Data, "data/vanilla/feature_rules", defs, biomeIDs, features); err != nil {
+	if err := o.loadFeatureRules(worldgen.Data, "data/vanilla/feature_rules", cfg.packs, defs, biomeIDs, features); err != nil {
+		return nil, err
+	}
+	if err := o.applyRules(cfg, defs, biomeIDs); err != nil {
 		return nil, err
 	}
 	return o, nil
@@ -459,14 +484,30 @@ func (o *Overworld) GenerateChunk(chunkX, chunkZ int32, c *Chunk) {
 	aq := newAquifer(o, chunkX, chunkZ)
 	o.fillBlocks(chunkX, chunkZ, g, aq, c)
 	mt := rand.NewMT(rand.ChunkSeed(chunkX, chunkZ))
-	o.bedrockFloor(mt, c)
-	o.fillBiomes(chunkX, chunkZ, c)
-	o.surface(chunkX, chunkZ, c, mt)
-	for _, cv := range o.carvers {
-		cv.carve(o, c, aq, chunkX, chunkZ)
+	if !o.skip.BedrockFloor {
+		o.bedrockFloor(mt, c)
+	} else {
+		// The floor's draws come before the surface's from the same random.
+		for range 16 * 16 {
+			mt.IntN(bedrockFloorRange)
+		}
 	}
-	o.canyons(c, aq, chunkX, chunkZ)
+	o.fillBiomes(chunkX, chunkZ, c)
+	if !o.skip.Surface {
+		o.surface(chunkX, chunkZ, c, mt)
+	}
+	if !o.skip.Caves {
+		for _, cv := range o.carvers {
+			cv.carve(o, c, aq, chunkX, chunkZ)
+		}
+	}
+	if !o.skip.Canyons {
+		o.canyons(c, aq, chunkX, chunkZ)
+	}
 }
+
+// bedrockFloorRange is the number of bedrock floor heights (2 to 5).
+const bedrockFloorRange = 4
 
 // floorBedrock reports whether b at height y is part of the bedrock floor.
 // Hard rule: once the floor is drawn, no later step (structures, features,
@@ -480,7 +521,7 @@ func (o *Overworld) floorBedrock(b uint32, y int32) bool {
 func (o *Overworld) bedrockFloor(mt *rand.MT, c *Chunk) {
 	for x := range 16 {
 		for z := range 16 {
-			n := int(mt.IntN(4)) + 2
+			n := int(mt.IntN(bedrockFloorRange)) + 2
 			for y := MinY; y < MinY+n; y++ {
 				c.set(x, y, z, o.ids.bedrock)
 			}
