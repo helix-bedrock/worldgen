@@ -296,3 +296,15 @@ func (o *Overworld) isForced(k structKind, cx, cz int32) bool {
 	at, ok := o.forced[k][o.regionOf(k, cx, cz)]
 	return ok && at == [2]int32{cx, cz}
 }
+
+// Placement returns the placement grid kind uses in this generator, with
+// the Config's changes; ok is false for strongholds, which are placed in
+// rings.
+func (o *Overworld) Placement(kind StructureKind) (p Placement, ok bool) {
+	k, err := structIndex(kind)
+	if err != nil || k == skStronghold {
+		return Placement{}, false
+	}
+	g := o.place[placementSlot(k)]
+	return Placement{Spacing: g.spacing, Separation: g.separation, Salt: g.salt, Chance: g.chance}, true
+}

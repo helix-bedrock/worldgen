@@ -36,7 +36,8 @@ Most parts match BDS block for block; the rest are close. What is left:
 - **Mobs in structures:** worldgen hands them to the engine as spawn records; only the End crystals
   so far.
 - **Loot:** chests get their loot table and seed; filling them is up to the server.
-- **The API is not stable yet.** Names and behaviour may still change between commits.
+- **The API is not stable yet.** Names and behaviour may still change between commits. The new
+  Overworld `Config` (see below) is the newest part.
 
 ## How it is checked
 
@@ -73,6 +74,50 @@ The generator returns indices into the block list; your server maps them to its 
 Each dimension has its own package: [`overworld`](overworld), [`nether`](nether) and [`end`](end). The shared vanilla data and the `biome`, `blocks`, `noise` and `rand` packages stay at the top,
 with [`structure`](structure): templates, jigsaw assembly, block rules and the ruined portal builder
 shared by every dimension's structures. The dimension packages do not import each other.
+
+## Customizing the world
+
+Everything is vanilla by default. A `Config` changes only what you ask for, and every
+change is checked when the generator is built: a misspelled name is an error that lists
+the closest real names.
+
+```go
+cfg := overworld.Vanilla()
+
+// Biomes
+cfg.Biomes.Remove("mushroom_island")         // its neighbours fill the space
+cfg.Biomes.Replace("roofed_forest", "forest")
+cfg.Biomes.Scale("cherry_grove", 1.5)        // a bigger climate box, so more of it
+cfg.Biomes.Add(overworld.Biome{Name: "myserver:crystal_plains", Like: "plains",
+	Climate: overworld.Climate{Temperature: overworld.Range{Min: 0.2, Max: 0.55}}})
+
+// Features: trees, plants, ores, rocks...
+cfg.Features.Disable("birch_forest_surface_trees_feature")
+cfg.Features.DisableIn([]string{"plains"}, "*flower*")
+cfg.Features.DisableFeature("*birch*")       // everywhere, also inside tree mixes
+cfg.Features.SetChance("plains_surface_trees_feature", 50)
+cfg.Features.SetWeight("random_roofed_forest_feature", "minecraft:huge_mushroom_feature", 0)
+cfg.Features.Register("myserver:crystal", crystalFeature{}) // your own Go code
+cfg.Features.AddRule(overworld.Rule{ID: "myserver:crystals", Places: "myserver:crystal",
+	Pass: overworld.SurfacePass, Tags: []string{"plains"}, Iterations: 2})
+cfg.AddPack(os.DirFS("my_addon")) // features/ and feature_rules/ in Mojang's add-on format
+
+// Structures
+cfg.Structures.Disable(overworld.StructureMansion)
+cfg.Structures.Exclude(overworld.Box(-500, -500, 500, 500)) // nothing near spawn
+cfg.Structures.SetPlacement(overworld.StructureVillage, overworld.Placement{Spacing: 20, Separation: 6})
+cfg.Structures.PlaceAt(overworld.StructureVillage, 2, 3)  // a village in chunk (2, 3)
+
+// Whole steps
+cfg.Skip.Caves = true
+
+gen, err := overworld.NewOverworld(seed, reg, biomeIDs, overworld.WithConfig(cfg))
+```
+
+What a change does not touch stays as in vanilla: a disabled rule still makes its random
+draws, so the features around it do not move. `FeatureRuleIDs`, `FeatureIDs`,
+`StructureKinds` and `Placement` list what there is to change. Only the Overworld has a
+`Config` so far.
 
 ## Features
 

@@ -406,3 +406,13 @@ func sortedKeys[V any](m map[string]V) []string {
 	slices.Sort(out)
 	return out
 }
+
+// FeatureRuleIDs lists the identifiers of the feature rules this generator
+// read, vanilla, from packs and added, in the order they run within a
+// pass. Rules the runtime cannot place yet are included: they still make
+// their random draws.
+func (o *Overworld) FeatureRuleIDs() []string { return slices.Clone(o.rules.read) }
+
+// FeatureIDs lists the identifiers of the features this generator can
+// place, sorted.
+func (o *Overworld) FeatureIDs() []string { return o.featureIDs() }

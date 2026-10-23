@@ -139,6 +139,20 @@ world seed and the template instead, so the same seed always gives the same colo
 Structure chests, dispensers and suspicious sand carry their loot table, but the loot is not filled in yet, so chests are empty in
 game.
 
+## Customizing (Overworld Config)
+
+Not part of vanilla: these change the world on purpose. With no changes the output is BDS's.
+
+| What | Status |
+| --- | --- |
+| Disable, re-weight or replace feature rules and features; Go features and rules; add-on packs | Done |
+| Remove, replace, scale and add biomes; change biome tags | Done |
+| Disable structures, exclude areas, filters, placement grids, fixed positions | Done (no fixed strongholds) |
+| Skip caves, canyons, bedrock floor, surfaces, structures, decoration, freezing | Done |
+| Structure biome lists, templates, jigsaw pools, loot tables, block swaps | Not yet |
+| Sea level, deepslate and other terrain settings; a JSON config file | Not yet |
+| Nether and End Config | Not yet |
+
 ## Other dimensions
 
 | What | Status |

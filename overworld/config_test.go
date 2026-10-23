@@ -291,3 +291,34 @@ func TestConfigPlacement(t *testing.T) {
 		t.Error("found a mineshaft with a near-zero chance")
 	}
 }
+
+// TestConfigReadme builds the Config of the README example.
+func TestConfigReadme(t *testing.T) {
+	reg, ids := testRegistry(t)
+	ids["myserver:crystal_plains"] = 10000
+	cfg := Vanilla()
+	cfg.Biomes.Remove("mushroom_island")
+	cfg.Biomes.Replace("roofed_forest", "forest")
+	cfg.Biomes.Scale("cherry_grove", 1.5)
+	cfg.Biomes.Add(Biome{Name: "myserver:crystal_plains", Like: "plains",
+		Climate: Climate{Temperature: Range{Min: 0.2, Max: 0.55}}})
+	cfg.Features.Disable("birch_forest_surface_trees_feature")
+	cfg.Features.DisableIn([]string{"plains"}, "*flower*")
+	cfg.Features.DisableFeature("*birch*")
+	cfg.Features.SetChance("plains_surface_trees_feature", 50)
+	cfg.Features.SetWeight("random_roofed_forest_feature", "minecraft:huge_mushroom_feature", 0)
+	cfg.Features.Register("myserver:crystal", goldPillar{})
+	cfg.Features.AddRule(Rule{ID: "myserver:crystals", Places: "myserver:crystal", Pass: SurfacePass,
+		Tags: []string{"plains"}, Iterations: 2})
+	cfg.Structures.Disable(StructureMansion)
+	cfg.Structures.Exclude(Box(-500, -500, 500, 500))
+	cfg.Structures.SetPlacement(StructureVillage, Placement{Spacing: 20, Separation: 6})
+	cfg.Structures.PlaceAt(StructureVillage, 2, 3)
+	cfg.Skip.Caves = true
+	o, err := NewOverworld(configSeed, reg, ids, WithConfig(cfg))
+	if err != nil {
+		t.Fatal(err)
+	}
+	var c Chunk
+	NewTerrainCache(o, 256).Generate(2, 3, &c)
+}
