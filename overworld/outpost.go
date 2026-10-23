@@ -150,7 +150,8 @@ func (o *Overworld) outpostAt(cx, cz int32) []outpostPiece {
 				continue
 			}
 			frot := int(r.IntN(structRotations))
-			pieces = append(pieces, outpostPiece{"pillageroutpost/" + outpostFeatures()[r.IntN(int32(len(outpostFeatures())))], mx + s[0], mz + s[1], frot, 1, true})
+			feats := outpostFeatures()
+			pieces = append(pieces, outpostPiece{"pillageroutpost/" + feats[r.IntN(int32(len(feats)))], mx + s[0], mz + s[1], frot, 1, true})
 		}
 	}
 	o.outposts.Store(k, pieces)

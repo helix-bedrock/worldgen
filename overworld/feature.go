@@ -30,9 +30,9 @@ import (
 // passOrder is the order BDS runs placement passes in.
 func passOrder() [passCount]string {
 	return [passCount]string{
-	"first_pass", "underground_pass", "after_underground_pass", "before_surface_pass",
-	"surface_pass", "after_surface_pass", "before_sky_pass", "sky_pass", "after_sky_pass", "final_pass",
-}
+		"first_pass", "underground_pass", "after_underground_pass", "before_surface_pass",
+		"surface_pass", "after_surface_pass", "before_sky_pass", "sky_pass", "after_sky_pass", "final_pass",
+	}
 }
 
 // passCount is the number of placement passes.

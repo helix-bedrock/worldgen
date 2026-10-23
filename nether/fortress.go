@@ -1,6 +1,8 @@
 package nether
 
 import (
+	"slices"
+
 	"github.com/helix-bedrock/worldgen/internal/mathx"
 	"github.com/helix-bedrock/worldgen/rand"
 	"github.com/helix-bedrock/worldgen/structure"
@@ -328,7 +330,7 @@ func (l *nbLayout) next(r *rand.MT, x, y, z, o, depth int32, castle bool) {
 				w.placed++
 				l.prev = w.kind
 				if w.max != 0 && w.placed >= w.max {
-					*weights = append(ws[:i], ws[i+1:]...)
+					*weights = slices.Delete(ws, i, i+1)
 				}
 				l.add(p)
 				return

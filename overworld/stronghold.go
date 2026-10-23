@@ -629,7 +629,7 @@ func (l *shLayout) children(p *shPiece, r *rand.MT) {
 // placeStrongholds writes the pieces of nearby strongholds that reach
 // chunk (cx, cz) into c (connectBlocks joins their fences and iron bars).
 // raw gives the terrain of neighbouring chunks.
-func (o *Overworld) placeStrongholds(cx, cz int32, c *Chunk, raw func(cx, cz int32) *PackedChunk) {
+func (o *Overworld) placeStrongholds(cx, cz int32, c *Chunk) {
 	cbox := structure.NewBox(cx*16, MinY, cz*16, cx*16+15, MaxY-1, cz*16+15)
 	o.strongholdsNear(cx, cz, shReach, func(sx, sz int32) {
 		s := o.strongholdAt(sx, sz)

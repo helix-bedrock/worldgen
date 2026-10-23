@@ -68,7 +68,7 @@ func (l *cityLayout) add(parent cityPiece, offset [3]int32, name string, rot int
 // fails, the pieces it added are dropped; when it succeeds, one more draw
 // follows (Java's depth tag).
 func (l *cityLayout) children(g cityGen, depth int32, parent cityPiece, offset [3]int32) bool {
-	if depth >= 9 {
+	if depth >= cityMaxDepth {
 		return false
 	}
 	n := len(l.pieces)
@@ -174,35 +174,35 @@ func (l *cityLayout) tower(depth int32, parent cityPiece) bool {
 	rot := parent.rot
 	dx := l.r.IntN(2)
 	dz := l.r.IntN(2)
-	p := l.add(parent, [3]int32{3 + dx, -3, 3 + dz}, "tower_base", rot, true)
-	p = l.add(p, [3]int32{0, 7, 0}, "tower_piece", rot, true)
+	p := l.add(parent, [3]int32{towerBaseInset + dx, towerBaseDrop, towerBaseInset + dz}, "tower_base", rot, true)
+	p = l.add(p, [3]int32{0, towerBaseRise, 0}, "tower_piece", rot, true)
 	var from cityPiece
-	bridged := l.r.IntN(3) == 0
+	bridged := l.r.IntN(towerBridgeOdds) == 0
 	if bridged {
 		from = p
 	}
-	n := l.r.IntN(3)
+	n := l.r.IntN(towerExtraPieces)
 	for i := int32(0); i <= n; i++ {
-		p = l.add(p, [3]int32{0, 4, 0}, "tower_piece", rot, true)
+		p = l.add(p, [3]int32{0, floorRise, 0}, "tower_piece", rot, true)
 		if i < n && l.bool() {
 			from, bridged = p, true
 		}
 	}
 	if !bridged {
-		if depth != 7 {
+		if depth != towerTopDepth {
 			return l.children(genFatTower, depth+1, p, [3]int32{})
 		}
-		l.add(p, [3]int32{-1, 4, -1}, "tower_top", rot, true)
+		l.add(p, [3]int32{-1, floorRise, -1}, "tower_top", rot, true)
 		return true
 	}
-	for _, b := range towerBridges {
+	for _, b := range towerBridges() {
 		if !l.bool() {
 			continue
 		}
-		end := l.add(from, b.pos, "bridge_end", (rot+b.rot)%4, true)
+		end := l.add(from, b.pos, "bridge_end", (rot+b.rot)%quarterTurns, true)
 		l.children(genBridge, depth+1, end, [3]int32{})
 	}
-	l.add(p, [3]int32{-1, 4, -1}, "tower_top", rot, true)
+	l.add(p, [3]int32{-1, floorRise, -1}, "tower_top", rot, true)
 	return true
 }
 
@@ -210,19 +210,19 @@ func (l *cityLayout) tower(depth int32, parent cityPiece) bool {
 // to two more middles with bridges, and a top.
 func (l *cityLayout) fatTower(depth int32, parent cityPiece) bool {
 	rot := parent.rot
-	p := l.add(parent, [3]int32{-3, 4, -3}, "fat_tower_base", rot, true)
-	p = l.add(p, [3]int32{0, 4, 0}, "fat_tower_middle", rot, true)
-	for i := 0; i < 2 && l.r.IntN(3) != 0; i++ {
-		p = l.add(p, [3]int32{0, 8, 0}, "fat_tower_middle", rot, true)
-		for _, b := range fatTowerBridges {
+	p := l.add(parent, [3]int32{fatBaseOutset, floorRise, fatBaseOutset}, "fat_tower_base", rot, true)
+	p = l.add(p, [3]int32{0, floorRise, 0}, "fat_tower_middle", rot, true)
+	for i := 0; i < fatMiddles && l.r.IntN(fatMiddleOdds) != 0; i++ {
+		p = l.add(p, [3]int32{0, tallRise, 0}, "fat_tower_middle", rot, true)
+		for _, b := range fatTowerBridges() {
 			if !l.bool() {
 				continue
 			}
-			end := l.add(p, b.pos, "bridge_end", (rot+b.rot)%4, true)
+			end := l.add(p, b.pos, "bridge_end", (rot+b.rot)%quarterTurns, true)
 			l.children(genBridge, depth+1, end, [3]int32{})
 		}
 	}
-	l.add(p, [3]int32{-2, 8, -2}, "fat_tower_top", rot, true)
+	l.add(p, [3]int32{fatTopOutset, tallRise, fatTopOutset}, "fat_tower_top", rot, true)
 	return true
 }
 
@@ -230,32 +230,32 @@ func (l *cityLayout) fatTower(depth int32, parent cityPiece) bool {
 // then the city's one ship or a house tower, and a bridge end facing back.
 func (l *cityLayout) bridge(depth int32, parent cityPiece) bool {
 	rot := parent.rot
-	n := l.r.IntN(4) + 1
-	p := l.add(parent, [3]int32{0, 0, -4}, "bridge_piece", rot, true)
+	n := l.r.IntN(bridgeParts) + 1
+	p := l.add(parent, [3]int32{0, 0, -bridgeStep}, "bridge_piece", rot, true)
 	y := int32(0)
 	for range n {
 		// Each test draws: a flat piece, else steep stairs, else gentle.
 		if l.bool() {
-			p = l.add(p, [3]int32{0, y, -4}, "bridge_piece", rot, true)
+			p = l.add(p, [3]int32{0, y, -bridgeStep}, "bridge_piece", rot, true)
 			y = 0
 			continue
 		}
 		if l.bool() {
-			p = l.add(p, [3]int32{0, y, -4}, "bridge_steep_stairs", rot, true)
+			p = l.add(p, [3]int32{0, y, -bridgeStep}, "bridge_steep_stairs", rot, true)
 		} else {
-			p = l.add(p, [3]int32{0, y, -8}, "bridge_gentle_stairs", rot, true)
+			p = l.add(p, [3]int32{0, y, -gentleStep}, "bridge_gentle_stairs", rot, true)
 		}
-		y = 4
+		y = stairsRise
 	}
-	if !l.shipBuilt && l.r.IntN(10-depth) == 0 {
-		sx := l.r.IntN(8)
-		sz := l.r.IntN(10)
-		l.add(p, [3]int32{sx - 8, y, sz - 70}, "ship", rot, true)
+	if !l.shipBuilt && l.r.IntN(shipOdds-depth) == 0 {
+		sx := l.r.IntN(shipRangeX)
+		sz := l.r.IntN(shipRangeZ)
+		l.add(p, [3]int32{sx + shipX, y, sz + shipZ}, "ship", rot, true)
 		l.shipBuilt = true
-	} else if !l.children(genHouseTower, depth+1, p, [3]int32{-3, y + 1, -11}) {
+	} else if !l.children(genHouseTower, depth+1, p, [3]int32{houseOffsetX, y + 1, houseOffsetZ}) {
 		return false
 	}
-	l.add(p, [3]int32{4, y, 0}, "bridge_end", (rot+2)%4, true)
+	l.add(p, [3]int32{bridgeStep, y, 0}, "bridge_end", (rot+halfTurn)%quarterTurns, true)
 	return true
 }
 
@@ -264,17 +264,17 @@ func (l *cityLayout) bridge(depth int32, parent cityPiece) bool {
 func (l *cityLayout) houseTower(depth int32, parent cityPiece, offset [3]int32) bool {
 	rot := parent.rot
 	p := l.add(parent, offset, "base_floor", rot, true)
-	switch l.r.IntN(3) {
+	switch l.r.IntN(houseKinds) {
 	case 0:
-		l.add(p, [3]int32{-1, 4, -1}, "base_roof", rot, true)
+		l.add(p, [3]int32{-1, floorRise, -1}, "base_roof", rot, true)
 	case 1:
 		p = l.add(p, [3]int32{-1, 0, -1}, "second_floor_2", rot, false)
-		p = l.add(p, [3]int32{-1, 8, -1}, "second_roof", rot, false)
+		p = l.add(p, [3]int32{-1, tallRise, -1}, "second_roof", rot, false)
 		l.children(genTower, depth+1, p, [3]int32{})
 	default:
 		p = l.add(p, [3]int32{-1, 0, -1}, "second_floor_2", rot, false)
-		p = l.add(p, [3]int32{-1, 4, -1}, "third_floor_c", rot, false)
-		p = l.add(p, [3]int32{-1, 8, -1}, "third_roof", rot, true)
+		p = l.add(p, [3]int32{-1, floorRise, -1}, "third_floor_c", rot, false)
+		p = l.add(p, [3]int32{-1, tallRise, -1}, "third_roof", rot, true)
 		l.children(genTower, depth+1, p, [3]int32{})
 	}
 	return true
@@ -285,13 +285,13 @@ func (l *cityLayout) houseTower(depth int32, parent cityPiece, offset [3]int32) 
 // picked the chunk (sub_4E400E0 hands it on to the start).
 func (e *End) layCity(cx, cz int32, rot int, y int32) *city {
 	l := &cityLayout{e: e, r: e.cityRandom(structure.Region(cx, citySpacing), structure.Region(cz, citySpacing))}
-	for range 4 {
+	for range startDraws {
 		l.r.IntN(citySpacing - citySeparation)
 	}
 	p := l.piece("base_floor", [3]int32{cx*16 | 8, y, cz*16 | 8}, rot, true)
 	p = l.add(p, [3]int32{-1, 0, -1}, "second_floor", rot, false)
-	p = l.add(p, [3]int32{-1, 4, -1}, "third_floor", rot, false)
-	p = l.add(p, [3]int32{-1, 8, -1}, "third_roof", rot, true)
+	p = l.add(p, [3]int32{-1, floorRise, -1}, "third_floor", rot, false)
+	p = l.add(p, [3]int32{-1, tallRise, -1}, "third_roof", rot, true)
 	l.children(genTower, 1, p, [3]int32{})
 	c := &city{pieces: l.pieces, box: l.pieces[0].box}
 	for _, p := range c.pieces {

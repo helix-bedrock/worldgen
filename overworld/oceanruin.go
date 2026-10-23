@@ -381,9 +381,10 @@ func (o *Overworld) ruinPieces(cx, cz int32, cfg ruinBiome) []ruinPiece {
 // one in three layers (brick, cracked at 0.7, mossy at 0.5).
 func addRuin(pieces []ruinPiece, r *rand.MT, x, z int32, rot int, integrity float32, big, warm bool) []ruinPiece {
 	if warm {
-		path := ruinWarmSmall()[r.IntN(int32(len(ruinWarmSmall())))]
+		small, large := ruinWarmSmall(), ruinWarmBig()
+		path := small[r.IntN(int32(len(small)))]
 		if big {
-			path = ruinWarmBig()[r.IntN(int32(len(ruinWarmBig())))]
+			path = large[r.IntN(int32(len(large)))]
 		}
 		return append(pieces, ruinPiece{"ruin/" + path, x, z, rot, integrity, big, warm})
 	}

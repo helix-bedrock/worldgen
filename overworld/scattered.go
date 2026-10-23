@@ -175,7 +175,7 @@ func (o *Overworld) topSolid(p *PackedChunk, x, z int32, water bool) int32 {
 	}
 	lx, lz := int(x&15), int(z&15)
 	for y := MaxY - 1; y >= MinY; y-- {
-		b := p.at(int(y-MinY)<<8 | lz<<4 | lx)
+		b := p.at((y-MinY)<<8 | lz<<4 | lx)
 		if water && (b == o.ids.water || b == o.ids.flowingWater) || o.solidMaterial(b) {
 			return int32(y + 1)
 		}

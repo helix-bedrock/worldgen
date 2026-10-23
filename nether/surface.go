@@ -17,7 +17,8 @@ const noBlock = ^uint32(0)
 type builderKind uint8
 
 const (
-	builderNone builderKind = iota
+	// The zero kind is no builder.
+	_ builderKind = iota
 	// builderOverworld is the overworld builder, which hell and the two
 	// forests use with netherrack as their stone.
 	builderOverworld
@@ -195,7 +196,7 @@ func seaLevelExpr(e string) (int32, error) {
 	e = strings.ReplaceAll(e, " ", "")
 	rest, ok := strings.CutPrefix(e, "variable.sea_level")
 	if !ok {
-		v, err := strconv.Atoi(e)
+		v, err := strconv.ParseInt(e, 10, 32)
 		if err != nil {
 			return 0, fmt.Errorf("nether: height bound %q: %w", e, err)
 		}
@@ -204,7 +205,7 @@ func seaLevelExpr(e string) (int32, error) {
 	if rest == "" {
 		return SeaLevel, nil
 	}
-	v, err := strconv.Atoi(rest)
+	v, err := strconv.ParseInt(rest, 10, 32)
 	if err != nil {
 		return 0, fmt.Errorf("nether: height bound %q: %w", e, err)
 	}

@@ -90,7 +90,7 @@ func TestStructureFingerprint(t *testing.T) {
 				}
 				h.Write(buf)
 				for _, be := range c.BlockEntities {
-					fmt.Fprintf(h, "%d %d %d %s %v;", be.X, be.Y, be.Z, be.LootTable, be.Data)
+					_, _ = fmt.Fprintf(h, "%d %d %d %s %v;", be.X, be.Y, be.Z, be.LootTable, be.Data)
 				}
 			}
 		}

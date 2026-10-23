@@ -42,7 +42,7 @@ func (t *TerrainCache) Get(chunkX, chunkZ int32) *PackedChunk {
 	return t.structured.Get([2]int32{chunkX, chunkZ}, func() *PackedChunk {
 		raw := t.Raw(chunkX, chunkZ)
 		height := surfaceHeights{t.gen, t.Raw}.at
-		if !t.gen.structuresReach(chunkX, chunkZ, height, t.Raw) {
+		if !t.gen.structuresReach(chunkX, chunkZ, t.Raw) {
 			return raw
 		}
 		full, _ := t.scratch.Get().(*Chunk)

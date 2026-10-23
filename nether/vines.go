@@ -77,8 +77,10 @@ func (n *Nether) twistingVinesCluster(r *region, x, y, z int32, mt *rand.MT) {
 	for range twistingVineTries {
 		// Each horizontal offset is the difference of two raw draws mod 10,
 		// shifted by -5 (x first, then z), then y.
-		dx := int32(mt.Uint32()%10) - int32(mt.Uint32()%10)
-		dz := int32(mt.Uint32()%10) - int32(mt.Uint32()%10)
+		a, b := int32(mt.Uint32()%10), int32(mt.Uint32()%10)
+		dx := a - b
+		a, b = int32(mt.Uint32()%10), int32(mt.Uint32()%10)
+		dz := a - b
 		dy := mt.IntN(5)
 		px, py, pz := x+dx-5, y+dy-4, z+dz-5
 		if r.at(px, py, pz) != n.ids.air {

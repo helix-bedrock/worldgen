@@ -413,7 +413,7 @@ func (o *Overworld) placeStructures(cx, cz int32, c *Chunk, height func(x, z int
 	o.placeDataJigsaws(cx, cz, c)
 	o.placeVillages(cx, cz, c, height)
 	o.placeMineshafts(cx, cz, c, raw)
-	o.placeStrongholds(cx, cz, c, raw)
+	o.placeStrongholds(cx, cz, c)
 	o.placeCities(cx, cz, c)
 	o.placeScattered(cx, cz, c, raw)
 	o.placeOutposts(cx, cz, c, raw)
@@ -427,7 +427,7 @@ func (o *Overworld) placeStructures(cx, cz int32, c *Chunk, height func(x, z int
 
 // structuresReach reports whether a structure has a piece in chunk
 // (cx, cz).
-func (o *Overworld) structuresReach(cx, cz int32, height func(x, z int32) int32, raw func(cx, cz int32) *PackedChunk) bool {
+func (o *Overworld) structuresReach(cx, cz int32, raw func(cx, cz int32) *PackedChunk) bool {
 	return o.dataJigsawsReach(cx, cz) || o.villagesReach(cx, cz) || o.mineshaftReaches(cx, cz) || o.strongholdReaches(cx, cz) || o.citiesReach(cx, cz) ||
 		o.scatteredReaches(cx, cz) || o.ruinReaches(cx, cz) ||
 		o.shipReaches(cx, cz) || o.isTreasureChunk(cx, cz) || o.monumentReaches(cx, cz) ||
@@ -469,7 +469,7 @@ func (o *Overworld) structuredView(raw func(cx, cz int32) *PackedChunk) func(cx,
 			return p
 		}
 		p := raw(cx, cz)
-		if p != nil && o.structuresReach(cx, cz, height, raw) {
+		if p != nil && o.structuresReach(cx, cz, raw) {
 			full := new(Chunk)
 			p.Unpack(full)
 			o.placeStructures(cx, cz, full, height, raw)

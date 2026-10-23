@@ -195,12 +195,13 @@ func (o *Overworld) layShip(sx, sz int32) *shipwreck {
 	var r rand.MT
 	r.Seed(populationSeed(o.seed, sx, sz))
 	s.rot = int(r.IntN(structRotations))
-	idx := r.IntN(int32(len(shipTemplates())))
+	templates, woods := shipTemplates(), shipWoods()
+	idx := r.IntN(int32(len(templates)))
 	if s.beached {
 		idx = r.IntN(shipUprightTemplates)
 	}
-	s.path = "shipwreck/" + shipTemplates()[idx]
-	s.woods = shipWoods()[r.IntN(int32(len(shipWoods())))]
+	s.path = "shipwreck/" + templates[idx]
+	s.woods = woods[r.IntN(int32(len(woods)))]
 	jt := o.st.Template(s.path)
 	if jt == nil {
 		return nil

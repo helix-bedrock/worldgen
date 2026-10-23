@@ -106,7 +106,7 @@ func (b *nbBuild) box(x0, y0, z0, x1, y1, z1 int32, edge, inner uint32) {
 
 // down is fillColumnDown (sub_D255920) with nether bricks: down through air
 // and liquid to the first other block, no lower than y 2.
-func (b *nbBuild) down(x, y, z int32) {
+func (b *nbBuild) down(x, y, z int32) { //nolint:unparam // the parameters of BDS fillColumnDown
 	wx, wy, wz := b.p.worldPos(x, y, z)
 	if !b.cbox.contains(wx, wy, wz) {
 		return
@@ -124,7 +124,7 @@ func (b *nbBuild) down(x, y, z int32) {
 }
 
 // downArea fills columns down at y -1 for x in [x0, x1] and z in [z0, z1].
-func (b *nbBuild) downArea(x0, z0, x1, z1 int32) {
+func (b *nbBuild) downArea(x0, z0, x1, z1 int32) { //nolint:unparam // the parameters of BDS fillColumnDown
 	for x := x0; x <= x1; x++ {
 		for z := z0; z <= z1; z++ {
 			b.down(x, -1, z)

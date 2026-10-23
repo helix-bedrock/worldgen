@@ -738,7 +738,7 @@ func (p *mansionPlacer) floor(f int, origin [3]int32, rot int, l *mansionLayout)
 	n, e, s, w := rotDir(rot, dirNorth), rotDir(rot, dirEast), rotDir(rot, dirSouth), rotDir(rot, dirWest)
 	fy := origin[1] + mansionFloorHeight*int32(f)
 	if f == floorThird {
-		fy += 3
+		fy += mansionThirdFloorLift
 	}
 	base := [3]int32{origin[0], fy, origin[2]}
 	rooms := &l.rooms[f]
