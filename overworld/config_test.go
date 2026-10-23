@@ -423,9 +423,11 @@ func TestConfigStructureContents(t *testing.T) {
 
 	reg, ids := testRegistry(t)
 	for want, set := range map[string]func(c *Config){
-		"jigsaw pool":    func(c *Config) { c.Structures.SetPoolWeight("minecraft:village/plains/housez", "x", 1) },
-		"element":        func(c *Config) { c.Structures.SetPoolWeight("minecraft:village/plains/houses", "nope", 1) },
-		"vanilla templ":  func(c *Config) { c.Structures.ReplaceTemplate("no/such/template", "village/plains/houses/plains_small_house_1") },
+		"jigsaw pool": func(c *Config) { c.Structures.SetPoolWeight("minecraft:village/plains/housez", "x", 1) },
+		"element":     func(c *Config) { c.Structures.SetPoolWeight("minecraft:village/plains/houses", "nope", 1) },
+		"vanilla templ": func(c *Config) {
+			c.Structures.ReplaceTemplate("no/such/template", "village/plains/houses/plains_small_house_1")
+		},
 		"unknown block":  func(c *Config) { c.Structures.ReplaceBlock(StructureVillage, "cobblestone", "no_such_block") },
 		"not in the pac": func(c *Config) { c.Structures.AddToPool("minecraft:village/plains/houses", "my/missing", 1) },
 	} {
