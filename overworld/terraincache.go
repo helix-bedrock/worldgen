@@ -50,7 +50,7 @@ func (t *TerrainCache) Get(chunkX, chunkZ int32) *PackedChunk {
 			full = new(Chunk)
 		}
 		raw.Unpack(full)
-		t.gen.placeStructures(chunkX, chunkZ, full, height, t.Raw)
+		t.gen.placeStructures(chunkX, chunkZ, full, height, t.Raw, nil)
 		p := Pack(full)
 		t.scratch.Put(full)
 		return p

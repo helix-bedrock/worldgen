@@ -224,12 +224,15 @@ func (o *Overworld) fillBlock(g *grids, aq *aquifer, adj []beardShaver, beards [
 				if aq.isLava {
 					return o.ids.lava
 				}
-				return o.ids.water
+				return o.seaFluid
 			}
 			return o.ids.air
 		}
 	}
 	block := o.stoneAt(x, y, z)
+	if o.terrain.NoOreVeins {
+		return block
+	}
 	return o.oreVein(g, i, j, k, dx, dy, dz, x, y, z, block)
 }
 
@@ -289,6 +292,9 @@ func (o *Overworld) oreVein(g *grids, i, j, k, dx, dy, dz int, x, y, z int32, bl
 // stoneAt is deepslate below y 0, stone from y 8, and a random mix between,
 // deepslate with chance 1 - y/8.
 func (o *Overworld) stoneAt(x, y, z int32) uint32 {
+	if o.terrain.NoDeepslate {
+		return o.ids.stone
+	}
 	if y < 0 {
 		return o.ids.deepslate
 	}

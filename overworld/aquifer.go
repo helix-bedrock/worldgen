@@ -181,11 +181,11 @@ func (a *aquifer) computeFluid(x, y, z int32) (int32, bool) {
 		h := a.prelimAt((x+16*off[0])>>2, (z+16*off[1])>>2)
 		centre := off[0] == 0 && off[1] == 0
 		if centre && y-12 > h+8 {
-			return SeaLevel, false
+			return o.seaLevel, false
 		}
-		if !(y+4 <= h && !centre) && h+8 < SeaLevel {
+		if !(y+4 <= h && !centre) && h+8 < o.seaLevel {
 			if y+4 > h {
-				return SeaLevel, false
+				return o.seaLevel, false
 			}
 			near = near || centre
 		}
@@ -213,7 +213,7 @@ func (a *aquifer) computeFluid(x, y, z int32) (int32, bool) {
 		flood = max(flood, -1)
 	}
 	if flood > 1.1*partial+-0.3 {
-		return SeaLevel, false
+		return o.seaLevel, false
 	}
 	if partial*1.2+-0.8 > flood {
 		return noFluidLevel, false

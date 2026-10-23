@@ -34,6 +34,8 @@ type Config struct {
 	Structures StructureConfig
 	// Skip turns whole generation steps off.
 	Skip Steps
+	// Terrain changes the terrain's settings.
+	Terrain Terrain
 	// Logger receives the panics of user code (Feature, StructureFilter),
 	// which are recovered so one bad plugin cannot stop the server. Nil
 	// drops them.
@@ -78,6 +80,23 @@ type Steps struct {
 	Decoration bool
 	// Freeze skips the snow and ice the climate puts on top.
 	Freeze bool
+}
+
+// Terrain are terrain settings. The zero value is vanilla.
+type Terrain struct {
+	// SeaLevel is the height the sea and the surface aquifers fill up to
+	// (exclusive); 0 keeps vanilla's 63. The land's shape does not change,
+	// and surfaces, structures and features keep vanilla's sea level for
+	// their own checks.
+	SeaLevel int32
+	// SeaBlock replaces the water of the sea and the aquifers
+	// ("minecraft:lava", "minecraft:air"); empty keeps water.
+	SeaBlock string
+	// NoDeepslate makes the deep ground stone, so ores are their stone
+	// kinds there too.
+	NoDeepslate bool
+	// NoOreVeins leaves out the big copper and iron ore veins.
+	NoOreVeins bool
 }
 
 // Pass is a feature placement pass. Passes run in this order; rules of one

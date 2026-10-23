@@ -479,6 +479,15 @@ type featureWorld struct {
 	lastOv   *overlayChunk
 	lastOvOK bool
 	tops     map[[2]int32]int32
+	// trace, for Explain, records the writes to one position.
+	trace *featureTrace
+}
+
+// featureTrace records what an origin's features write to one position.
+type featureTrace struct {
+	pos    [3]int32
+	step   string
+	writes []Explanation
 }
 
 // overlayChunk holds one origin's placements in one chunk column: set has a
@@ -566,6 +575,9 @@ func (w *featureWorld) set(x, y, z int32, b uint32) {
 	if cur, ok := w.block(x, y, z); ok && w.o.floorBedrock(cur, y) {
 		return
 	}
+	if w.trace != nil && w.trace.pos == [3]int32{x, y, z} {
+		w.trace.writes = append(w.trace.writes, Explanation{Step: w.trace.step, Block: w.o.blockName(b)})
+	}
 	oi := int(y-MinY)<<8 | int(z&15)<<4 | int(x&15)
 	oc := w.overlayAt(x>>4, z>>4, true)
 	oc.set[oi>>6] |= 1 << (oi & 63)
@@ -614,12 +626,18 @@ type featureWrites struct {
 // originFeatures runs the rules of origin chunk (ox, oz). It returns nil
 // when neighbour cannot provide the origin.
 func (o *Overworld) originFeatures(ox, oz int32, neighbour func(cx, cz int32) *PackedChunk) *featureWrites {
+	return o.originFeaturesTraced(ox, oz, neighbour, nil)
+}
+
+// originFeaturesTraced is originFeatures, recording the writes to one
+// position in tr when it is not nil.
+func (o *Overworld) originFeaturesTraced(ox, oz int32, neighbour func(cx, cz int32) *PackedChunk, tr *featureTrace) *featureWrites {
 	origin := neighbour(ox, oz)
 	if origin == nil || o.rules == nil || o.skip.Decoration {
 		return nil
 	}
 	w := &featureWorld{o: o, ox: ox, oz: oz, neighbour: neighbour, lastX: math.MaxInt32,
-		overlay: map[[2]int32]*overlayChunk{}, tops: map[[2]int32]int32{}}
+		overlay: map[[2]int32]*overlayChunk{}, tops: map[[2]int32]int32{}, trace: tr}
 	defer w.release()
 	o.decorateFrom(w, ox, oz, origin)
 	n := 0
@@ -822,9 +840,13 @@ func (o *Overworld) decorateFrom(w *featureWorld, ox, oz int32, origin *PackedCh
 	popMT := rand.NewMT(pop)
 	w.pop = popMT
 	w.shuffleOK = false
+	w.traceStep("lakes and dungeons")
 	o.lakesAndDungeons(w, ox, oz, popMT)
+	w.traceStep("ancient city features")
 	o.cityFeatures(w, ox, oz, pop)
+	w.traceStep("village features")
 	o.villageFeatures(w, ox, oz, pop)
+	w.traceStep("structure features")
 	o.dataJigsawFeatures(w, ox, oz, pop)
 	// No rule's feature may change an abandoned camp's cells either (a
 	// Helix rule: BDS lets nearby trees grow into a camp).
@@ -845,6 +867,7 @@ func (o *Overworld) decorateFrom(w *featureWorld, ox, oz int32, origin *PackedCh
 			// the y of rules in xyz order does for z.
 			var world [3]int32
 			for _, r := range o.rules.byBiome[b][pass] {
+				w.traceStep(r.id)
 				seed := ruleSeed(pop, r.hash)
 				rule.Seed(seed)
 				n := r.iterations
@@ -919,4 +942,11 @@ func (o *Overworld) dropOverwrittenBlockEntities(c *Chunk) {
 	}
 	clear(c.BlockEntities[len(kept):])
 	c.BlockEntities = kept
+}
+
+// traceStep names the step that writes next, for Explain.
+func (w *featureWorld) traceStep(step string) {
+	if w.trace != nil {
+		w.trace.step = step
+	}
 }

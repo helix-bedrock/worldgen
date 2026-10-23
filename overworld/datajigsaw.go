@@ -909,10 +909,10 @@ func buryAt(bs []structure.Box, x, y, z int32) float32 {
 
 // placeDataJigsaws writes the pieces of data-driven jigsaw structures that
 // reach chunk (cx, cz) into c.
-func (o *Overworld) placeDataJigsaws(cx, cz int32, c *Chunk) {
+func (o *Overworld) placeDataJigsaws(cx, cz int32, c *Chunk, trace func(step string)) {
 	chunkBox := structure.NewBox(cx*16, MinY, cz*16, cx*16+15, MaxY-1, cz*16+15)
 	for _, d := range o.dataJigsaws {
-		o.swapped(d.sk, c, func() {
+		o.swapped(d.sk, c, trace, func() {
 			d.near(o, cx, cz, func(s *djStructure) {
 				if !s.bb.Intersects(chunkBox) {
 					return

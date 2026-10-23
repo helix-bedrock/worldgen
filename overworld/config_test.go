@@ -438,3 +438,71 @@ func TestConfigStructureContents(t *testing.T) {
 		}
 	}
 }
+
+func TestConfigTerrain(t *testing.T) {
+	cfg := Vanilla()
+	cfg.Terrain = Terrain{SeaBlock: "lava", NoDeepslate: true, NoOreVeins: true}
+	o := newConfigured(t, cfg)
+	var c Chunk
+	o.GenerateChunk(-41, 31, &c) // an ocean chunk
+	water, lava, deep := 0, 0, 0
+	for _, b := range c.Blocks {
+		switch o.blockName(uint32(b)) {
+		case "minecraft:water":
+			water++
+		case "minecraft:lava":
+			lava++
+		case "minecraft:deepslate":
+			deep++
+		}
+	}
+	if water != 0 || lava == 0 || deep != 0 {
+		t.Errorf("water %d, lava %d, deepslate %d; want a lava sea and no deepslate", water, lava, deep)
+	}
+	cfg = Vanilla()
+	cfg.Terrain.SeaLevel = 100
+	o = newConfigured(t, cfg)
+	o.GenerateChunk(-41, 31, &c)
+	if b := o.blockName(c.Block(8, 90, 8)); b != "minecraft:water" {
+		t.Errorf("block %s at y 90 with sea level 100", b)
+	}
+}
+
+func TestConfigExplain(t *testing.T) {
+	o := newConfigured(t, Vanilla())
+	cache := NewTerrainCache(o, 256)
+	// A log in the forest chunk.
+	var c Chunk
+	cache.Generate(forestX, forestZ, &c)
+	var pos [3]int32
+	found := false
+	for i, b := range c.Blocks {
+		if strings.HasSuffix(o.blockName(uint32(b)), "_log") {
+			pos = [3]int32{forestX*16 + int32(i&15), int32(i>>8) + MinY, forestZ*16 + int32(i>>4&15)}
+			found = true
+			break
+		}
+	}
+	if !found {
+		t.Fatal("no log in the forest chunk")
+	}
+	steps, err := cache.Explain(pos[0], pos[1], pos[2])
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(steps) < 2 || steps[0].Step != "terrain (noise, aquifers, ore veins)" || !strings.HasSuffix(steps[len(steps)-1].Block, "_log") {
+		t.Fatalf("steps %+v", steps)
+	}
+	tree := false
+	for _, s := range steps {
+		tree = tree || strings.Contains(s.Step, "tree") && strings.HasSuffix(s.Block, "_log")
+	}
+	if !tree {
+		t.Errorf("no tree rule placed the log: %+v", steps)
+	}
+	var again Chunk
+	cache.Generate(forestX, forestZ, &again)
+	if again.Blocks != c.Blocks {
+		t.Error("Explain changed the cache's output")
+	}
+}

@@ -94,8 +94,12 @@ func WithHouseChests(pick func(house string) bool) Option {
 type Overworld struct {
 	opts options
 	// skip and gates are the Config's step and structure changes.
-	skip  Steps
-	gates structGates
+	skip    Steps
+	terrain Terrain
+	// seaLevel and seaFluid are the sea's height and block (Terrain).
+	seaLevel int32
+	seaFluid uint32
+	gates    structGates
 	// place is each structure kind's placement grid (see placementSlot).
 	place [structKindCount]startGrid
 	// forced are the PlaceAt starts by kind and placement region.
@@ -340,6 +344,20 @@ func NewOverworld(seed int64, reg *blocks.Registry, biomeIDs map[string]uint32, 
 	if err := reg.Resolve(names...); err != nil {
 		return nil, err
 	}
+	o.terrain, o.seaLevel, o.seaFluid = cfg.Terrain, SeaLevel, o.ids.water
+	if cfg.Terrain.SeaLevel != 0 {
+		if cfg.Terrain.SeaLevel <= MinY || cfg.Terrain.SeaLevel > MaxY {
+			return nil, fmt.Errorf("worldgen: sea level %d is outside the world (%d to %d)", cfg.Terrain.SeaLevel, MinY+1, MaxY)
+		}
+		o.seaLevel = cfg.Terrain.SeaLevel
+	}
+	if cfg.Terrain.SeaBlock != "" {
+		id, ok := reg.Default(fullID(cfg.Terrain.SeaBlock))
+		if !ok {
+			return nil, fmt.Errorf("worldgen: unknown sea block %q", cfg.Terrain.SeaBlock)
+		}
+		o.seaFluid = id
+	}
 	o.ids.magma, _ = reg.Default("minecraft:magma")
 	o.ids.bubbleColumn, _ = reg.Lookup("minecraft:bubble_column", map[string]any{"drag_down": true})
 	for _, n := range []string{"stone", "granite", "polished_granite", "diorite", "polished_diorite", "andesite", "polished_andesite"} {
@@ -504,6 +522,12 @@ func (o *Overworld) Registry() *blocks.Registry { return o.reg }
 
 // GenerateChunk fills c with the chunk at (chunkX, chunkZ).
 func (o *Overworld) GenerateChunk(chunkX, chunkZ int32, c *Chunk) {
+	o.generateChunk(chunkX, chunkZ, c, nil)
+}
+
+// generateChunk is GenerateChunk; trace, when not nil, is called after
+// each step with its name (Explain).
+func (o *Overworld) generateChunk(chunkX, chunkZ int32, c *Chunk, trace func(step string)) {
 	var cols [gridXZ * gridXZ]column
 	for i := range gridXZ {
 		for k := range gridXZ {
@@ -516,6 +540,7 @@ func (o *Overworld) GenerateChunk(chunkX, chunkZ int32, c *Chunk) {
 	o.fillDensity(chunkX, chunkZ, &cols, g)
 	aq := newAquifer(o, chunkX, chunkZ)
 	o.fillBlocks(chunkX, chunkZ, g, aq, c)
+	traceStep(trace, "terrain (noise, aquifers, ore veins)")
 	mt := rand.NewMT(rand.ChunkSeed(chunkX, chunkZ))
 	if !o.skip.BedrockFloor {
 		o.bedrockFloor(mt, c)
@@ -525,22 +550,33 @@ func (o *Overworld) GenerateChunk(chunkX, chunkZ int32, c *Chunk) {
 			mt.IntN(bedrockFloorRange)
 		}
 	}
+	traceStep(trace, "bedrock floor")
 	o.fillBiomes(chunkX, chunkZ, c)
 	if !o.skip.Surface {
 		o.surface(chunkX, chunkZ, c, mt)
 	}
+	traceStep(trace, "biome surface")
 	if !o.skip.Caves {
 		for _, cv := range o.carvers {
 			cv.carve(o, c, aq, chunkX, chunkZ)
 		}
 	}
+	traceStep(trace, "cave carvers")
 	if !o.skip.Canyons {
 		o.canyons(c, aq, chunkX, chunkZ)
 	}
+	traceStep(trace, "canyons")
 }
 
 // bedrockFloorRange is the number of bedrock floor heights (2 to 5).
 const bedrockFloorRange = 4
+
+// traceStep reports a finished step to an Explain trace.
+func traceStep(trace func(step string), name string) {
+	if trace != nil {
+		trace(name)
+	}
+}
 
 // floorBedrock reports whether b at height y is part of the bedrock floor.
 // Hard rule: once the floor is drawn, no later step (structures, features,

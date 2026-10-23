@@ -134,8 +134,11 @@ func (o *Overworld) applyPools(edits []poolEdit) error {
 }
 
 // swapped runs place, which writes structure k into c, then swaps the
-// blocks it changed by k's block swaps.
-func (o *Overworld) swapped(k structKind, c *Chunk, place func()) {
+// blocks it changed by k's block swaps, and reports the step to trace.
+func (o *Overworld) swapped(k structKind, c *Chunk, trace func(step string), place func()) {
+	if trace != nil {
+		defer trace(string(o.gates.names[k]))
+	}
 	m := o.swaps[k]
 	if m == nil {
 		place()

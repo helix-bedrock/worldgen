@@ -281,13 +281,13 @@ func (o *Overworld) scatteredY(kind uint8, sx, sz int32, start *PackedChunk) int
 
 // placeScattered writes the scattered features that reach chunk (cx, cz)
 // into c. raw gives undecorated terrain.
-func (o *Overworld) placeScattered(cx, cz int32, c *Chunk, raw func(cx, cz int32) *PackedChunk) {
+func (o *Overworld) placeScattered(cx, cz int32, c *Chunk, raw func(cx, cz int32) *PackedChunk, trace func(step string)) {
 	o.scatteredReach(cx, cz, func(sx, sz int32, kind uint8) {
 		start := raw(sx, sz)
 		if start == nil {
 			return
 		}
-		o.swapped(scatterStructKind(kind), c, func() { o.buildScattered(cx, cz, sx, sz, kind, c, start) })
+		o.swapped(scatterStructKind(kind), c, trace, func() { o.buildScattered(cx, cz, sx, sz, kind, c, start) })
 	})
 }
 
