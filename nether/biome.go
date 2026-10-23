@@ -74,6 +74,8 @@ type biomeSource struct {
 	biomes  []netherBiome
 	// zoomSeed is the zoom node's layer seed.
 	zoomSeed int64
+	// remap replaces picked biomes (the Config's Replace and Only).
+	remap map[uint32]uint32
 }
 
 func newBiomeSource(seed int64, biomeIDs map[string]uint32) (*biomeSource, error) {
@@ -134,6 +136,9 @@ func (s *biomeSource) pick(qx, qz int32) uint32 {
 		if i == 0 || d < bestD {
 			best, bestD = b.id, d
 		}
+	}
+	if to, ok := s.remap[best]; ok {
+		return to
 	}
 	return best
 }

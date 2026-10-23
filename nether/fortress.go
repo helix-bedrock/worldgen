@@ -55,7 +55,11 @@ const (
 const (
 	complexSpacing = 30
 	complexRange   = 26
-	complexSalt    = 30084232
+	// complexKinds and fortressKinds: a start is a fortress when a draw
+	// below complexKinds is below fortressKinds, else a bastion.
+	complexKinds  = 6
+	fortressKinds = 2
+	complexSalt   = 30084232
 	// nbReach is how many chunks from its start chunk a fortress can reach:
 	// a piece starts at most 112 blocks from the start's corner and runs up
 	// to 18 further.
@@ -115,14 +119,20 @@ func (n *Nether) complexBiomesOK(cx, cz int32, ok func(b uint32) bool) bool {
 // leaves r where the start goes on. A fortress may stand in every Nether
 // biome; a third of the grid's starts are fortresses, the rest bastions.
 func (n *Nether) fortressChunk(cx, cz int32, r *rand.MT) bool {
-	sx, sz := n.complexStart(mathx.FloorDiv(cx, complexSpacing), mathx.FloorDiv(cz, complexSpacing), r)
-	if sx != cx || sz != cz {
+	rx, rz := mathx.FloorDiv(cx, complexSpacing), mathx.FloorDiv(cz, complexSpacing)
+	sx, sz := n.complexStart(rx, rz, r)
+	if at, ok := n.forcedIn(gridComplex, rx, rz); ok {
+		// The kind draw still happens: the start goes on after it.
+		r.IntN(complexKinds)
+		return at.kind == skFortress && at.chunk == [2]int32{cx, cz}
+	}
+	if sx != cx || sz != cz || !n.gate.OK(skFortress, cx, cz) {
 		return false
 	}
 	if !n.complexBiomesOK(cx, cz, func(uint32) bool { return true }) {
 		return false
 	}
-	return r.IntN(6) < 2
+	return r.IntN(complexKinds) < fortressKinds
 }
 
 type nbPiece struct {
@@ -431,7 +441,7 @@ func (n *Nether) NearestFortress(x, z, maxRings int32) (fx, fy, fz int32, found 
 				if mathx.Abs(rx-rx0) != ring && mathx.Abs(rz-rz0) != ring {
 					continue
 				}
-				cx, cz := n.complexStart(rx, rz, &r)
+				cx, cz := n.complexPick(rx, rz, &r)
 				if !n.fortressChunk(cx, cz, &r) {
 					continue
 				}

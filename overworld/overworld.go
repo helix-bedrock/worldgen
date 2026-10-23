@@ -99,7 +99,7 @@ type Overworld struct {
 	// seaLevel and seaFluid are the sea's height and block (Terrain).
 	seaLevel int32
 	seaFluid uint32
-	gates    structGates
+	gates    *structure.Gate
 	// place is each structure kind's placement grid (see placementSlot).
 	place [structKindCount]startGrid
 	// forced are the PlaceAt starts by kind and placement region.

@@ -79,14 +79,20 @@ func (n *Nether) loadBastions(biomeIDs map[string]uint32) error {
 // bastionChunk reports whether a bastion starts in chunk (cx, cz) and
 // leaves r where the start goes on.
 func (n *Nether) bastionChunk(cx, cz int32, r *rand.MT) bool {
-	sx, sz := n.complexStart(mathx.FloorDiv(cx, complexSpacing), mathx.FloorDiv(cz, complexSpacing), r)
-	if sx != cx || sz != cz {
+	rx, rz := mathx.FloorDiv(cx, complexSpacing), mathx.FloorDiv(cz, complexSpacing)
+	sx, sz := n.complexStart(rx, rz, r)
+	if at, ok := n.forcedIn(gridComplex, rx, rz); ok {
+		// The kind draw still happens: the start goes on after it.
+		r.IntN(complexKinds)
+		return at.kind == skBastion && at.chunk == [2]int32{cx, cz}
+	}
+	if sx != cx || sz != cz || !n.gate.OK(skBastion, cx, cz) {
 		return false
 	}
 	if !n.complexBiomesOK(cx, cz, func(b uint32) bool { return n.bastionBiomes[b] }) {
 		return false
 	}
-	return r.IntN(6) >= 2
+	return r.IntN(complexKinds) >= fortressKinds
 }
 
 // bastionAt assembles the bastion starting in chunk (cx, cz), if any.
@@ -144,7 +150,7 @@ func (n *Nether) bastionsReach(cx, cz int32, f func(b *bastion)) {
 	for rx := mathx.FloorDiv(cx-bastionReach, complexSpacing); rx <= mathx.FloorDiv(cx+bastionReach, complexSpacing); rx++ {
 		for rz := mathx.FloorDiv(cz-bastionReach, complexSpacing); rz <= mathx.FloorDiv(cz+bastionReach, complexSpacing); rz++ {
 			var r rand.MT
-			sx, sz := n.complexStart(rx, rz, &r)
+			sx, sz := n.complexPick(rx, rz, &r)
 			if mathx.Abs(sx-cx) > bastionReach || mathx.Abs(sz-cz) > bastionReach {
 				continue
 			}
@@ -211,7 +217,7 @@ func (n *Nether) NearestBastion(x, z, maxRings int32, kind string) (bx, by, bz i
 	for rx := rx0 - maxRings; rx <= rx0+maxRings; rx++ {
 		for rz := rz0 - maxRings; rz <= rz0+maxRings; rz++ {
 			var r rand.MT
-			cx, cz := n.complexStart(rx, rz, &r)
+			cx, cz := n.complexPick(rx, rz, &r)
 			if !n.bastionChunk(cx, cz, &r) {
 				continue
 			}

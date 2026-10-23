@@ -10,7 +10,18 @@ import (
 	"github.com/helix-bedrock/worldgen/rand"
 )
 
-func testNether(t testing.TB, seed int64) *Nether {
+func testNether(t testing.TB, seed int64, opts ...Option) *Nether {
+	t.Helper()
+	reg, ids := testData(t)
+	n, err := New(seed, reg, ids, opts...)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return n
+}
+
+// testData loads the BDS block and biome lists.
+func testData(t testing.TB) (*blocks.Registry, map[string]uint32) {
 	t.Helper()
 	// The overworld's testdata holds the BDS 1.26.52 block and biome lists.
 	dir := filepath.Join("..", "overworld", "testdata")
@@ -37,11 +48,7 @@ func testNether(t testing.TB, seed int64) *Nether {
 	if err != nil {
 		t.Fatal(err)
 	}
-	n, err := New(seed, reg, ids)
-	if err != nil {
-		t.Fatal(err)
-	}
-	return n
+	return reg, ids
 }
 
 // TestFortressLayout pins a fortress whose blocks were compared with a BDS

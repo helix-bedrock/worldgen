@@ -34,104 +34,57 @@ const (
 	structKindCount
 )
 
-// structGates are the Config's structure changes, resolved.
-type structGates struct {
-	// any is false for a vanilla Config, which skips every check.
-	any      bool
-	disabled [structKindCount]bool
-	excludes []gateExclude
-	filters  []StructureFilter
-	log      *slog.Logger
-	// names are the kinds' StructureKind names, by index.
-	names [structKindCount]StructureKind
-}
-
-type gateExclude struct {
-	area  Area
-	kinds [structKindCount]bool
-}
-
 // newStructGates resolves the structure changes; skipAll (Steps.Structures)
 // disables every kind, so locating finds none either.
-func newStructGates(c *StructureConfig, skipAll bool, log *slog.Logger) (structGates, error) {
-	index := structIndex
-	g := structGates{log: log, filters: slices.Clone(c.filters)}
-	copy(g.names[:], StructureKinds())
+func newStructGates(c *StructureConfig, skipAll bool, log *slog.Logger) (*structure.Gate, error) {
+	kinds := StructureKinds()
+	names := make([]string, len(kinds))
+	for i, k := range kinds {
+		names[i] = string(k)
+	}
+	g := structure.NewGate(names, log)
 	for _, k := range c.disabled {
-		i, err := index(k)
+		i, err := structIndex(k)
 		if err != nil {
-			return g, err
+			return nil, err
 		}
-		g.disabled[i] = true
+		g.Disable(int(i))
 	}
 	for _, e := range c.excludes {
-		ge := gateExclude{area: e.area}
-		if len(e.kinds) == 0 {
-			for i := range ge.kinds {
-				ge.kinds[i] = true
-			}
-		}
+		idx := make([]int, 0, len(e.kinds))
 		for _, k := range e.kinds {
-			i, err := index(k)
+			i, err := structIndex(k)
 			if err != nil {
-				return g, err
+				return nil, err
 			}
-			ge.kinds[i] = true
+			idx = append(idx, int(i))
 		}
-		g.excludes = append(g.excludes, ge)
+		g.Exclude(e.area, idx...)
 	}
-	for _, f := range g.filters {
+	for _, f := range c.filters {
 		if f == nil {
-			return g, fmt.Errorf("worldgen: nil structure filter")
+			return nil, fmt.Errorf("worldgen: nil structure filter")
+		}
+		if err := g.AddFilter(f.forGate); err != nil {
+			return nil, err
 		}
 	}
-	g.any = len(c.disabled) > 0 || len(g.excludes) > 0 || len(g.filters) > 0
 	if skipAll {
-		g.any = true
-		for i := range g.disabled {
-			g.disabled[i] = true
+		for i := range names {
+			g.Disable(i)
 		}
 	}
 	return g, nil
 }
 
-// structOK reports whether a structure of kind k may start in chunk
-// (cx, cz).
-func (o *Overworld) structOK(k structKind, cx, cz int32) bool {
-	g := &o.gates
-	if !g.any {
-		return true
-	}
-	if g.disabled[k] {
-		return false
-	}
-	for i := range g.excludes {
-		if g.excludes[i].kinds[k] && g.excludes[i].area.holdsChunk(cx, cz) {
-			return false
-		}
-	}
-	for _, f := range g.filters {
-		if !g.callFilter(f, k, cx, cz) {
-			return false
-		}
-	}
-	return true
+// forGate is the filter as the shared structure gate calls it.
+func (f StructureFilter) forGate(kind string, cx, cz int32) bool {
+	return f(StructureKind(kind), cx, cz)
 }
 
-// callFilter runs a user filter; a panic counts as no.
-func (g *structGates) callFilter(f StructureFilter, k structKind, cx, cz int32) (ok bool) {
-	kind := g.names[k]
-	defer func() {
-		if p := recover(); p != nil {
-			ok = false
-			if g.log != nil {
-				g.log.Error("worldgen: structure filter panicked", "structure", string(kind), "panic", fmt.Sprint(p),
-					"chunkX", cx, "chunkZ", cz)
-			}
-		}
-	}()
-	return f(kind, cx, cz)
-}
+// structOK reports whether a structure of kind k may start in chunk
+// (cx, cz).
+func (o *Overworld) structOK(k structKind, cx, cz int32) bool { return o.gates.OK(int(k), cx, cz) }
 
 // startGrid is a structure kind's placement grid: one start per spacing x
 // spacing chunk region, at least separation chunks from the region's far
@@ -252,7 +205,7 @@ func (o *Overworld) applyPlacements(c *StructureConfig) error {
 		if err != nil {
 			return err
 		}
-		if o.gates.disabled[k] {
+		if o.gates.Disabled(int(k)) {
 			return fmt.Errorf("worldgen: %s is placed at chunk %d %d but disabled", f.kind, f.cx, f.cz)
 		}
 		if o.forced[k] == nil {

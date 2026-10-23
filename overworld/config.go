@@ -4,6 +4,8 @@ import (
 	"io/fs"
 	"log/slog"
 	"strings"
+
+	"github.com/helix-bedrock/worldgen/structure"
 )
 
 // Config changes what an Overworld generates. The zero Config, and the one
@@ -517,17 +519,10 @@ type structExclude struct {
 }
 
 // Area is a box of block columns, corners included.
-type Area struct{ MinX, MinZ, MaxX, MaxZ int32 }
+type Area = structure.Area
 
 // Box returns the area between two corners, in any order.
-func Box(x0, z0, x1, z1 int32) Area {
-	return Area{min(x0, x1), min(z0, z1), max(x0, x1), max(z0, z1)}
-}
-
-func (a Area) holdsChunk(cx, cz int32) bool {
-	x, z := cx*16+8, cz*16+8
-	return x >= a.MinX && x <= a.MaxX && z >= a.MinZ && z <= a.MaxZ
-}
+func Box(x0, z0, x1, z1 int32) Area { return structure.NewArea(x0, z0, x1, z1) }
 
 // StructureFilter decides whether a structure may start in chunk
 // (chunkX, chunkZ). It must give the same answer every time for the same

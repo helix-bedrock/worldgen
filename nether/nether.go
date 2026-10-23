@@ -87,12 +87,28 @@ type Nether struct {
 	bastionData   *structure.JigsawData
 	bastionBiomes map[uint32]bool
 	bastions      sync.Map // [2]int32 -> *bastion
+
+	// The Config's changes: steps skipped, the structure gate, the
+	// placed starts by grid and region, and the loot swaps.
+	skip   Steps
+	gate   *structure.Gate
+	forced [gridCount]map[[2]int32]forcedAt
+	loot   map[string]string
+	// netherBiomeIDs are the vanilla Nether biomes' IDs.
+	netherBiomeIDs []uint32
 }
 
 // New builds the noises for a seed. reg must contain the vanilla blocks the
 // generator places; biomeIDs maps biome names (no "minecraft:" prefix) to
 // numeric IDs, as from biome.LoadIDs.
-func New(seed int64, reg *blocks.Registry, biomeIDs map[string]uint32) (*Nether, error) {
+func New(seed int64, reg *blocks.Registry, biomeIDs map[string]uint32, opts ...Option) (*Nether, error) {
+	var o options
+	for _, opt := range opts {
+		opt(&o)
+	}
+	if o.cfg == nil {
+		o.cfg = Vanilla()
+	}
 	if reg.Len() > 1<<16 {
 		return nil, fmt.Errorf("worldgen: %d block states do not fit the 16-bit chunk storage", reg.Len())
 	}
@@ -156,6 +172,12 @@ func New(seed int64, reg *blocks.Registry, biomeIDs map[string]uint32) (*Nether,
 	if err := n.loadBastions(biomeIDs); err != nil {
 		return nil, err
 	}
+	for _, b := range n.biomes.biomes {
+		n.netherBiomeIDs = append(n.netherBiomeIDs, b.id)
+	}
+	if err := n.applyConfig(o.cfg, biomeIDs); err != nil {
+		return nil, err
+	}
 	return n, nil
 }
 
@@ -180,8 +202,12 @@ func (n *Nether) baseChunk(chunkX, chunkZ int32, c *Chunk) {
 	n.biomes.fill(chunkX, chunkZ, &c.Biomes)
 	mt := rand.NewMT(chunkSeed(chunkX, chunkZ))
 	n.bedrock(mt, c)
-	n.surface(chunkX, chunkZ, c, mt)
-	n.carver.carve(n.seed, chunkX, chunkZ, c)
+	if !n.skip.Surface {
+		n.surface(chunkX, chunkZ, c, mt)
+	}
+	if !n.skip.Caves {
+		n.carver.carve(n.seed, chunkX, chunkZ, c)
+	}
 }
 
 // ChunkBiomes writes the biome ID of every column of chunk (chunkX, chunkZ),

@@ -44,6 +44,9 @@ func (n *Nether) placePortals(cx, cz int32, c *Chunk) {
 
 // portalPick is the start chunk of the portal of placement region (rx, rz).
 func (n *Nether) portalPick(rx, rz int32) (int32, int32) {
+	if at, ok := n.forcedIn(gridPortal, rx, rz); ok {
+		return at.chunk[0], at.chunk[1]
+	}
 	return structure.PortalPick(n.seed, rx, rz, structure.NetherPortalSpacing, structure.NetherPortalSeparation, structure.PortalSalt)
 }
 
@@ -64,6 +67,10 @@ func (n *Nether) portalsReach(cx, cz int32, f func(sx, sz int32)) {
 // portalAt returns the portal starting in chunk (sx, sz), built once. sx,
 // sz must be a start chunk.
 func (n *Nether) portalAt(sx, sz int32) *structure.RuinedPortal {
+	reg, _ := n.regionOf(skPortal, sx, sz)
+	if at, ok := n.forcedIn(gridPortal, reg[0], reg[1]); (!ok || at.chunk != [2]int32{sx, sz}) && !n.gate.OK(skPortal, sx, sz) {
+		return nil
+	}
 	k := [2]int32{sx, sz}
 	if v, ok := n.portals.Load(k); ok {
 		p, _ := v.(*structure.RuinedPortal)

@@ -45,6 +45,8 @@ type netherRule struct {
 	// axes are uniform [lo, hi) offsets from the chunk corner (y from 0);
 	// lo == hi is a constant.
 	axes [3][2]int32
+	// off marks a rule the Config disabled: it still makes its draws.
+	off bool
 }
 
 // coordinateOrders maps coordinate_eval_order to the axis order (see the
@@ -248,6 +250,9 @@ func (n *Nether) runRules(r *region, ox, oz int32, b uint32, pop *rand.MT) {
 				// As the overworld evaluates math.random: lo + (hi-lo)*f,
 				// rounded.
 				iterations = int32(math.Round(float64(ir[0] + (ir[1]-ir[0])*pop.Float())))
+			}
+			if rule.off {
+				continue
 			}
 			featMT.Seed(seed)
 			for range iterations {

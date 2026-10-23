@@ -449,6 +449,9 @@ func (n *Nether) originWrites(ox, oz int32, neighbour func(cx, cz int32) *Chunk)
 		r = &region{n: n}
 	}
 	defer n.regions.Put(r)
+	if n.skip.Decoration {
+		return &originWrites{}
+	}
 	r.load(ox, oz, neighbour)
 	n.decorate(r, ox, oz)
 	return r.result()
@@ -464,6 +467,7 @@ func (n *Nether) Decorate(chunkX, chunkZ int32, c *Chunk, neighbour func(cx, cz 
 	w := originSource{n: n, neighbour: neighbour}
 	n.decorateWith(chunkX, chunkZ, c, w.writes)
 	n.connectFences(c, chunkX, chunkZ, w.decorated)
+	n.finishChunk(c)
 }
 
 // originSource computes origin writes from a chunk's undecorated
@@ -560,6 +564,7 @@ func (c *Cache) Generate(chunkX, chunkZ int32, out *Chunk) {
 	c.n.connectFences(out, chunkX, chunkZ, func(cx, cz int32) *Chunk {
 		return c.n.decorated(cx, cz, c.Terrain, c.origin)
 	})
+	c.n.finishChunk(out)
 }
 
 // origin returns the placements of origin (ox, oz).
