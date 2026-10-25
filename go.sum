@@ -1,6 +1,2 @@
-github.com/helix-bedrock/helix-data v0.0.0-20261013012428-7d5224fe7313 h1:dat2HFcrqFZgySdBdHi5MuLwPLZAmhDVGBtULHglikQ=
-github.com/helix-bedrock/helix-data v0.0.0-20261013012428-7d5224fe7313/go.mod h1:PXONJI5Vag90BsByDA3wVhDw/edESqhAbLY6Z47lQE0=
-github.com/helix-bedrock/helix-data v0.0.0-20261025202525-34456c5a5101 h1:NgSagvKam7BfDnPVfugb5sAN7lh0zO9FLbmEvKB/4Kc=
-github.com/helix-bedrock/helix-data v0.0.0-20261025202525-34456c5a5101/go.mod h1:PXONJI5Vag90BsByDA3wVhDw/edESqhAbLY6Z47lQE0=
-github.com/helix-bedrock/helix-data v0.0.0-20261025203232-9bbe8120a1ec h1:bcYmwfBLJmxU2SzxpLoMvtpbn8z0Scwy9cDYQ2ahqLw=
-github.com/helix-bedrock/helix-data v0.0.0-20261025203232-9bbe8120a1ec/go.mod h1:PXONJI5Vag90BsByDA3wVhDw/edESqhAbLY6Z47lQE0=
+github.com/helix-bedrock/helix-data v0.0.0-20261025223546-0e70a8c7f7d9 h1:7k3AgRBdnK1ROFngginW+LZo9MpwSB6DL5jL3YfcEWk=
+github.com/helix-bedrock/helix-data v0.0.0-20261025223546-0e70a8c7f7d9/go.mod h1:PXONJI5Vag90BsByDA3wVhDw/edESqhAbLY6Z47lQE0=

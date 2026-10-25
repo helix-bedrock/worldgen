@@ -40,3 +40,14 @@ func (o *Overworld) DeepBiomeAt(x, z int32) uint32 {
 	id, _ := o.biomes.Search(target)
 	return id
 }
+
+// BiomeTags returns the tags of a biome ID, after the Config's SetTags, or
+// nil for an unknown ID. Mob spawn rules pick biomes by these tags. The
+// slice is shared; callers must not change it. It may be called from many
+// goroutines at once.
+func (o *Overworld) BiomeTags(id uint32) []string {
+	if int(id) < len(o.biomeTags) {
+		return o.biomeTags[id]
+	}
+	return nil
+}
