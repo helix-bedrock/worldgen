@@ -1,6 +1,6 @@
 # What worldgen generates
 
-Status as of 2026-10-22. This page lists everything worldgen places today and what is still
+Status as of 2026-10-25. This page lists everything worldgen places today and what is still
 missing, so you know what to expect in a world. The **Overworld**, the **Nether** and the **End** are
 generated; a refinement pass over all three comes next.
 
@@ -158,7 +158,7 @@ Not part of vanilla: these change the world on purpose. With no changes the outp
 
 | What | Status |
 | --- | --- |
-| Nether terrain, biomes, bedrock and surfaces | Close: biomes match BDS; BDS caps about a fifth of the roof undersides with nylium, from a height map its Nether generation never fills, and worldgen caps none (see `nether/surface.go`) |
+| Nether terrain, biomes, bedrock and surfaces | Close: biomes match BDS; BDS caps about a fifth of the roof undersides with nylium, from a height map its Nether generation never fills, and worldgen caps none (see `1.26.52/nether/surface.go`) |
 | Nether lava springs, fire, glowstone, mushrooms | Matches BDS |
 | Nether ores: gold, quartz, magma, gravel, blackstone, ancient debris | Matches BDS (debris 85%: one unexplained random draw, see the code) |
 | Huge crimson and warped fungi, fungi, roots, sprouts, weeping and twisting vines | Close: 94% of crimson stems sit where BDS has them, caps 77%; where two trees overlap, BDS lets the first tree's blocks stop the second, and worldgen keeps each chunk's features apart (fixed in refinement) |

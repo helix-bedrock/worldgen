@@ -8,7 +8,8 @@ disagree, this file wins for this repo.
 ## What this repo is
 
 Bedrock world generation that must match BDS block for block. Standard
-library only. It never imports the engine.
+library only, plus helix-data's stdlib-only data package. Code lives in one
+folder per game version (`1.26.52/`). It never imports the engine.
 
 ## Invariants: do not break these
 
@@ -16,7 +17,7 @@ library only. It never imports the engine.
    a BDS world of the same seed. Do not guess vanilla behaviour.
 2. Optimize for the lowest memory and the highest speed, but an optimization
    that changes the generated world so it no longer matches BDS is not worth
-   it. Before and after: `WORLDGEN_FINGERPRINT=<file> go test -run Fingerprint ./overworld`
+   it. Before and after: `WORLDGEN_FINGERPRINT=<file> go test -run Fingerprint ./1.26.52/overworld`
    must give the same hash.
 3. Never paste decompiled Mojang code; use it only to understand behaviour.
 4. No package-level mutable state, no panics.

@@ -16,7 +16,7 @@
 
 ## Status
 
-Status as of 2026-10-22: **all three dimensions are generated**, built from BDS 1.26.52.
+Status as of 2026-10-25: **all three dimensions are generated**, built from BDS 1.26.52. Each game version has its own folder; this one is [`1.26.52`](1.26.52), and its vanilla data comes from `helix-bedrock/helix-data`'s `data/1.26.52`.
 
 - **Overworld:** terrain, every biome, surfaces, caves and canyons, aquifers, ores, every tree and
   plant, oceans and reefs, and every structure (villages, mineshafts, dungeons, ancient cities,
@@ -71,8 +71,8 @@ cache.Generate(chunkX, chunkZ, &c) // terrain + features, safe from many gorouti
 
 The generator returns indices into the block list; your server maps them to its own block IDs.
 
-Each dimension has its own package: [`overworld`](overworld), [`nether`](nether) and [`end`](end). The shared vanilla data and the `biome`, `blocks`, `noise` and `rand` packages stay at the top,
-with [`structure`](structure): templates, jigsaw assembly, block rules and the ruined portal builder
+Each game version is its own folder, so a newer version never changes this one's worlds: import `github.com/helix-bedrock/worldgen/1.26.52/overworld`. Inside it each dimension has its own package: [`overworld`](1.26.52/overworld), [`nether`](1.26.52/nether) and [`end`](1.26.52/end). The shared `biome`, `blocks`, `noise` and `rand` packages sit beside them,
+with [`structure`](1.26.52/structure): templates, jigsaw assembly, block rules and the ruined portal builder
 shared by every dimension's structures. The dimension packages do not import each other.
 
 ## Customizing the world
@@ -139,10 +139,10 @@ islands, chorus and gateways in the End.
 
 - **Same world as vanilla:** seeds give BDS's terrain, biomes, caves, ores and decorations.
 - **Data-driven:** biomes, features and feature rules are read from Mojang's own data files in
-  [`data/vanilla`](data/vanilla), not hard-coded.
+  helix-data's `data/1.26.52/vanilla`, not hard-coded.
 - **Fast:** about 30 to 40 ms per finished chunk, generated on many threads at once.
 - **Low memory:** cached chunks are stored packed, at about a fifth of their full size.
-- **No dependencies:** only the Go standard library.
+- **No dependencies:** only the Go standard library and helix-data's data package, which uses only the standard library itself.
 
 ## Performance
 
@@ -197,6 +197,5 @@ project is maintained.
 
 ## License
 
-worldgen is licensed under [GPL-3.0](LICENSE). The files in [`data/vanilla`](data/vanilla) are
-Mojang's vanilla data shipped with BDS; [`_provenance.tsv`](data/vanilla/_provenance.tsv) lists
-where each one came from.
+worldgen is licensed under [GPL-3.0](LICENSE). Mojang's vanilla data it reads lives in
+[helix-data](https://github.com/helix-bedrock/helix-data), whose `_provenance.tsv` lists where each file came from.

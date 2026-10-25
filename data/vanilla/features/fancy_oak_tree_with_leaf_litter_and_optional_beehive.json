@@ -1,1 +1,0 @@
-{"format_version":"1.13.0","minecraft:aggregate_feature":{"description":{"identifier":"minecraft:fancy_oak_tree_with_leaf_litter_and_optional_beehive"},"early_out":"first_failure","features":["minecraft:fancy_oak_tree_with_optional_beehive_feature","minecraft:scatter_leaf_litter_feature"]}}
