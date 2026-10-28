@@ -7,7 +7,7 @@
   Fast, low memory, standard library only
 </p>
 
-[![Minecraft](https://img.shields.io/badge/minecraft-v1.26.52_(Bedrock)-black)](https://feedback.minecraft.net/hc/en-us/sections/360001186971-Release-Changelogs)
+[![Minecraft](https://img.shields.io/badge/minecraft-v1.26.60_(Bedrock)-black)](https://feedback.minecraft.net/hc/en-us/sections/360001186971-Release-Changelogs)
 [![Go](https://img.shields.io/badge/go-1.26-00ADD8?logo=go&logoColor=white)](https://go.dev/)
 [![License](https://img.shields.io/badge/license-GPL--3.0-blue)](LICENSE)
 [![Status](https://img.shields.io/badge/status-refinement_pass-yellow)](#status)
@@ -16,7 +16,19 @@
 
 ## Status
 
-Status as of 2026-10-25: **all three dimensions are generated**, built from BDS 1.26.52. Each game version has its own folder; this one is [`1.26.52`](1.26.52), and its vanilla data comes from `helix-bedrock/helix-data`'s `data/1.26.52`.
+Status as of 2026-10-27: **all three dimensions are generated**, built from BDS 1.26.52 and brought to 1.26.60. Each game version has its own folder: [`1.26.60`](1.26.60) is the newest and [`1.26.52`](1.26.52) stays as it was. Each reads its vanilla data from `helix-bedrock/helix-data`'s `data/<version>`.
+
+1.26.60 changes, read from BDS 1.26.60.6 and the 1.26.60 changelog:
+
+- Lush caves now win over dripstone and sulfur caves in very humid regions (both stop at humidity 0.7).
+- Dripstone and sulfur spike clusters cut each stalactite and stalagmite to the open space it has
+  before deciding whether the two meet.
+- Abandoned camps lose their single coarse dirt and the swamp camp's mycelium (new templates).
+- **Drop 4 of 2026 experiment** (`Config.Experiments.Drop4Of2026`, JSON `"experiments": ["drop_4_of_2026"]`):
+  ice caves under cold regions, of packed ice and calcite, with icicles, large icicles, ice crystals
+  and snow, and overworld ores set in pockets of stone or deepslate there. The experiment's files come
+  from helix-data's `data/1.26.60/experiments/y_2026_drop_4`.
+- `.mcstructure` templates may be zlib-compressed (`compression: 1`), as the game now exports them.
 
 - **Overworld:** terrain, every biome, surfaces, caves and canyons, aquifers, ores, every tree and
   plant, oceans and reefs, and every structure (villages, mineshafts, dungeons, ancient cities,
@@ -71,8 +83,8 @@ cache.Generate(chunkX, chunkZ, &c) // terrain + features, safe from many gorouti
 
 The generator returns indices into the block list; your server maps them to its own block IDs.
 
-Each game version is its own folder, so a newer version never changes this one's worlds: import `github.com/helix-bedrock/worldgen/1.26.52/overworld`. Inside it each dimension has its own package: [`overworld`](1.26.52/overworld), [`nether`](1.26.52/nether) and [`end`](1.26.52/end). The shared `biome`, `blocks`, `noise` and `rand` packages sit beside them,
-with [`structure`](1.26.52/structure): templates, jigsaw assembly, block rules and the ruined portal builder
+Each game version is its own folder, so a newer version never changes this one's worlds: import `github.com/helix-bedrock/worldgen/1.26.60/overworld`. Inside it each dimension has its own package: [`overworld`](1.26.60/overworld), [`nether`](1.26.60/nether) and [`end`](1.26.60/end). The shared `biome`, `blocks`, `noise` and `rand` packages sit beside them,
+with [`structure`](1.26.60/structure): templates, jigsaw assembly, block rules and the ruined portal builder
 shared by every dimension's structures. The dimension packages do not import each other.
 
 ## Customizing the world
@@ -139,7 +151,7 @@ islands, chorus and gateways in the End.
 
 - **Same world as vanilla:** seeds give BDS's terrain, biomes, caves, ores and decorations.
 - **Data-driven:** biomes, features and feature rules are read from Mojang's own data files in
-  helix-data's `data/1.26.52/vanilla`, not hard-coded.
+  helix-data's `data/<version>/vanilla`, not hard-coded.
 - **Fast:** about 30 to 40 ms per finished chunk, generated on many threads at once.
 - **Low memory:** cached chunks are stored packed, at about a fifth of their full size.
 - **No dependencies:** only the Go standard library and helix-data's data package, which uses only the standard library itself.

@@ -1,0 +1,245 @@
+// Package nether generates the vanilla Bedrock Nether. Like the overworld
+// package it depends on nothing but the standard library and a block list
+// exported from BDS. See STATUS.md for what is generated.
+package nether
+
+import (
+	"fmt"
+	"sync"
+
+	"github.com/helix-bedrock/worldgen/1.26.60/blocks"
+	"github.com/helix-bedrock/worldgen/1.26.60/noise"
+	"github.com/helix-bedrock/worldgen/1.26.60/rand"
+	"github.com/helix-bedrock/worldgen/1.26.60/structure"
+)
+
+// Nether dimensions.
+const (
+	Height   = 128
+	SeaLevel = 32
+)
+
+// Chunk is the generator output for one 16x16 column. Blocks holds
+// registry indices, index y<<8 | z<<4 | x.
+type Chunk struct {
+	Blocks [16 * 16 * Height]uint16
+	// Biomes holds one biome ID per column, index z<<4 | x: the Nether's
+	// biomes are the same at every height.
+	Biomes [16 * 16]uint16
+	// BlockEntities are the block entities of blocks structures placed
+	// (chests and spawners).
+	BlockEntities []structure.BlockEntity
+}
+
+// Biome returns the biome ID at local (x, z).
+func (c *Chunk) Biome(x, z int) uint32 {
+	return uint32(c.Biomes[z<<4|x])
+}
+
+// Block returns the state index at local (x, z) and y.
+func (c *Chunk) Block(x, y, z int) uint32 {
+	return uint32(c.Blocks[y<<8|z<<4|x])
+}
+
+func (c *Chunk) set(x, y, z int, s uint32) {
+	c.Blocks[y<<8|z<<4|x] = uint16(s)
+}
+
+// Nether generates Nether chunks for one seed. It is immutable after
+// creation and safe for concurrent use.
+type Nether struct {
+	seed int64
+	reg  *blocks.Registry
+	ids  struct {
+		air, netherrack, lava, bedrock   uint32
+		water, flowingWater, flowingLava uint32
+	}
+	// The terrain noises (BDS's NetherGenerator, sub_515FDF0).
+	minLimit, maxLimit, selector *noise.LegacyOctaves
+	surface4                     *noise.SimplexOctaves
+	biomes                       *biomeSource
+	surfaces                     []*biomeSurface
+	surfNoise                    surfaceNoises
+
+	deco         decoIDs
+	basaltStates []bool // by state: any basalt
+	topSupport   []bool // by state: a sturdy top face
+	regions      sync.Pool
+
+	crimson, warped fungusKind
+	fungi           fungusIDs
+	// rules[biome][pass] are the biome's feature rules.
+	rules  map[uint32][][]*netherRule
+	carver netherCarver
+	fossil fossilIDs
+
+	nb         fortressIDs
+	fenceJoin  []uint8  // by state: what it is to a nether brick fence
+	fortresses sync.Map // [2]int32 start chunk -> *fortress
+
+	// portals caches the ruined portals by start chunk.
+	portals sync.Map // [2]int32 start chunk -> *structure.RuinedPortal
+
+	// st prepares structure templates; bastionData holds the bastion
+	// pools, bastionBiomes the biomes a bastion may start in and bastions
+	// the assembled ones by start chunk.
+	st            *structure.Lib
+	bastionData   *structure.JigsawData
+	bastionBiomes map[uint32]bool
+	bastions      sync.Map // [2]int32 -> *bastion
+
+	// The Config's changes: steps skipped, the structure gate, the
+	// placed starts by grid and region, and the loot swaps.
+	skip   Steps
+	gate   *structure.Gate
+	forced [gridCount]map[[2]int32]forcedAt
+	loot   map[string]string
+	swaps  [structKindCount]map[uint32]uint32
+	// netherBiomeIDs are the vanilla Nether biomes' IDs.
+	netherBiomeIDs []uint32
+}
+
+// New builds the noises for a seed. reg must contain the vanilla blocks the
+// generator places; biomeIDs maps biome names (no "minecraft:" prefix) to
+// numeric IDs, as from biome.LoadIDs.
+func New(seed int64, reg *blocks.Registry, biomeIDs map[string]uint32, opts ...Option) (*Nether, error) {
+	var o options
+	for _, opt := range opts {
+		opt(&o)
+	}
+	if o.cfg == nil {
+		o.cfg = Vanilla()
+	}
+	if reg.Len() > 1<<16 {
+		return nil, fmt.Errorf("worldgen: %d block states do not fit the 16-bit chunk storage", reg.Len())
+	}
+	n := &Nether{seed: seed, reg: reg}
+	for _, b := range []blockTarget{
+		{&n.ids.air, blockAir},
+		{&n.ids.netherrack, blockNetherrack},
+		{&n.ids.lava, blockLava},
+		{&n.ids.bedrock, "minecraft:bedrock"},
+		{&n.ids.water, blockWater},
+		{&n.ids.flowingWater, blockFlowingWater},
+		{&n.ids.flowingLava, blockFlowingLava},
+	} {
+		id, ok := reg.Default(b.name)
+		if !ok {
+			return nil, fmt.Errorf("worldgen: block %s missing from the block list", b.name)
+		}
+		*b.dst = id
+	}
+	// Every noise is drawn in turn from one Mersenne Twister on the low 32
+	// bits of the seed, including three the terrain never samples: their
+	// draws still move the ones after them.
+	mt := rand.NewMT(uint32(seed))
+	n.minLimit = noise.NewLegacyOctaves(mt, 16)
+	n.maxLimit = noise.NewLegacyOctaves(mt, 16)
+	n.selector = noise.NewLegacyOctaves(mt, 8)
+	noise.NewLegacyOctaves(mt, 4)
+	n.surface4 = noise.NewSimplexOctaves(mt, 4, false)
+	noise.NewLegacyOctaves(mt, 10)
+	noise.NewLegacyOctaves(mt, 16)
+	// The overworld builder's material adjustment noise comes last.
+	n.surfNoise.adjustment = noise.NewSimplexOctaves(mt, 3, false)
+	var err error
+	if n.biomes, err = newBiomeSource(seed, biomeIDs); err != nil {
+		return nil, err
+	}
+	if err := n.loadSurfaces(biomeIDs); err != nil {
+		return nil, err
+	}
+	if err := n.loadDecoIDs(); err != nil {
+		return nil, err
+	}
+	if err := n.loadFortressIDs(); err != nil {
+		return nil, err
+	}
+	if err := n.loadFungi(); err != nil {
+		return nil, err
+	}
+	if err := n.loadFossils(); err != nil {
+		return nil, err
+	}
+	if err := n.loadRules(biomeIDs); err != nil {
+		return nil, err
+	}
+	if err := n.loadCarver(); err != nil {
+		return nil, err
+	}
+	if n.st, err = structure.NewLib(seed, reg); err != nil {
+		return nil, err
+	}
+	n.st.SetPacks(o.cfg.packs, o.cfg.Structures.templates)
+	if err := n.loadBastions(biomeIDs); err != nil {
+		return nil, err
+	}
+	for _, b := range n.biomes.biomes {
+		n.netherBiomeIDs = append(n.netherBiomeIDs, b.id)
+	}
+	if err := n.applyConfig(o.cfg, biomeIDs); err != nil {
+		return nil, err
+	}
+	return n, nil
+}
+
+// Seed returns the world seed.
+func (n *Nether) Seed() int64 { return n.seed }
+
+// GenerateChunk fills c with the chunk at (chunkX, chunkZ), in BDS's order
+// (NetherGenerator loadChunk, sub_5163F50), and the structure pieces in it.
+// Fence connections across the chunk's sides need its neighbours: Decorate
+// sets them.
+func (n *Nether) GenerateChunk(chunkX, chunkZ int32, c *Chunk) {
+	n.baseChunk(chunkX, chunkZ, c)
+	n.swapped(skPortal, c, func() { n.placePortals(chunkX, chunkZ, c) })
+	n.swapped(skBastion, c, func() { n.placeBastions(chunkX, chunkZ, c) })
+	n.swapped(skFortress, c, func() { n.placeFortresses(chunkX, chunkZ, c) })
+}
+
+// baseChunk is the chunk before its structures: the ruined portals read it.
+func (n *Nether) baseChunk(chunkX, chunkZ int32, c *Chunk) {
+	c.BlockEntities = c.BlockEntities[:0]
+	n.terrain(chunkX, chunkZ, c)
+	n.biomes.fill(chunkX, chunkZ, &c.Biomes)
+	mt := rand.NewMT(chunkSeed(chunkX, chunkZ))
+	n.bedrock(mt, c)
+	if !n.skip.Surface {
+		n.surface(chunkX, chunkZ, c, mt)
+	}
+	if !n.skip.Caves {
+		n.carver.carve(n.seed, chunkX, chunkZ, c)
+	}
+}
+
+// ChunkBiomes writes the biome ID of every column of chunk (chunkX, chunkZ),
+// index z<<4 | x, without generating its blocks. It is safe for concurrent
+// use.
+func (n *Nether) ChunkBiomes(chunkX, chunkZ int32, out *[256]uint16) {
+	n.biomes.fill(chunkX, chunkZ, out)
+}
+
+// chunkSeed seeds the chunk's Mersenne Twister. It differs from the
+// overworld's and, like it, leaves out the world seed.
+func chunkSeed(chunkX, chunkZ int32) uint32 {
+	return structure.RegionSeed(0, 0, chunkX, chunkZ)
+}
+
+// bedrock draws the floor (two to five layers) and the roof (one to five),
+// each column x outer, z inner, the floor first.
+func (n *Nether) bedrock(mt *rand.MT, c *Chunk) {
+	for x := range 16 {
+		for z := range 16 {
+			for y := range int(mt.IntN(4)) + 2 {
+				c.set(x, y, z, n.ids.bedrock)
+			}
+		}
+	}
+	for x := range 16 {
+		for z := range 16 {
+			for y := Height - 1 - int(mt.IntN(5)); y < Height; y++ {
+				c.set(x, y, z, n.ids.bedrock)
+			}
+		}
+	}
+}

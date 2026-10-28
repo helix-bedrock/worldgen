@@ -1,11 +1,12 @@
 # What worldgen generates
 
-Status as of 2026-10-25. This page lists everything worldgen places today and what is still
+Status as of 2026-10-27. This page lists everything worldgen places today and what is still
 missing, so you know what to expect in a world. The **Overworld**, the **Nether** and the **End** are
 generated; a refinement pass over all three comes next.
 
-Every part is built from the Bedrock Dedicated Server (BDS 1.26.52) and compared with chunks that
-BDS generated from the same seed. The marks mean:
+Every part is built from the Bedrock Dedicated Server (BDS 1.26.52, carried to 1.26.60 in the
+`1.26.60` folder) and compared with chunks that BDS 1.26.52 generated from the same seed. The 1.26.60
+changes and the Drop 4 of 2026 ice caves are not compared with BDS 1.26.60 chunks yet. The marks mean:
 
 - **Exact**: compared block for block with BDS and matches.
 - **Close**: in place and looks right, but not block for block yet. It is fixed in the final
@@ -20,6 +21,7 @@ BDS generated from the same seed. The marks mean:
 | All Overworld biomes, stored per block with BDS's jagged edges | Exact |
 | Surface layers (grass, sand, sandstone, snow, terracotta bands in badlands, mud, podzol...) | Exact |
 | Caves (cheese, spaghetti and noodle caves), cave carvers and canyons | Exact |
+| Ice caves, icicles, large icicles, ice crystals, hosted ores (Drop 4 of 2026 experiment, 1.26.60) | Close (from BDS 1.26.60 code, not compared with BDS chunks) |
 | Underground water and lava (aquifers), and lava below y -55 | Exact |
 | Bedrock floor (never replaced by anything generated later) | Exact |
 | Freezing: ice on water and snow layers in cold biomes | Close |
