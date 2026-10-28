@@ -402,10 +402,12 @@ const surfaceNoiseY = 0
 const steepDrop = 4
 
 // subsurfaceRun runs the subsurface builder of biome b, if it has one, over
-// the column's blocks start to end (exclusive).
+// the column's blocks start to end (exclusive), leaving the run's top block
+// as it is: BDS worlds keep stone there in sulfur caves (1.26.52) and ice
+// caves (1.26.60).
 func (o *Overworld) subsurfaceRun(c *Chunk, col *surfaceColumn, b uint32, start, end int32) {
 	if int(b) < len(o.subsurfaces) && o.subsurfaces[b] != nil {
-		col.start, col.end = start, end
+		col.start, col.end = start, end-1
 		o.gradientSurface(c, col, o.subsurfaces[b])
 	}
 }

@@ -6,7 +6,8 @@ generated; a refinement pass over all three comes next.
 
 Every part is built from the Bedrock Dedicated Server (BDS 1.26.52, carried to 1.26.60 in the
 `1.26.60` folder) and compared with chunks that BDS 1.26.52 generated from the same seed. The 1.26.60
-changes and the Drop 4 of 2026 ice caves are not compared with BDS 1.26.60 chunks yet. The marks mean:
+ice caves are compared with 100 chunks BDS 1.26.60 generated with the Drop 4 of 2026 experiment on;
+the other 1.26.60 changes are not compared with BDS 1.26.60 chunks yet. The marks mean:
 
 - **Exact**: compared block for block with BDS and matches.
 - **Close**: in place and looks right, but not block for block yet. It is fixed in the final
@@ -21,7 +22,8 @@ changes and the Drop 4 of 2026 ice caves are not compared with BDS 1.26.60 chunk
 | All Overworld biomes, stored per block with BDS's jagged edges | Exact |
 | Surface layers (grass, sand, sandstone, snow, terracotta bands in badlands, mud, podzol...) | Exact |
 | Caves (cheese, spaghetti and noodle caves), cave carvers and canyons | Exact |
-| Ice caves, icicles, large icicles, ice crystals, hosted ores (Drop 4 of 2026 experiment, 1.26.60) | Close (from BDS 1.26.60 code, not compared with BDS chunks) |
+| Ice caves: the biome and its packed ice and calcite (Drop 4 of 2026 experiment, 1.26.60) | Exact (biome map the same; packed ice and calcite within 0.02% of BDS over 100 chunks, the rest is ore placement) |
+| Icicles, large icicles, ice crystals, hosted ores (Drop 4 of 2026 experiment, 1.26.60) | Close (every BDS icicle in the compare area is placed, plus some more; BDS itself places different icicles in two worlds of the same seed, so its icicles depend on the order chunks load) |
 | Underground water and lava (aquifers), and lava below y -55 | Exact |
 | Bedrock floor (never replaced by anything generated later) | Exact |
 | Freezing: ice on water and snow layers in cold biomes | Close |
@@ -48,7 +50,7 @@ changes and the Drop 4 of 2026 ice caves are not compared with BDS 1.26.60 chunk
 | Deep dark: sculk, sculk veins, sculk sensors, sculk shriekers, sculk catalysts | Close |
 | Glow lichen in caves everywhere | Close |
 | Amethyst geodes (smooth basalt, calcite, amethyst, budding amethyst, buds and clusters) | Exact |
-| Sulfur caves: the biome and its floor | Close |
+| Sulfur caves: the biome and its floor | Close (sulfur and cinnabar within 0.6% of BDS 1.26.52; the top block of each sulfur caves stretch stays stone, as in BDS) |
 | Sulfur caves: sulfur pools with potent sulfur | Close (both pools of the BDS compare area found; one sits a block higher where the terrain differs) |
 | Sulfur caves: sulfur spikes and spike clusters | Close (positions match BDS) |
 | Sulfur caves: sulfur spring trails (a sulfur column up to a sulfur spring on the surface) | Close (rare: none in the BDS compare area, none in ours) |

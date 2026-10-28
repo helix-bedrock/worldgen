@@ -24,6 +24,8 @@ Status as of 2026-10-27: **all three dimensions are generated**, built from BDS 
 - Dripstone and sulfur spike clusters cut each stalactite and stalagmite to the open space it has
   before deciding whether the two meet.
 - Abandoned camps lose their single coarse dirt and the swamp camp's mycelium (new templates).
+- Cave biome blocks (sulfur caves, ice caves) leave the top block of each stretch of the biome in a
+  column as it was, as BDS worlds show (a fix that also holds for 1.26.52's sulfur caves).
 - **Drop 4 of 2026 experiment** (`Config.Experiments.Drop4Of2026`, JSON `"experiments": ["drop_4_of_2026"]`):
   ice caves under cold regions, of packed ice and calcite, with icicles, large icicles, ice crystals
   and snow, and overworld ores set in pockets of stone or deepslate there. The experiment's files come
