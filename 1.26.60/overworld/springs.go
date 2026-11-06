@@ -4,8 +4,9 @@ import "github.com/helix-bedrock/worldgen/1.26.60/rand"
 
 // Water and lava springs: single liquid sources set into cave walls
 // (SpringFeature sub_49C58B0, LegacySpringsFeature sub_51D30F0, written from
-// BDS 1.26.52). BDS lets them flow in block ticks after generation; the
-// compare world has none flowing, so only the source is placed.
+// BDS 1.26.52, rechecked in 1.26.60). BDS sets the source, then adds a block
+// tick for it one tick later to the chunk's queue (skipped on a client), so it
+// flows once the world runs; the chunk here leaves that tick pending in Ticks.
 
 // Spring placement constants (sub_49C58B0, sub_51D30F0).
 const (
@@ -21,6 +22,9 @@ const (
 	// floor plus a triple nested draw that biases it to the bottom.
 	lavaSpringFloor = 8
 	lavaSpringRange = 240
+	// springTickDelay is how many ticks after generation a spring's first
+	// tick is due.
+	springTickDelay = 1
 )
 
 // springFeature places a liquid source in a wall: rock above and below, the
@@ -62,6 +66,7 @@ func (f *springFeature) place(w *featureWorld, x, y, z int32, _ *rand.MT) (block
 	}
 	if rock == springRockSides && air == 1 {
 		w.set(x, y, z, f.liquid)
+		w.scheduleTick(x, y, z, f.liquid, springTickDelay)
 	}
 	return blockPos{x, y, z}, true
 }

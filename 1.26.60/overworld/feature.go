@@ -454,6 +454,7 @@ type featureWorld struct {
 	ox, oz    int32 // the origin chunk
 	slots     [16]writeList
 	entities  [16][]structure.BlockEntity // block entities placed, by slot as slots
+	ticks     [16][]Tick                  // pending block ticks, by slot as slots
 	neighbour func(cx, cz int32) *PackedChunk
 	lastX     int32
 	lastZ     int32
@@ -603,6 +604,14 @@ func (w *featureWorld) setEntity(be structure.BlockEntity) {
 	}
 }
 
+// scheduleTick leaves a block tick pending at x, y, z for the chunk it is in,
+// as BDS's feature code adds one to the chunk's tick queue.
+func (w *featureWorld) scheduleTick(x, y, z int32, b uint32, delay int32) {
+	if sx, sz := x>>4-w.ox+1, z>>4-w.oz+1; uint32(sx) < 4 && uint32(sz) < 4 {
+		w.ticks[sx*4+sz] = append(w.ticks[sx*4+sz], Tick{X: x, Y: y, Z: z, Block: b, Delay: delay})
+	}
+}
+
 // writeList is an origin's placements in one chunk, in placement order: the
 // Chunk index and the state of each.
 type writeList struct {
@@ -621,6 +630,7 @@ type featureWrites struct {
 	pos      []uint32
 	blk      []uint16
 	entities [16][]structure.BlockEntity // by slot; nil for most origins
+	ticks    [16][]Tick                  // by slot; nil for most origins
 }
 
 // originFeatures runs the rules of origin chunk (ox, oz). It returns nil
@@ -651,7 +661,7 @@ func (o *Overworld) originFeaturesTraced(ox, oz int32, neighbour func(cx, cz int
 		fw.blk = append(fw.blk, w.slots[i].blk...)
 	}
 	fw.off[16] = int32(n)
-	fw.entities = w.entities
+	fw.entities, fw.ticks = w.entities, w.ticks
 	return fw
 }
 
@@ -677,6 +687,7 @@ func (o *Overworld) applyWrites(c *Chunk, base *PackedChunk, fw *featureWrites, 
 	// A later origin may replace the block; dropOverwrittenBlockEntities
 	// then removes its entity.
 	c.BlockEntities = append(c.BlockEntities, fw.entities[slot]...)
+	c.Ticks = append(c.Ticks, fw.ticks[slot]...)
 }
 
 // heightmap is the y above the highest block of a column that is fully

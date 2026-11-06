@@ -162,6 +162,7 @@ func (p *PackedChunk) Unpack(c *Chunk) {
 	clear(c.Water[:])
 	copy(c.Water[:], p.water)
 	c.BlockEntities = c.BlockEntities[:0]
+	c.Ticks = c.Ticks[:0]
 	for _, be := range p.blockEntities {
 		// Each chunk gets its own data: servers fill chests in it.
 		be.Data = maps.Clone(be.Data)

@@ -45,6 +45,20 @@ type Chunk struct {
 	// BlockEntities are the block entities of blocks structures placed
 	// (beds, bells, chests...): the client draws these blocks from them.
 	BlockEntities []structure.BlockEntity
+	// Ticks are the block ticks generation left pending in the chunk, as BDS
+	// saves them with it: the springs, which BDS sets and then schedules a tick
+	// for so they flow once the world runs. A server runs them in its own block
+	// ticks.
+	Ticks []Tick
+}
+
+// Tick is a block tick generation left pending: the block at X, Y, Z, as
+// placed, ticks Delay ticks after the chunk starts ticking. Like a pending
+// tick in BDS, it only runs if that block is still there.
+type Tick struct {
+	X, Y, Z int32
+	Block   uint32
+	Delay   int32
 }
 
 // Waterlogged reports whether the block at local (x, z) and world y also
@@ -538,6 +552,7 @@ func (o *Overworld) generateChunk(chunkX, chunkZ int32, c *Chunk, trace func(ste
 	}
 	clear(c.Water[:])
 	c.BlockEntities = c.BlockEntities[:0]
+	c.Ticks = c.Ticks[:0]
 	g := new(grids)
 	o.fillDensity(chunkX, chunkZ, &cols, g)
 	aq := newAquifer(o, chunkX, chunkZ)
