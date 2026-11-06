@@ -3,6 +3,7 @@ package overworld
 import (
 	"encoding/json"
 	"math"
+	"strings"
 
 	"github.com/helix-bedrock/worldgen/1.26.60/noise"
 	"github.com/helix-bedrock/worldgen/1.26.60/rand"
@@ -102,7 +103,8 @@ func (o *Overworld) parseGeode(raw json.RawMessage) (placer, error) {
 			f.invalid[b] = true
 		}
 		for _, t := range o.reg.Tags(s.Name) {
-			if t == "minecraft:not_feature_replaceable" {
+			// BDS's own tag has no namespace; some block lists add one.
+			if strings.TrimPrefix(t, "minecraft:") == "not_feature_replaceable" {
 				f.notReplaceable[b] = true
 			}
 		}

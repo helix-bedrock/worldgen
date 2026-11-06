@@ -83,7 +83,9 @@ var c overworld.Chunk
 cache.Generate(chunkX, chunkZ, &c) // terrain + features, safe from many goroutines
 ```
 
-The generator returns indices into the block list; your server maps them to its own block IDs.
+The generator returns indices into the block list; your server maps them to its own block IDs. A server
+with its own block table builds the list from it with `blocks.New` (states, defaults, tags, light and
+translucency), and the indices are then its own state IDs: Helix does this.
 
 Each game version is its own folder, so a newer version never changes this one's worlds: import `github.com/helix-bedrock/worldgen/1.26.60/overworld`. Inside it each dimension has its own package: [`overworld`](1.26.60/overworld), [`nether`](1.26.60/nether) and [`end`](1.26.60/end). The shared `biome`, `blocks`, `noise` and `rand` packages sit beside them,
 with [`structure`](1.26.60/structure): templates, jigsaw assembly, block rules and the ruined portal builder
