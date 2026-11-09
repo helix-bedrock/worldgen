@@ -41,6 +41,14 @@ func (o *Overworld) temperature(b uint32, x, y, z int32) float32 {
 	return t + float32(float64(((float32(y)+col*columnNoiseScale)-limit)*coolingRate)/coolingDivisor)
 }
 
+// Temperature is BDS's biome temperature at a block (Biome::getTemperature, sub_CD539E0 in
+// 1.26.60): the biome's own, frozen ocean patches, and cooling above sea level + 17 that
+// varies per column. biome is a biome ID as the chunk holds it. Snow falls and water freezes
+// at freezeTemperature (0.15) and below. Runs: any goroutine.
+func (o *Overworld) Temperature(biome uint32, x, y, z int32) float32 {
+	return o.temperature(biome, x, y, z)
+}
+
 // rainTop is the y above the highest block that stops rain in a column of
 // the chunk (LevelChunk::getTopRainBlockPos, sub_C9FBAC0): solid blocks,
 // liquids and leaves; plants and snow layers let it through.

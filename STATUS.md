@@ -1,6 +1,6 @@
 # What worldgen generates
 
-Status as of 2026-10-27. This page lists everything worldgen places today and what is still
+Status as of 2026-11-09. This page lists everything worldgen places today and what is still
 missing, so you know what to expect in a world. The **Overworld**, the **Nether** and the **End** are
 generated; a refinement pass over all three comes next.
 
