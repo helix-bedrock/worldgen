@@ -253,6 +253,10 @@ func (f *vinesFeature) place(w *featureWorld, x, y, z int32, r *rand.MT) (blockP
 // VERIFY: BDS adds the dimension's minimum height to a chunk field (+4056); it is
 // taken to be the highest block.
 func (w *featureWorld) chunkTop(x, z int32) int32 {
+	if w.live != nil {
+		// A live world gives no chunk tops; its height map is the nearest it has.
+		return w.live.Height(x, z)
+	}
 	c := w.chunk(x, z)
 	if c == nil {
 		return MinY

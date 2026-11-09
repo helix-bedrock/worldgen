@@ -150,6 +150,7 @@ Not part of vanilla: these change the world on purpose. With no changes the outp
 | What | Status |
 | --- | --- |
 | Overworld: disable, re-weight or replace feature rules and features; Go features and rules; add-on packs | Done |
+| Overworld: place any feature into a running world (`PlaceFeature` over a `LiveWorld`), as a server needs for saplings; the feature reads the live blocks, biomes and height map and hands back its writes, block entities and ticks | Done, not compared with BDS |
 | Overworld: remove, replace, scale and add biomes; change biome tags | Done |
 | Overworld: disable structures, exclude areas, filters, placement grids, biome lists, fixed positions (strongholds too) | Done |
 | Overworld: replace templates, edit jigsaw pools, swap loot tables and structure blocks | Done |

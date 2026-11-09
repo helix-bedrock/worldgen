@@ -482,6 +482,10 @@ type featureWorld struct {
 	tops     map[[2]int32]int32
 	// trace, for Explain, records the writes to one position.
 	trace *featureTrace
+	// live, set by PlaceFeature, is the running world read in place of the
+	// generated chunks; placed collects what is written into it.
+	live   LiveWorld
+	placed Placed
 }
 
 // featureTrace records what an origin's features write to one position.
@@ -532,6 +536,9 @@ func (w *featureWorld) chunk(x, z int32) *PackedChunk {
 	if w.lastChunk != nil && cx == w.lastX && cz == w.lastZ {
 		return w.lastChunk
 	}
+	if w.neighbour == nil {
+		return nil
+	}
 	c := w.neighbour(cx, cz)
 	w.lastX, w.lastZ, w.lastChunk = cx, cz, c
 	return c
@@ -546,6 +553,9 @@ func (w *featureWorld) block(x, y, z int32) (uint32, bool) {
 	i := int(y-MinY)<<8 | int(z&15)<<4 | int(x&15)
 	if oc := w.overlayAt(x>>4, z>>4, false); oc != nil && oc.set[i>>6]&(1<<(i&63)) != 0 {
 		return oc.blocks[i], true
+	}
+	if w.live != nil {
+		return w.live.Block(x, y, z)
 	}
 	c := w.chunk(x, z)
 	if c == nil {
@@ -579,6 +589,9 @@ func (w *featureWorld) set(x, y, z int32, b uint32) {
 	if w.trace != nil && w.trace.pos == [3]int32{x, y, z} {
 		w.trace.writes = append(w.trace.writes, Explanation{Step: w.trace.step, Block: w.o.blockName(b)})
 	}
+	if w.live != nil {
+		w.placed.Blocks = append(w.placed.Blocks, PlacedBlock{X: x, Y: y, Z: z, Block: b})
+	}
 	oi := int(y-MinY)<<8 | int(z&15)<<4 | int(x&15)
 	oc := w.overlayAt(x>>4, z>>4, true)
 	oc.set[oi>>6] |= 1 << (oi & 63)
@@ -599,6 +612,10 @@ func (w *featureWorld) set(x, y, z int32, b uint32) {
 // setEntity records the block entity of a block the current origin placed
 // at (x, y, z), for the chunk it is in.
 func (w *featureWorld) setEntity(be structure.BlockEntity) {
+	if w.live != nil {
+		w.placed.Entities = append(w.placed.Entities, be)
+		return
+	}
 	if sx, sz := be.X>>4-w.ox+1, be.Z>>4-w.oz+1; uint32(sx) < 4 && uint32(sz) < 4 {
 		w.entities[sx*4+sz] = append(w.entities[sx*4+sz], be)
 	}
@@ -607,6 +624,10 @@ func (w *featureWorld) setEntity(be structure.BlockEntity) {
 // scheduleTick leaves a block tick pending at x, y, z for the chunk it is in,
 // as BDS's feature code adds one to the chunk's tick queue.
 func (w *featureWorld) scheduleTick(x, y, z int32, b uint32, delay int32) {
+	if w.live != nil {
+		w.placed.Ticks = append(w.placed.Ticks, Tick{X: x, Y: y, Z: z, Block: b, Delay: delay})
+		return
+	}
 	if sx, sz := x>>4-w.ox+1, z>>4-w.oz+1; uint32(sx) < 4 && uint32(sz) < 4 {
 		w.ticks[sx*4+sz] = append(w.ticks[sx*4+sz], Tick{X: x, Y: y, Z: z, Block: b, Delay: delay})
 	}
@@ -694,16 +715,20 @@ func (o *Overworld) applyWrites(c *Chunk, base *PackedChunk, fw *featureWrites, 
 // opaque (light dampening 15), as BDS's height map: air, plants, snow
 // layers, leaves and water do not count.
 func (w *featureWorld) heightmap(x, z int32) int32 {
-	c := w.chunk(x, z)
-	if c == nil {
-		return MinY
-	}
 	h := int32(MinY)
-	lx, lz := int(x&15), int(z&15)
-	for y := MaxY - 1; y >= MinY; y-- {
-		if b := c.at((y-MinY)<<8 | lz<<4 | lx); b != w.o.ids.air && w.o.reg.LightDampening(b) >= 15 {
-			h = int32(y + 1)
-			break
+	if w.live != nil {
+		h = w.live.Height(x, z)
+	} else {
+		c := w.chunk(x, z)
+		if c == nil {
+			return MinY
+		}
+		lx, lz := int(x&15), int(z&15)
+		for y := MaxY - 1; y >= MinY; y-- {
+			if b := c.at((y-MinY)<<8 | lz<<4 | lx); b != w.o.ids.air && w.o.reg.LightDampening(b) >= 15 {
+				h = int32(y + 1)
+				break
+			}
 		}
 	}
 	if t, ok := w.tops[[2]int32{x, z}]; ok && t+1 > h {
@@ -731,6 +756,12 @@ func (w *featureWorld) aboveTopSolid(x, z int32) int32 {
 // biome returns the biome at a position, or ^0 outside the chunks and the
 // world height (BDS's block target gives no biome there).
 func (w *featureWorld) biome(x, y, z int32) uint32 {
+	if w.live != nil {
+		if id, ok := w.live.Biome(x, y, z); ok && y >= MinY && y < MaxY {
+			return id
+		}
+		return ^uint32(0)
+	}
 	c := w.chunk(x, z)
 	if c == nil || y < MinY || y >= MaxY {
 		return ^uint32(0)
@@ -740,6 +771,12 @@ func (w *featureWorld) biome(x, y, z int32) uint32 {
 
 // biomeTags returns the tags of the biome at a position.
 func (w *featureWorld) biomeTags(x, y, z int32) []string {
+	if w.live != nil {
+		if b := w.biome(x, y, z); int(b) < len(w.o.biomeTags) {
+			return w.o.biomeTags[b]
+		}
+		return nil
+	}
 	c := w.chunk(x, z)
 	if c == nil || y < MinY || y >= MaxY {
 		return nil

@@ -391,6 +391,12 @@ func (o *Overworld) supportsWaterPlant(b uint32) bool {
 // temperatureAtBlock is the biome temperature at a block, as features see it
 // (Biome::getTemperature, sub_C7B8B70).
 func (w *featureWorld) temperatureAtBlock(x, y, z int32) float32 {
+	if w.live != nil {
+		if b := w.biome(x, y, z); b != ^uint32(0) {
+			return w.o.temperature(b, x, y, z)
+		}
+		return 1
+	}
 	c := w.chunk(x, z)
 	if c == nil || y < MinY || y >= MaxY {
 		return 1
