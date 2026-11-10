@@ -9,7 +9,7 @@ import (
 	"slices"
 	"strings"
 
-	files "github.com/helix-bedrock/helix-data/data/1.26.60"
+	files "github.com/helix-bedrock/helix-data/data/files"
 )
 
 // Data holds Mojang's vanilla behaviour pack files from BDS 1.26.60.6 under

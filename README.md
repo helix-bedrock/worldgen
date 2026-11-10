@@ -16,7 +16,7 @@
 
 ## Status
 
-Status as of 2026-10-27: **all three dimensions are generated**, built from BDS 1.26.52 and brought to 1.26.60. Only the newest game version is kept, at the repo root; it reads its vanilla data from `helix-bedrock/helix-data`'s `data/1.26.60`.
+Status as of 2026-10-27: **all three dimensions are generated**, built from BDS 1.26.52 and brought to 1.26.60. Only the newest game version is kept, at the repo root; it reads its vanilla data from `helix-bedrock/helix-data`'s `data/files`.
 
 1.26.60 changes, read from BDS 1.26.60.6 and the 1.26.60 changelog:
 
@@ -29,7 +29,7 @@ Status as of 2026-10-27: **all three dimensions are generated**, built from BDS 
 - **Drop 4 of 2026 experiment** (`Config.Experiments.Drop4Of2026`, JSON `"experiments": ["drop_4_of_2026"]`):
   ice caves under cold regions, of packed ice and calcite, with icicles, large icicles, ice crystals
   and snow, and overworld ores set in pockets of stone or deepslate there. The experiment's files come
-  from helix-data's `data/1.26.60/experiments/y_2026_drop_4`.
+  from helix-data's `data/files/experiments/y_2026_drop_4`.
 - `.mcstructure` templates may be zlib-compressed (`compression: 1`), as the game now exports them.
 
 - **Overworld:** terrain, every biome, surfaces, caves and canyons, aquifers, ores, every tree and
