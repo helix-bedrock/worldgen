@@ -155,7 +155,7 @@ islands, chorus and gateways in the End.
 
 - **Same world as vanilla:** seeds give BDS's terrain, biomes, caves, ores and decorations.
 - **Data-driven:** biomes, features and feature rules are read from Mojang's own data files in
-  helix-data's `data/<version>/vanilla`, not hard-coded.
+  helix-data's `data/files/vanilla`, not hard-coded.
 - **Fast:** about 30 to 40 ms per finished chunk, generated on many threads at once.
 - **Low memory:** cached chunks are stored packed, at about a fifth of their full size.
 - **No dependencies:** only the Go standard library and helix-data's data package, which uses only the standard library itself.
