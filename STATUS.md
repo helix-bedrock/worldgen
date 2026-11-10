@@ -4,8 +4,7 @@ Status as of 2026-11-09. This page lists everything worldgen places today and wh
 missing, so you know what to expect in a world. The **Overworld**, the **Nether** and the **End** are
 generated; a refinement pass over all three comes next.
 
-Every part is built from the Bedrock Dedicated Server (BDS 1.26.52, carried to 1.26.60 in the
-`1.26.60` folder) and compared with chunks that BDS 1.26.52 generated from the same seed. The 1.26.60
+Every part is built from the Bedrock Dedicated Server (BDS 1.26.52, carried to 1.26.60) and compared with chunks that BDS 1.26.52 generated from the same seed. The 1.26.60
 ice caves are compared with 100 chunks BDS 1.26.60 generated with the Drop 4 of 2026 experiment on;
 the other 1.26.60 changes are not compared with BDS 1.26.60 chunks yet. The marks mean:
 
@@ -163,7 +162,7 @@ Not part of vanilla: these change the world on purpose. With no changes the outp
 
 | What | Status |
 | --- | --- |
-| Nether terrain, biomes, bedrock and surfaces | Close: biomes match BDS; BDS caps about a fifth of the roof undersides with nylium, from a height map its Nether generation never fills, and worldgen caps none (see `1.26.52/nether/surface.go`) |
+| Nether terrain, biomes, bedrock and surfaces | Close: biomes match BDS; BDS caps about a fifth of the roof undersides with nylium, from a height map its Nether generation never fills, and worldgen caps none (see `nether/surface.go`) |
 | Nether lava springs, fire, glowstone, mushrooms | Matches BDS |
 | Nether ores: gold, quartz, magma, gravel, blackstone, ancient debris | Matches BDS (debris 85%: one unexplained random draw, see the code) |
 | Huge crimson and warped fungi, fungi, roots, sprouts, weeping and twisting vines | Close: 94% of crimson stems sit where BDS has them, caps 77%; where two trees overlap, BDS lets the first tree's blocks stop the second, and worldgen keeps each chunk's features apart (fixed in refinement) |

@@ -16,7 +16,7 @@
 
 ## Status
 
-Status as of 2026-10-27: **all three dimensions are generated**, built from BDS 1.26.52 and brought to 1.26.60. Each game version has its own folder: [`1.26.60`](1.26.60) is the newest and [`1.26.52`](1.26.52) stays as it was. Each reads its vanilla data from `helix-bedrock/helix-data`'s `data/<version>`.
+Status as of 2026-10-27: **all three dimensions are generated**, built from BDS 1.26.52 and brought to 1.26.60. Only the newest game version is kept, at the repo root; it reads its vanilla data from `helix-bedrock/helix-data`'s `data/1.26.60`.
 
 1.26.60 changes, read from BDS 1.26.60.6 and the 1.26.60 changelog:
 
@@ -25,7 +25,7 @@ Status as of 2026-10-27: **all three dimensions are generated**, built from BDS 
   before deciding whether the two meet.
 - Abandoned camps lose their single coarse dirt and the swamp camp's mycelium (new templates).
 - Cave biome blocks (sulfur caves, ice caves) leave the top block of each stretch of the biome in a
-  column as it was, as BDS worlds show (a fix that also holds for 1.26.52's sulfur caves).
+  column as it was, as BDS worlds show.
 - **Drop 4 of 2026 experiment** (`Config.Experiments.Drop4Of2026`, JSON `"experiments": ["drop_4_of_2026"]`):
   ice caves under cold regions, of packed ice and calcite, with icicles, large icicles, ice crystals
   and snow, and overworld ores set in pockets of stone or deepslate there. The experiment's files come
@@ -87,8 +87,8 @@ The generator returns indices into the block list; your server maps them to its 
 with its own block table builds the list from it with `blocks.New` (states, defaults, tags, light and
 translucency), and the indices are then its own state IDs: Helix does this.
 
-Each game version is its own folder, so a newer version never changes this one's worlds: import `github.com/helix-bedrock/worldgen/1.26.60/overworld`. Inside it each dimension has its own package: [`overworld`](1.26.60/overworld), [`nether`](1.26.60/nether) and [`end`](1.26.60/end). The shared `biome`, `blocks`, `noise` and `rand` packages sit beside them,
-with [`structure`](1.26.60/structure): templates, jigsaw assembly, block rules and the ruined portal builder
+Import `github.com/helix-bedrock/worldgen/overworld`. Each dimension has its own package: [`overworld`](overworld), [`nether`](nether) and [`end`](end). The shared `biome`, `blocks`, `noise` and `rand` packages sit beside them,
+with [`structure`](structure): templates, jigsaw assembly, block rules and the ruined portal builder
 shared by every dimension's structures. The dimension packages do not import each other.
 
 ## Customizing the world
