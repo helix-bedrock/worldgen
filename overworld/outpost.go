@@ -249,24 +249,70 @@ func (o *Overworld) placeOutposts(cx, cz int32, c *Chunk, raw func(cx, cz int32)
 			// The chunk's random rolls the allays and the chest seed.
 			b.r.Seed(populationSeed(o.seed, cx, cz))
 		}
+		placed := make([]structure.Box, 0, len(pieces))
 		for _, p := range pieces {
-			b.outpostPiece(p, raw)
+			if bb, ok := b.outpostPiece(p, raw); ok {
+				placed = append(placed, bb)
+			}
 		}
+		b.outpostFoundations(placed)
 	})
 }
 
+// outpostFoundations extends the bottom of an outpost's placed pieces down
+// to the ground, after all its pieces (PillagerOutpostStart postProcess,
+// sub_536E8D0 in BDS 1.26.60). Under each column of a piece's bottom layer
+// whose block is not air or leaves (BDS's LeavesBlock flag, BlockType+264
+// bit 0x20), the air and liquid below is filled with that block when it is
+// solid (Block+113) and cobblestone otherwise, down to the first other
+// block, stopping once y 2 is filled. This keeps a watchtower on a cliff
+// edge or in a lake from floating.
+func (b *scBuild) outpostFoundations(placed []structure.Box) {
+	o := b.o
+	for _, bb := range placed {
+		y0 := bb.Y0
+		for x := bb.X0; x <= bb.X1; x++ {
+			for z := bb.Z0; z <= bb.Z1; z++ {
+				if !b.cbox.Contains([3]int32{x, y0, z}) {
+					continue
+				}
+				bottom := b.c.Block(int(x&15), int(y0), int(z&15))
+				if bottom == o.ids.air || o.hasBlockTag(bottom, "leaves") {
+					continue
+				}
+				fill := o.ids.cobblestone
+				if o.solidMaterial(bottom) {
+					fill = bottom
+				}
+				for y := y0 - 1; y >= outpostFoundationFloor; y-- {
+					if cur := b.c.Block(int(x&15), int(y), int(z&15)); cur != o.ids.air && !o.liquidMaterial(cur) {
+						break
+					}
+					b.setWorld(x, y, z, fill)
+				}
+			}
+		}
+	}
+}
+
+// outpostFoundationFloor is the lowest y an outpost's foundation fills:
+// BDS stops after filling y 2.
+const outpostFoundationFloor = 2
+
 // outpostPiece places one outpost template into the chunk, then handles
-// its markers.
-func (b *scBuild) outpostPiece(p outpostPiece, raw func(cx, cz int32) *PackedChunk) {
+// its markers. It returns the piece's box at its placed height, ok false
+// when the piece is not placed.
+func (b *scBuild) outpostPiece(p outpostPiece, raw func(cx, cz int32) *PackedChunk) (structure.Box, bool) {
 	o := b.o
 	bb, jt := o.outpostBox(p)
 	if jt == nil || !bb.Intersects(b.cbox) {
-		return
+		return structure.Box{}, false
 	}
 	y0, ok := o.outpostY(p, bb, raw)
 	if !ok {
-		return
+		return structure.Box{}, false
 	}
+	bb.Y0, bb.Y1 = y0, y0+jt.Template.Size[1]-1
 	conv := o.st.TemplateStates(jt, p.rot)
 	var ir rand.MT
 	ir.Seed(populationSeed(o.seed, b.cbox.X0>>4, b.cbox.Z0>>4))
@@ -326,6 +372,7 @@ func (b *scBuild) outpostPiece(p outpostPiece, raw func(cx, cz int32) *PackedChu
 			}
 		}
 	}
+	return bb, true
 }
 
 // NearestOutpost finds the pillager outpost nearest to block (x, z),

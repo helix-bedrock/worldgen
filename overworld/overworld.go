@@ -236,7 +236,7 @@ type blockIDs struct {
 	redSand, suspiciousSand, sandstone, redSandstone uint32
 	flowingWater, lava, flowingLava                  uint32
 	ice, packedIce, blueIce, snow                    uint32
-	netherrack, coarseDirt                           uint32
+	netherrack, coarseDirt, cobblestone              uint32
 	// replaceable is the stone family surface builders paint over.
 	replaceable []uint32
 	// terracotta is indexed by dye colour (0 white ... 15 black).
@@ -351,6 +351,7 @@ func NewOverworld(seed int64, reg *blocks.Registry, biomeIDs map[string]uint32, 
 		{Dst: &o.ids.snow, Name: "minecraft:snow"},
 		{Dst: &o.ids.netherrack, Name: "minecraft:netherrack"},
 		{Dst: &o.ids.coarseDirt, Name: "minecraft:coarse_dirt"},
+		{Dst: &o.ids.cobblestone, Name: "minecraft:cobblestone"},
 		{Dst: &o.ids.mycelium, Name: "minecraft:mycelium"},
 	}
 	for i, c := range terracottaColours() {

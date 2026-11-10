@@ -131,7 +131,7 @@ world seed and the template instead, so the same seed always gives the same colo
 | Jungle temples (traps, dispensers, lever puzzle) | Exact (tree leaves can poke inside; fixed in refinement) |
 | Witch huts (cauldron with a random potion) | Close |
 | Igloos (half with a basement: trapdoor, ladder, stone brick cells) | Exact (compared with BDS) |
-| Pillager outposts (watchtower, overgrown overlay, feature pieces, chest; no pillagers) | Close (one of two compared outposts exact; the other 1 block high) |
+| Pillager outposts (watchtower, overgrown overlay, feature pieces, chest, foundations filled down to the ground; no pillagers) | Close (one of two compared outposts exact; the other 1 block high; foundations not compared yet) |
 | Ruined portals (buried and on the surface, netherrack spread, aging) | Close: the same code matches BDS block for block in the Nether; overworld portals not yet compared |
 | Woodland mansions (all floors and rooms, roofs, foundation, entrance steps, joined windows) | Close (checked in game) |
 | Strongholds (all rooms, library, portal room with silverfish spawner, joined fences and bars) | Close (checked in game) |
