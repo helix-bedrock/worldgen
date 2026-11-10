@@ -525,7 +525,21 @@ func (l *Lib) ConvertJavaState(st TemplateState) (uint32, bool, bool) {
 	if !ok {
 		id = def
 	}
+	if alwaysInWater(name) {
+		water = true
+	}
 	return id, water, true
+}
+
+// alwaysInWater reports whether a Java block always holds water without a
+// waterlogged property. Bedrock keeps that water in the block's liquid
+// layer, so without it the abandoned camps' seagrass pools had dry gaps.
+func alwaysInWater(javaName string) bool {
+	switch javaName {
+	case "seagrass", "tall_seagrass", "kelp", "kelp_plant", "bubble_column":
+		return true
+	}
+	return false
 }
 
 // setProp sets key in props to v, converted to the type key already has;
