@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"maps"
+	"slices"
 	"sync/atomic"
 
 	worldgen "github.com/helix-bedrock/worldgen"
@@ -548,6 +549,7 @@ func (c *Cache) Generate(chunkX, chunkZ int32, out *Chunk) {
 		be.Data = maps.Clone(be.Data)
 		out.BlockEntities[i] = be
 	}
+	out.Entities = slices.Clone(t.Entities)
 	c.n.decorateWith(chunkX, chunkZ, out, func(ox, oz int32) *originWrites {
 		pos := [2]int32{ox, oz}
 		ow := c.origin(ox, oz)
