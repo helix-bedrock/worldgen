@@ -22,6 +22,8 @@ type PackedChunk struct {
 	// terrain; nil for plain terrain.
 	water         []uint64
 	blockEntities []structure.BlockEntity
+	// entities are the mobs structures placed in the chunk.
+	entities []structure.EntitySpawn
 }
 
 type packedSub struct {
@@ -70,6 +72,9 @@ func Pack(c *Chunk) *PackedChunk {
 	}
 	if len(c.BlockEntities) > 0 {
 		p.blockEntities = append([]structure.BlockEntity(nil), c.BlockEntities...)
+	}
+	if len(c.Entities) > 0 {
+		p.entities = append([]structure.EntitySpawn(nil), c.Entities...)
 	}
 	packSubs(&p.subs, c.Blocks[:])
 	packSubs(&p.biomes, c.Biomes[:])
@@ -162,6 +167,7 @@ func (p *PackedChunk) Unpack(c *Chunk) {
 	clear(c.Water[:])
 	copy(c.Water[:], p.water)
 	c.BlockEntities = c.BlockEntities[:0]
+	c.Entities = append(c.Entities[:0], p.entities...)
 	c.Ticks = c.Ticks[:0]
 	for _, be := range p.blockEntities {
 		// Each chunk gets its own data: servers fill chests in it.

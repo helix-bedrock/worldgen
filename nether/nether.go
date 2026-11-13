@@ -29,6 +29,9 @@ type Chunk struct {
 	// BlockEntities are the block entities of blocks structures placed
 	// (chests and spawners).
 	BlockEntities []structure.BlockEntity
+	// Entities are the mobs structures placed in the chunk, for the server
+	// to spawn when the chunk is generated.
+	Entities []structure.EntitySpawn
 }
 
 // Biome returns the biome ID at local (x, z).
@@ -200,6 +203,7 @@ func (n *Nether) GenerateChunk(chunkX, chunkZ int32, c *Chunk) {
 // baseChunk is the chunk before its structures: the ruined portals read it.
 func (n *Nether) baseChunk(chunkX, chunkZ int32, c *Chunk) {
 	c.BlockEntities = c.BlockEntities[:0]
+	c.Entities = c.Entities[:0]
 	n.terrain(chunkX, chunkZ, c)
 	n.biomes.fill(chunkX, chunkZ, &c.Biomes)
 	mt := rand.NewMT(chunkSeed(chunkX, chunkZ))

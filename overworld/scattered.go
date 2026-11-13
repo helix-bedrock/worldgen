@@ -937,7 +937,17 @@ func (b *scBuild) igloo(y int32) {
 	bottom := iglooSection(origin, rot, [3]int32{3, -3*n - 1, 5}, [3]int32{3, 5, 7})
 	markers := b.template("igloo/igloo_bottom", bottom, rot)
 	for _, m := range markers {
-		if m.name != "chest" {
+		switch m.name {
+		case "Villager":
+			// BDS's igloo still places the old villager and zombie
+			// villager (1.26.60 sub_5383130: types 0x100030F, 0x30B2C).
+			b.mob(m.pos, structureMob{mobVillagerV1, ""})
+			continue
+		case "Zombie Villager":
+			b.mob(m.pos, structureMob{mobZombieVillagerV1, ""})
+			continue
+		case "chest":
+		default:
 			continue
 		}
 		// The chest under the marker gets its loot.
@@ -951,6 +961,49 @@ func (b *scBuild) igloo(y int32) {
 			}
 		}
 	}
+}
+
+// structureMob is a mob a structure piece's named data marker places, with
+// its spawn event.
+type structureMob struct {
+	identifier, event string
+}
+
+// The mobs the named markers place (BDS 1.26.60's postProcessMobsAt:
+// outpost sub_536FDA0, mansion sub_53A25C0, igloo sub_5383130).
+const (
+	mobAllay            = "minecraft:allay"
+	mobPillager         = "minecraft:pillager"
+	mobIronGolem        = "minecraft:iron_golem"
+	mobVindicator       = "minecraft:vindicator"
+	mobEvoker           = "minecraft:evocation_illager"
+	mobVillagerV1       = "minecraft:villager"
+	mobZombieVillagerV1 = "minecraft:zombie_villager"
+
+	eventEntitySpawned = "minecraft:entity_spawned"
+	eventCaptain       = "minecraft:spawn_as_illager_captain"
+)
+
+// outpostMob is the mob an outpost marker places: the cage holds an iron
+// golem, the captain is a pillager spawned as a captain.
+func outpostMob(marker string) structureMob {
+	switch marker {
+	case "cage":
+		return structureMob{mobIronGolem, eventEntitySpawned}
+	case "captain":
+		return structureMob{mobPillager, eventCaptain}
+	default:
+		return structureMob{mobPillager, eventEntitySpawned}
+	}
+}
+
+// mob records a mob a marker places, when the marker is in the chunk being
+// built: each mob spawns once, from the chunk holding its block.
+func (b *scBuild) mob(pos [3]int32, m structureMob) {
+	if !b.cbox.Contains(pos) {
+		return
+	}
+	b.c.Entities = append(b.c.Entities, structure.MobAt(pos[0], pos[1], pos[2], m.identifier, m.event, "structure"))
 }
 
 // templateMarker is a data structure block of a placed template.

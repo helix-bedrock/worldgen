@@ -193,6 +193,10 @@ func (w chunkWorld) Entity(be structure.BlockEntity) {
 	w.c.BlockEntities = append(w.c.BlockEntities, be)
 }
 
+func (w chunkWorld) Mob(m structure.EntitySpawn) {
+	w.c.Entities = append(w.c.Entities, m)
+}
+
 // bastionKind is the index in BastionKinds of a bastion, given the random
 // bastionChunk left: the start's second draw picks it.
 func bastionKind(r *rand.MT) int {

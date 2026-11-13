@@ -333,6 +333,10 @@ func (w chunkWorld) Entity(be structure.BlockEntity) {
 	w.c.BlockEntities = append(w.c.BlockEntities, be)
 }
 
+func (w chunkWorld) Mob(m structure.EntitySpawn) {
+	w.c.Entities = append(w.c.Entities, m)
+}
+
 // isDwelling reports whether a houses-pool template is a building one lives
 // or works in: the pools also hold farms, animal pens, lamp posts and
 // decorations, which get no extra chest.

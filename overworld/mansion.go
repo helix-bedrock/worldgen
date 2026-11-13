@@ -1193,7 +1193,13 @@ func (b *scBuild) mansionPiece(p mansionPiece) {
 			if b.setWorld(m.pos[0], m.pos[1], m.pos[2], b.air) {
 				b.dropEntity(m.pos)
 			}
-			b.r.IntN(mansionAllayDraws)
+			for range b.r.IntN(mansionAllayDraws) + 1 {
+				b.mob(m.pos, structureMob{mobAllay, eventEntitySpawned})
+			}
+		case m.name == "Warrior":
+			b.mob(m.pos, structureMob{mobVindicator, eventEntitySpawned})
+		case m.name == "Mage":
+			b.mob(m.pos, structureMob{mobEvoker, eventEntitySpawned})
 		}
 		if side != chestNone {
 			facing := [4]int32{dirNorth, dirEast, dirSouth, dirWest}[(p.rot+side)&3]

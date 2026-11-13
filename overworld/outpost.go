@@ -355,11 +355,14 @@ func (b *scBuild) outpostPiece(p outpostPiece, raw func(cx, cz int32) *PackedChu
 			if b.setWorld(m.pos[0], m.pos[1], m.pos[2], b.air) {
 				b.dropEntity(m.pos)
 			}
+			b.mob(m.pos, outpostMob(m.name))
 		case "Group of Allays":
 			if b.setWorld(m.pos[0], m.pos[1], m.pos[2], b.air) {
 				b.dropEntity(m.pos)
 			}
-			b.r.IntN(outpostAllayDraws)
+			for range b.r.IntN(outpostAllayDraws) + 1 {
+				b.mob(m.pos, structureMob{mobAllay, eventEntitySpawned})
+			}
 		case "topChest":
 			cp := [3]int32{m.pos[0], m.pos[1] - 1, m.pos[2]}
 			for i := range b.c.BlockEntities {

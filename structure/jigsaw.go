@@ -832,6 +832,9 @@ type World interface {
 	// did (the bottom bedrock is never replaced).
 	Set(x, y, z int32, id uint32, water bool) bool
 	Entity(be BlockEntity)
+	// Mob records a mob the piece places, for the engine to spawn with the
+	// chunk.
+	Mob(m EntitySpawn)
 }
 
 // PlacePiece writes the blocks of a piece that fall in chunkBox into w.
@@ -883,6 +886,13 @@ func (l *Lib) PlacePiece(p *Piece, w World, chunkBox Box, height func(x, z int32
 			// Data markers are handled by the element, not placed.
 			if st.Name == "minecraft:structure_void" {
 				continue
+			}
+			// A data marker names the mob placed there (the village
+			// pieces' "minecraft:villager_v2:minecraft:spawn_from_village").
+			if md, _ := b.NBT["metadata"].(string); md != "" {
+				if id, ev, ok := MarkerMob(md); ok {
+					w.Mob(MobAt(x, y, z, id, ev, "jigsaw"))
+				}
 			}
 			cs = ConvertedState{l.air, false, true}
 		}

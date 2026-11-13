@@ -45,6 +45,10 @@ type Chunk struct {
 	// BlockEntities are the block entities of blocks structures placed
 	// (beds, bells, chests...): the client draws these blocks from them.
 	BlockEntities []structure.BlockEntity
+	// Entities are the mobs structures placed in the chunk (villagers, iron
+	// golems, pillagers...), for the server to spawn when the chunk is
+	// generated.
+	Entities []structure.EntitySpawn
 	// Ticks are the block ticks generation left pending in the chunk, as BDS
 	// saves them with it: the springs, which BDS sets and then schedules a tick
 	// for so they flow once the world runs. A server runs them in its own block
@@ -553,6 +557,7 @@ func (o *Overworld) generateChunk(chunkX, chunkZ int32, c *Chunk, trace func(ste
 	}
 	clear(c.Water[:])
 	c.BlockEntities = c.BlockEntities[:0]
+	c.Entities = c.Entities[:0]
 	c.Ticks = c.Ticks[:0]
 	g := new(grids)
 	o.fillDensity(chunkX, chunkZ, &cols, g)
