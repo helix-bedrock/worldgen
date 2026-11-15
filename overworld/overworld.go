@@ -228,6 +228,9 @@ type Overworld struct {
 	cityBiome []bool
 	// soilPlant is soilPlants by state, for applying placements.
 	soilPlant []bool
+	// lowerHalf marks the bottom state of each two-block soil plant
+	// (sunflower, tall grass, large fern...), for applying placements.
+	lowerHalf []bool
 	// blockTags are block tags by block name, without "minecraft:".
 	blockTags map[string][]string
 	// biomeTags are biome tags by biome ID.
@@ -447,12 +450,14 @@ func NewOverworld(seed int64, reg *blocks.Registry, biomeIDs map[string]uint32, 
 		return nil, err
 	}
 	o.soilPlant = make([]bool, reg.Len())
+	o.lowerHalf = make([]bool, reg.Len())
 	o.names = make([]string, reg.Len())
 	o.joinKind = make([]uint8, reg.Len())
 	for i := range o.names {
 		st, _ := reg.State(uint32(i))
 		o.names[i] = st.Name
 		o.soilPlant[i] = soilPlants[st.Name]
+		o.lowerHalf[i] = o.soilPlant[i] && isLowerHalf(st.Props)
 		o.joinKind[i] = joinKindOf(st.Name)
 	}
 	o.blockTags = map[string][]string{}
@@ -709,4 +714,21 @@ func (o *Overworld) hasState(name, prop string) bool {
 	}
 	_, ok = st.Props[prop]
 	return ok
+}
+
+// isLowerHalf reports whether a state's upper_block_bit is present and off.
+func isLowerHalf(props map[string]any) bool {
+	v, ok := props["upper_block_bit"]
+	if !ok {
+		return false
+	}
+	switch t := v.(type) {
+	case bool:
+		return !t
+	case uint8:
+		return t == 0
+	case int32:
+		return t == 0
+	}
+	return false
 }
