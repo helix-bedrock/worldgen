@@ -235,6 +235,12 @@ func (ow *originWrites) apply(c *Chunk, slot int, cx, cz int32) {
 // decoIDs are the blocks the decoration places.
 type decoIDs struct {
 	obsidian, chorusPlant, chorusFlower, bedrock, gateway uint32
+	// chorusJoined are chorus plants by the sides they join: bit k for
+	// chorusSides()[k].
+	chorusJoined [1 << len(chorusSideNames)]uint32
+	// chorusJoins is the sides each chorus plant state joins, -1 for
+	// other blocks, by state.
+	chorusJoins []int8
 	// ironBars by the sides they join: bit d for cube.Direction d.
 	ironBars [16]uint32
 	// frames are item frames by facing_direction.
@@ -246,7 +252,7 @@ type decoIDs struct {
 }
 
 func (e *End) loadDecoIDs() error {
-	wants := make([]blocks.Want, 0, 6+len(e.deco.ironBars)+len(e.deco.frames)+len(e.deco.torches))
+	wants := make([]blocks.Want, 0, 6+len(e.deco.ironBars)+len(e.deco.chorusJoined)+len(e.deco.frames)+len(e.deco.torches))
 	wants = append(wants, []blocks.Want{
 		{Dst: &e.deco.obsidian, Name: "minecraft:obsidian"},
 		{Dst: &e.deco.chorusPlant, Name: "minecraft:chorus_plant"},
@@ -264,6 +270,13 @@ func (e *End) loadDecoIDs() error {
 		}
 		wants = append(wants, blocks.Want{Dst: &e.deco.ironBars[join], Name: "minecraft:iron_bars", Props: props})
 	}
+	for join := range e.deco.chorusJoined {
+		props := map[string]any{}
+		for k, name := range chorusSideNames {
+			props["minecraft:connection_"+name] = join>>k&1 == 1
+		}
+		wants = append(wants, blocks.Want{Dst: &e.deco.chorusJoined[join], Name: "minecraft:chorus_plant", Props: props})
+	}
 	for _, f := range cube.Faces() {
 		wants = append(wants, blocks.Want{Dst: &e.deco.frames[f], Name: "minecraft:frame",
 			Props: map[string]any{"facing_direction": int32(f)}})
@@ -273,7 +286,17 @@ func (e *End) loadDecoIDs() error {
 		wants = append(wants, blocks.Want{Dst: &e.deco.torches[d], Name: "minecraft:torch",
 			Props: map[string]any{"torch_facing_direction": d.Opposite().String()}})
 	}
-	return e.reg.Resolve(wants...)
+	if err := e.reg.Resolve(wants...); err != nil {
+		return err
+	}
+	e.deco.chorusJoins = make([]int8, e.reg.Len())
+	for i := range e.deco.chorusJoins {
+		e.deco.chorusJoins[i] = -1
+	}
+	for join, id := range e.deco.chorusJoined {
+		e.deco.chorusJoins[id] = int8(join)
+	}
+	return nil
 }
 
 // spike is one of the ten obsidian pillars around the main island.
@@ -512,6 +535,88 @@ func (e *End) growChorus(r *region, x, y, z, rx, rz int32, mt *rand.MT, spread, 
 	}
 }
 
+// chorusSideNames are the sides of a chorus plant's connection states, in
+// the order of chorusSides.
+var chorusSideNames = [6]string{"down", "up", "north", "south", "west", "east"}
+
+// chorusSides are the offsets of chorusSideNames.
+func chorusSides() [6][3]int32 {
+	return [6][3]int32{{0, -1, 0}, {0, 1, 0}, {0, 0, -1}, {0, 0, 1}, {-1, 0, 0}, {1, 0, 0}}
+}
+
+// joinChorus sets the connection states of the chorus plants the origin
+// placed, as BDS's chorus plant does (sub_CB5B7A0, also run by
+// TheEndGenerator::decorationPostProcessChunk): a side joins a chorus plant
+// or flower, and the bottom also joins end stone. Plants are grown with no
+// connections, so the growth checks compare one state; the states are set
+// once the origin is done. Neighbours another origin placed are not seen.
+func (e *End) joinChorus(r *region) {
+	for s := range r.slots {
+		l := &r.slots[s]
+		for k, b := range l.blk {
+			if uint32(b) != e.deco.chorusPlant {
+				continue
+			}
+			x, y, z := r.slotPos(s, l.pos[k])
+			if r.at(x, y, z) != e.deco.chorusPlant {
+				continue // a later write (the end flower) replaced it
+			}
+			l.blk[k] = uint16(e.deco.chorusJoined[e.chorusJoins(r, x, y, z)])
+		}
+	}
+}
+
+// chorusJoins returns the sides a chorus plant at (x, y, z) joins, bit k
+// for chorusSides()[k].
+func (e *End) chorusJoins(r *region, x, y, z int32) int {
+	join := 0
+	for k, d := range chorusSides() {
+		nb := r.at(x+d[0], y+d[1], z+d[2])
+		if nb == e.deco.chorusPlant || nb == e.deco.chorusFlower || k == 0 && nb == e.ids.endStone {
+			join |= 1 << k
+		}
+	}
+	return join
+}
+
+// joinChorusChunk sets again the connections of the chorus plants of a
+// finished chunk toward neighbours inside it, which other origins may have
+// placed after the plant's own origin set them. Sides across the chunk's
+// edge keep what the origin set.
+func (e *End) joinChorusChunk(c *Chunk) {
+	for i, b := range c.Blocks {
+		if int(b) >= len(e.deco.chorusJoins) || e.deco.chorusJoins[b] < 0 {
+			continue
+		}
+		x, y, z := i&15, i>>8, i>>4&15
+		join := int(e.deco.chorusJoins[b])
+		for k, d := range chorusSides() {
+			nx, ny, nz := x+int(d[0]), y+int(d[1]), z+int(d[2])
+			if nx < 0 || nx > 15 || nz < 0 || nz > 15 || ny < 0 || ny >= Height {
+				continue
+			}
+			nb := uint32(c.Blocks[ny<<8|nz<<4|nx])
+			if e.isChorus(nb) || k == 0 && nb == e.ids.endStone {
+				join |= 1 << k
+			} else {
+				join &^= 1 << k
+			}
+		}
+		c.Blocks[i] = uint16(e.deco.chorusJoined[join])
+	}
+}
+
+// isChorus reports whether b is a chorus plant in any state or the dead
+// chorus flower the decoration grows.
+func (e *End) isChorus(b uint32) bool {
+	return b == e.deco.chorusFlower || int(b) < len(e.deco.chorusJoins) && e.deco.chorusJoins[b] >= 0
+}
+
+// slotPos returns the world position of index i of chunk slot s.
+func (r *region) slotPos(s int, i uint32) (x, y, z int32) {
+	return r.x0 + int32(s/3)*16 + int32(i&15), int32(i >> 8), r.z0 + int32(s%3)*16 + int32(i>>4&15)
+}
+
 // sidesClear reports whether the four sides of a block are air.
 func (e *End) sidesClear(r *region, x, y, z int32) bool {
 	for _, d := range cube.Directions() {
@@ -579,6 +684,7 @@ func (e *End) originWrites(ox, oz int32, neighbour func(cx, cz int32) *Chunk) *o
 	defer e.regions.Put(r)
 	r.reset(ox, oz, neighbour)
 	e.decorate(r, ox, oz)
+	e.joinChorus(r)
 	return r.result()
 }
 
@@ -590,6 +696,7 @@ func (e *End) originWrites(ox, oz int32, neighbour func(cx, cz int32) *Chunk) *o
 // neighbours kept. It is safe to call from many goroutines if neighbour is.
 func (e *End) Decorate(chunkX, chunkZ int32, c *Chunk, neighbour func(cx, cz int32) *Chunk) {
 	e.decorateWith(chunkX, chunkZ, c, func(ox, oz int32) *originWrites { return e.originWrites(ox, oz, neighbour) })
+	e.joinChorusChunk(c)
 	e.placeCities(chunkX, chunkZ, c)
 	e.placeCrystals(chunkX, chunkZ, c)
 	e.finishChunk(c)
@@ -654,6 +761,7 @@ func (c *Cache) Generate(chunkX, chunkZ int32, out *Chunk) {
 		}
 		return ow
 	})
+	c.e.joinChorusChunk(out)
 	c.e.placeCities(chunkX, chunkZ, out)
 	c.e.placeCrystals(chunkX, chunkZ, out)
 	c.e.finishChunk(out)
