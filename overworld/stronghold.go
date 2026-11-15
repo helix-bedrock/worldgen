@@ -1356,3 +1356,66 @@ func (n *nearestChunk) try(cx, cz int32) {
 		n.best, n.found = d, [2]int32{cx, cz}
 	}
 }
+
+// strongholdRings is how many rings of 200-chunk cells EnderEyeTarget looks
+// through before it gives up.
+const strongholdRings = 100
+
+// strongholdTargetY is the height of the position EnderEyeTarget returns:
+// BDS takes a dimension value less 31, assumed to be the sea level (63).
+const strongholdTargetY = 32
+
+// EnderEyeTarget is BDS 1.26.60's StrongholdFeature nearest search
+// (sub_53886D0), the place an eye of ender flies toward: the first three
+// strongholds and the grid starts of the cells around (x, z), ring by ring
+// until one ring holds any. The nearest by chunk is returned as a block
+// position, 2 blocks into its start chunk. Because the first three always
+// count, the search ends at the first ring; the stronghold found is not
+// always the closest one in the world. It may be called from any goroutine.
+func (o *Overworld) EnderEyeTarget(x, z int32) (bx, by, bz int32, ok bool) {
+	cx, cz := x>>4, z>>4
+	first := o.strongholdFirst()
+	gx := int32(math.Floor(float64(float32(cx) / 200)))
+	gz := int32(math.Floor(float64(float32(cz) / 200)))
+	best, bestDist := [2]int32{}, int64(math.MaxInt64)
+	found := false
+	consider := func(c [2]int32) {
+		dx, dz := int64(c[0]-cx), int64(c[1]-cz)
+		if d := dx*dx + dz*dz; d < bestDist {
+			best, bestDist, found = c, d, true
+		}
+	}
+	for _, c := range first {
+		consider(c)
+	}
+	for ring := int32(1); ring < strongholdRings; ring++ {
+		for cellX := gx - ring; cellX <= gx+ring; cellX++ {
+			for cellZ := gz - ring; cellZ <= gz+ring; cellZ++ {
+				if ring >= 2 && mathx.Abs(cellX-gx) < ring && mathx.Abs(cellZ-gz) < ring {
+					continue
+				}
+				if o.firstInCell(first, cellX, cellZ) {
+					continue
+				}
+				if sx, sz, has := o.strongholdCell(cellX*200, cellZ*200); has {
+					consider([2]int32{sx, sz})
+				}
+			}
+		}
+		if found {
+			return best[0]<<4 + 2, strongholdTargetY, best[1]<<4 + 2, true
+		}
+	}
+	return 0, 0, 0, false
+}
+
+// firstInCell reports whether one of the first three strongholds lies in the
+// 200-chunk cell (cellX, cellZ): BDS then rolls no grid start for that cell.
+func (o *Overworld) firstInCell(first [][2]int32, cellX, cellZ int32) bool {
+	for _, c := range first {
+		if int32(math.Floor(float64(float32(c[0])/200))) == cellX && int32(math.Floor(float64(float32(c[1])/200))) == cellZ {
+			return true
+		}
+	}
+	return false
+}
