@@ -693,33 +693,31 @@ func (o *Overworld) applyWrites(c *Chunk, base *PackedChunk, fw *featureWrites, 
 		return
 	}
 	from, to := fw.off[slot], fw.off[slot+1]
-	// dropped is the cell of the top half of a two-block plant whose bottom
-	// half was dropped, so the top half goes with it.
-	dropped := int64(-1)
+	// Two-block plants are decided first, from what earlier origins left,
+	// because this origin may write a plant's top half before its bottom
+	// half, or put short grass where its own tall grass then goes.
+	var dropBuf [16]uint32
+	dropped := dropBuf[:0]
 	for k := from; k < to; k++ {
 		i, b := fw.pos[k], fw.blk[k]
-		if o.soilPlant[b] {
-			if int64(i) == dropped {
+		if bottom, ok := o.plantBottom(i, b); ok && o.pairTaken(c, base, bottom) {
+			dropped = append(dropped, bottom, bottom+chunkLayer)
+		}
+	}
+	for k := from; k < to; k++ {
+		i, b := fw.pos[k], fw.blk[k]
+		if _, ok := o.plantBottom(i, b); ok {
+			// A two-block plant is kept or dropped whole: dropping only its
+			// bottom half left its top floating over short grass.
+			if slices.Contains(dropped, i) {
 				continue
 			}
-			// A block an earlier origin placed here stays when this origin puts
-			// a plant on it: this origin cannot see it, but in BDS the plant
-			// feature would have found the spot taken. Without this, half of a
-			// large fern could be replaced by a fern, or a flower could take
-			// the bottom log of a tree. A two-block plant is kept or dropped
-			// whole: dropping only its bottom half left its top floating over
-			// short grass.
-			taken := o.takenByEarlierOrigin(c, base, i)
-			if o.lowerHalf[b] {
-				top := i + chunkLayer
-				taken = taken || int(top) >= len(c.Blocks) || o.takenByEarlierOrigin(c, base, top)
-				if taken {
-					dropped = int64(top)
-				}
-			}
-			if taken {
-				continue
-			}
+		} else if o.soilPlant[b] && o.takenByEarlierOrigin(c, base, i) {
+			// A block an earlier origin placed here stays when this origin
+			// puts a plant on it: this origin cannot see it, but in BDS the
+			// plant feature would have found the spot taken. Without this, a
+			// flower could take the bottom log of a tree.
+			continue
 		}
 		c.Blocks[i] = b
 	}
@@ -731,6 +729,28 @@ func (o *Overworld) applyWrites(c *Chunk, base *PackedChunk, fw *featureWrites, 
 
 // chunkLayer is the Chunk.Blocks index step from one y to the next.
 const chunkLayer = 256
+
+// plantBottom reports whether b is a half of a two-block soil plant placed
+// at index i, and the index of the plant's bottom half.
+func (o *Overworld) plantBottom(i uint32, b uint16) (uint32, bool) {
+	switch o.plantHalf[b] {
+	case lowerHalf:
+		return i, true
+	case upperHalf:
+		if i >= chunkLayer {
+			return i - chunkLayer, true
+		}
+	}
+	return 0, false
+}
+
+// pairTaken reports whether an earlier origin took either cell of the
+// two-block plant whose bottom half is at index bottom, or the top half
+// would be above the chunk.
+func (o *Overworld) pairTaken(c *Chunk, base *PackedChunk, bottom uint32) bool {
+	top := bottom + chunkLayer
+	return int(top) >= len(c.Blocks) || o.takenByEarlierOrigin(c, base, bottom) || o.takenByEarlierOrigin(c, base, top)
+}
 
 // takenByEarlierOrigin reports whether an earlier origin placed a block other
 // than air at index i of c, whose undecorated terrain is base.
