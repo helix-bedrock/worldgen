@@ -9,7 +9,7 @@
 
 [![Minecraft](https://img.shields.io/badge/minecraft-v1.26.60_(Bedrock)-black)](https://feedback.minecraft.net/hc/en-us/sections/360001186971-Release-Changelogs)
 [![Go](https://img.shields.io/badge/go-1.26-00ADD8?logo=go&logoColor=white)](https://go.dev/)
-[![License](https://img.shields.io/badge/license-GPL--3.0-blue)](LICENSE)
+[![License](https://img.shields.io/badge/license-noncommercial-orange)](LICENSE)
 [![Status](https://img.shields.io/badge/status-refinement_pass-yellow)](#status)
 
 </div>
@@ -65,7 +65,7 @@ code is **not** in this repo; it was only used to read how the game works.
 Custom Bedrock servers usually generate worlds that only look like vanilla: seeds give different
 terrain, and ores, trees and caves end up in other places. worldgen aims to be a one-to-one copy of
 Bedrock's own generator, so a seed gives the same world as on a vanilla server. It is part of
-[Helix](https://github.com/helix-bedrock), an open-source Bedrock server engine in Go, but it is a
+[Helix](https://github.com/helix-bedrock), a source-available Bedrock server engine in Go, but it is a
 plain library that any Go project can use.
 
 ## Quick Start
@@ -213,5 +213,12 @@ project is maintained.
 
 ## License
 
-worldgen is licensed under [GPL-3.0](LICENSE). Mojang's vanilla data it reads lives in
-[helix-data](https://github.com/helix-bedrock/helix-data), whose `_provenance.tsv` lists where each file came from.
+Noncommercial use only: [PolyForm Noncommercial 1.0.0](LICENSE) with Helix's
+[extra permissions](ADDITIONAL-PERMISSIONS.md). Anyone may use it, run servers with it
+(even ones that make money) and sell their own plugins, but nobody may sell Helix or its
+code. Helix's game behaviour is re-engineered from Minecraft's Bedrock Dedicated Server;
+see [NOTICE.md](NOTICE.md). Not an official Minecraft product. Not approved by or
+associated with Mojang or Microsoft.
+
+Mojang's vanilla data it reads lives in [helix-data](https://github.com/helix-bedrock/helix-data),
+whose `_provenance.tsv` lists where each file came from.
