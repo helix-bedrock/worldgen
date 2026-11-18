@@ -24,6 +24,9 @@ func javaBlockName(name string) (string, bool) {
 		return "torch", true
 	case "bricks":
 		return "brick_block", true
+	case "stone_slab":
+		// Java's plain stone slab; Bedrock's stone_slab name is not a block.
+		return "normal_stone_slab", true
 	case "terracotta":
 		return "hardened_clay", true
 	case "oak_fence_gate":
@@ -317,6 +320,22 @@ func stairCorner(shape string) string {
 	return shape
 }
 
+// doubleSlab is the Bedrock block of a Java slab with type=double. Bedrock
+// keeps a full slab as its own block (acacia_double_slab, and the copper
+// slabs as double_cut_copper_slab); kept as the slab, it was half a block.
+// A slab with no double block found stays a slab.
+func (l *Lib) doubleSlab(slab string) string {
+	for _, name := range [...]string{
+		strings.TrimSuffix(slab, "_slab") + "_double_slab",
+		strings.Replace(slab, "cut_copper_slab", "double_cut_copper_slab", 1),
+	} {
+		if _, ok := l.reg.Default("minecraft:" + name); ok && name != slab {
+			return name
+		}
+	}
+	return slab
+}
+
 // withJavaProp returns a copy of p with one property set.
 func withJavaProp(p map[string]string, k, v string) map[string]string {
 	out := make(map[string]string, len(p)+1)
@@ -400,6 +419,9 @@ func (l *Lib) ConvertJavaState(st TemplateState) (uint32, bool, bool) {
 				break
 			}
 		}
+	}
+	if st.Props["type"] == "double" && strings.HasSuffix(target, "_slab") {
+		target = l.doubleSlab(target)
 	}
 	full := "minecraft:" + target
 	def, ok := l.reg.Default(full)
