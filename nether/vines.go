@@ -14,7 +14,7 @@ const (
 	twistingVineTries = 100
 )
 
-// weepingVinesCluster is BDS's WeepingVinesClusterFeature (sub_4DE7B20):
+// weepingVinesCluster is BDS's WeepingVinesClusterFeature:
 // nether wart under netherrack or wart, 200 tries to grow the wart along
 // the ceiling (an air block next to exactly one of them), then 100 tries to
 // hang vines from netherrack or wart.
@@ -69,7 +69,7 @@ func vineLength(mt *rand.MT) int32 {
 	return l
 }
 
-// twistingVinesCluster is BDS's TwistingVinesClusterFeature (sub_49C6C50):
+// twistingVinesCluster is BDS's TwistingVinesClusterFeature:
 // 100 tries around the position, each growing a column of twisting vines up
 // from netherrack, warped nylium or warped wart.
 func (n *Nether) twistingVinesCluster(r *region, x, y, z int32, mt *rand.MT) {

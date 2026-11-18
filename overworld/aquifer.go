@@ -7,8 +7,8 @@ import (
 )
 
 // Aquifers decide what fills the empty space of the terrain: water or lava at
-// a per-cell fluid level, or air. Copied from BDS (sub_5158C60 for the block,
-// sub_5159950 for a cell's fluid).
+// a per-cell fluid level, or air. Copied from BDS (for the block,
+// for a cell's fluid).
 
 const (
 	// noFluidLevel is the fluid level of a cell with no fluid.

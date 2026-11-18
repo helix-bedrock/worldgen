@@ -8,8 +8,7 @@ import (
 
 // The terrain is the old 3D-noise generator: a selector noise blends two
 // limit noises on a grid of 5 x 17 x 5 corners, 4 blocks apart across and 8
-// tall, minus a height falloff that closes the floor and the roof (BDS's
-// sub_5161D20).
+// tall, minus a height falloff that closes the floor and the roof (BDS's).
 const (
 	gridY = 17
 	// Input scales of the selector and the limits, per octave amplitude 1.

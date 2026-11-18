@@ -44,7 +44,7 @@ type column struct {
 }
 
 // factorScale: BDS keeps density at 128x the vanilla Java scale (its final
-// squeeze multiplies by 0.005 = 0.64/128, its slides go to -10 and +15), so
+// squeeze multiplies by 0.005 = 0.64/128, its slides go to -10 and), so
 // the factor carries the 128.
 const factorScale = 128
 
@@ -91,12 +91,12 @@ func (o *Overworld) column(qx, qz int32) column {
 // uses, truncated toward zero like BDS.
 func quantize(v float32) int64 { return int64(float64(v) * 10000) }
 
-// Biome zoom, after BDS 1.26.52 (BiomeSource3d::fillBiomes, slot 4,
-// sub_493AAF0): biomes are searched on a grid every 8 blocks starting 8
-// blocks before the chunk (sub_493A2F0), each grid point is moved by a
+// Biome zoom, after BDS 1.26.52 (BDS's code, slot 4,):
+// biomes are searched on a grid every 8 blocks starting 8
+// blocks before the chunk, each grid point is moved by a
 // random offset, and every block takes the biome of the nearest moved point
-// among the 8 around it (BiomeChunkVolume, sub_C74F340, with the offsets of
-// sub_C74E6D0 and the search sub_D1C42B0).
+// among the 8 around it (BiomeChunkVolume,, with the offsets of
+// and the search).
 const (
 	zoomXZ = 4
 	zoomY  = Height/8 + 2

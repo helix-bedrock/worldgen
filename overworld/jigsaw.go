@@ -10,14 +10,14 @@ import (
 )
 
 // Jigsaw structures (villages for now), after BDS 1.26.52:
-//   start      sub_D2B36D0  start piece, moved onto the ground at its centre
-//   loop       sub_D2B3CB0  per piece: its jigsaw blocks shuffled, then each
+//   start start piece, moved onto the ground at its centre
+//   loop per piece: its jigsaw blocks shuffled, then each
 //                           tried against its target pool, then the fallback
-//   fit        sub_D2B4120  candidates from a weighted shuffle of the pool,
+//   fit candidates from a weighted shuffle of the pool,
 //                           4 rotations shuffled, candidate jigsaws shuffled
 // Shuffles are BDS's forward one: for i = 1..n-1, j = rand % (i+1), swap.
 // VERIFY: the y rules and the free-space test follow the structure of
-// sub_D2B4120 and Java's JigsawPlacement; both are to be compared block by
+// and Java's JigsawPlacement; both are to be compared block by
 // block with BDS villages.
 
 // jigsawAssembly holds the state of one structure being assembled.
@@ -30,15 +30,14 @@ type jigsawAssembly struct {
 }
 
 // assembleJigsaw builds a structure from a start pool at pos (y ignored:
-// the start piece sits on the ground at its centre), as BDS does
-// (sub_D2B36D0): depth first, each new piece's children built before its
+// the start piece sits on the ground at its centre), as BDS does:
+// depth first, each new piece's children built before its
 // parent's next jigsaw is tried.
 func (o *Overworld) assembleJigsaw(start *structure.Pool, pos [3]int32, rotation int, maxDepth int, r *rand.MT, height func(x, z int32) int32) []*structure.Piece {
 	if start == nil || len(start.Entries) == 0 {
 		return nil
 	}
 	// The start element is drawn from the weight-expanded pool
-	// (sub_D27F680).
 	all := start.Expanded()
 	el := all[r.IntN(int32(len(all)))]
 	tpl := o.elementTemplate(el)
@@ -58,7 +57,7 @@ func (o *Overworld) assembleJigsaw(start *structure.Pool, pos [3]int32, rotation
 	return a.pieces
 }
 
-// children tries each jigsaw block of piece p (sub_D2B3CB0): the pool,
+// children tries each jigsaw block of piece p: the pool,
 // unless p is at the last depth, then its fallback if the pool placed
 // nothing. A placed piece's own children are built at once.
 func (a *jigsawAssembly) children(p *structure.Piece) {
@@ -94,7 +93,7 @@ func overlaps2D(b, c structure.Box) bool {
 	return b.X1 >= c.X0 && b.X0 <= c.X1 && b.Z1 >= c.Z0 && b.Z0 <= c.Z1
 }
 
-// fit tries the elements of pool at jigsaw j of p (sub_D2B4120) and
+// fit tries the elements of pool at jigsaw j of p and
 // places the first that fits, with its children.
 func (a *jigsawAssembly) fit(p *structure.Piece, j structure.JigsawBlock, pool *structure.Pool, inner *[]structure.Box) bool {
 	dir := structure.JigsawDir(j.Facing)
@@ -188,7 +187,7 @@ func villageTop(j structure.JigsawBlock, rot int) string {
 	return structure.RotateFacing("north", rot)
 }
 
-// rotations are the four turns in BDS's order (sub_D2B3520): 1, 2, 3, 0
+// rotations are the four turns in BDS's order: 1, 2, 3, 0
 // with each of the last three swapped with a random earlier one.
 func (a *jigsawAssembly) rotations() [4]int {
 	r := [4]int{1, 2, 3, 0}
@@ -212,8 +211,8 @@ type village struct {
 
 // villageAt assembles the village starting in chunk (cx, cz), if any. Its
 // heights come from the terrain fill without structures, as BDS's come from
-// the generator's height map before any structure adjusts the terrain
-// (sub_D2ACD80); the village's own beards then reshape the terrain.
+// the generator's height map before any structure adjusts the terrain;
+// the village's own beards then reshape the terrain.
 // VERIFY: whether BDS's height map includes adjustments of structures
 // assembled earlier.
 func (o *Overworld) villageAt(cx, cz int32) *village {
@@ -225,7 +224,7 @@ func (o *Overworld) villageAt(cx, cz int32) *village {
 	if o.jigsaw != nil && o.IsVillageChunk(cx, cz) {
 		var r rand.MT
 		// The start is built with the region's random after the spread
-		// draws (VERIFY: sub_4FBBAD0's caller).
+		// draws (VERIFY:'s caller).
 		rx, rz := structure.Region(cx, o.place[skVillage].spacing), structure.Region(cz, o.place[skVillage].spacing)
 		structureSeed(&r, o.seed, rx, rz, o.place[skVillage].salt)
 		for range 4 {
@@ -412,7 +411,7 @@ func (o *Overworld) surfaceHeight(terrain func(cx, cz int32) *PackedChunk, x, z 
 // in BDS's order: trail ruins and trial chambers, villages, mineshafts, strongholds, ancient cities, scattered
 // features, pillager outposts, woodland mansions, ocean monuments, ocean ruins, shipwrecks,
 // then buried treasure. raw gives undecorated terrain.
-// VERIFY: the order of structure types (sub_C970F80 walks the registry).
+// VERIFY: the order of structure types (walks the registry).
 func (o *Overworld) placeStructures(cx, cz int32, c *Chunk, height func(x, z int32) int32, raw func(cx, cz int32) *PackedChunk,
 	trace func(step string)) {
 	o.placeDataJigsaws(cx, cz, c, trace)
@@ -496,7 +495,7 @@ func (o *Overworld) villageKind(cx, cz int32) string {
 	if int(biome) >= len(o.villageType) {
 		return "plains"
 	}
-	// BDS's village types (sub_D27F680): desert, ice (snowy pools),
+	// BDS's village types: desert, ice (snowy pools),
 	// savanna, taiga; anything else is plains.
 	switch t := o.villageType[biome]; t {
 	case "desert", "savanna", "taiga":
@@ -546,7 +545,7 @@ func (o *Overworld) NearestVillage(x, z int32, kind string, maxRings int32) (vx,
 // in piece order, with the structure post-process random: a Mersenne
 // Twister seeded with the chunk's population seed. A template piece before
 // them draws one number per chest it places in the chunk, for the chest's
-// loot seed (sub_D2B7A10), as dataJigsawFeatures does for camps.
+// loot seed, as dataJigsawFeatures does for camps.
 // VERIFY: the order of villages against other structures in the chunk.
 func (o *Overworld) villageFeatures(w *featureWorld, ox, oz int32, pop uint32) {
 	if o.jigsaw == nil {

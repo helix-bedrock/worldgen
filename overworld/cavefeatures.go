@@ -44,7 +44,7 @@ func jsonOK(raw json.RawMessage, v any) bool {
 }
 
 // sturdyFace reports whether a block can hold something on a face
-// (BlockType::canProvideSupport with the center rule, vfunc +144).
+// (with the center rule, vfunc).
 // VERIFY: BDS asks each block type; the shape table was not read, so full
 // cubes are told apart from thin and partial blocks by name here.
 func (o *Overworld) sturdyFace(b uint32, face int) bool {
@@ -154,8 +154,8 @@ func (o *Overworld) withProp(b uint32, prop string, v any) uint32 {
 }
 
 // snapToSurfaceFeature moves its position up or down a column to a floor or
-// ceiling and places a feature there (SnapToSurfaceFeature, sub_D313660
-// with the column scan sub_D313B20 / sub_D2D3770).
+// ceiling and places a feature there (SnapToSurfaceFeature,
+// with the column scan).
 type snapToSurfaceFeature struct {
 	feat       featureRef
 	rng        int32
@@ -163,7 +163,7 @@ type snapToSurfaceFeature struct {
 	horizontal bool
 	// allowAir, allowNonAir and allowWater are allow_air_placement (default
 	// true), allow_non_air_placement and allow_underwater_placement
-	// (default false), from the constructor sub_4F66A10.
+	// (default false), from the constructor.
 	allowAir, allowNonAir, allowWater bool
 	surfaces                          blockMatcher
 }
@@ -253,8 +253,8 @@ func faceStep() [6][3]int32 {
 	return [6][3]int32{{0, -1, 0}, {0, 1, 0}, {0, 0, -1}, {0, 0, 1}, {-1, 0, 0}, {1, 0, 0}}
 }
 
-// scan walks from (x, y, z) toward face (sub_D313B20 with the column scan
-// sub_D2D3770) and returns the open block next to the surface it finds.
+// scan walks from (x, y, z) toward face (with the column scan)
+// and returns the open block next to the surface it finds.
 func (f *snapToSurfaceFeature) scan(w *featureWorld, x, y, z int32, face int) (blockPos, bool) {
 	o := w.o
 	b, ok := w.block(x, y, z)
@@ -264,7 +264,7 @@ func (f *snapToSurfaceFeature) scan(w *featureWorld, x, y, z int32, face int) (b
 	solid := b != o.ids.air && !o.waterMaterial(b)
 	st := faceStep()[face]
 	// The scan only runs on through blocks of the start's biome (the
-	// wrapper lambda sub_D2DE640 compares the block target's biome, slot
+	// wrapper lambda compares the block target's biome, slot
 	// 25).
 	s := surfaceScan{f: f, w: w, solid: solid, startBiome: w.biome(x, y, z), face: face}
 	if !s.cont(blockPos{x, y, z}, b) {
@@ -324,7 +324,7 @@ func (s *surfaceScan) surface(b uint32) bool {
 }
 
 // vegetationPatchFeature lays a patch of ground blocks on a floor or
-// ceiling and grows vegetation on it (VegetationPatchFeature, sub_D31FD70).
+// ceiling and grows vegetation on it (VegetationPatchFeature).
 type vegetationPatchFeature struct {
 	replace    blockMatcher
 	ground     uint32
@@ -528,7 +528,7 @@ func pickWeighted[T any](r *rand.MT, list []T, weight func(T) float32) T {
 }
 
 // growingPlantFeature grows a column of body blocks ending in a head
-// (GrowingPlantFeature, sub_D2E0BF0): cave vines down from a ceiling, big
+// (GrowingPlantFeature): cave vines down from a ceiling, big
 // dripleaves up from a floor.
 type growingPlantFeature struct {
 	heights    []weightedRange
@@ -633,15 +633,13 @@ func (f *growingPlantFeature) place(w *featureWorld, x, y, z int32, r *rand.MT) 
 }
 
 // vinesSingleFaceFeature hangs one vine on the first solid side of an air
-// block, trying north, east, south, west (VinesSingleFaceFeature,
-// sub_49EBFD0).
+// block, trying north, east, south, west (VinesSingleFaceFeature,).
 type vinesSingleFaceFeature struct {
 	vine, invisibleBedrock uint32
 }
 
 // singleFaceVines are the vine_direction_bits of a vine held by a block to the
-// north, east, south and west (sub_CEC5A70 with the table set at
-// sub_CED62C0).
+// north, east, south and west (with the table set at).
 type vineSupport struct {
 	dx, dz int32
 	bits   float64
@@ -658,7 +656,7 @@ func (f *vinesSingleFaceFeature) place(w *featureWorld, x, y, z int32, r *rand.M
 	}
 	for _, s := range singleFaceVines() {
 		b, _ := w.block(x+s.dx, y, z+s.dz)
-		// VERIFY: BDS wants the block's solid flag (BlockLegacy +266 bit 2)
+		// VERIFY: BDS wants the block's solid flag (bit 2)
 		// and a solid material; full blocks by name stand in for both.
 		if b == f.invisibleBedrock || !o.sturdyFace(b, faceUp) {
 			continue
@@ -670,8 +668,8 @@ func (f *vinesSingleFaceFeature) place(w *featureWorld, x, y, z int32, r *rand.M
 }
 
 // mossVegetationFeature puts one weighted plant on a sturdy floor
-// (VegetationFeature, sub_49EB6E0, with the moss list built at
-// sub_49BC9C0): flowering azalea 4, azalea 7, moss carpet 25, short grass
+// (VegetationFeature,, with the moss list built at):
+// flowering azalea 4, azalea 7, moss carpet 25, short grass
 // 50, tall grass 10. Double plants get their upper half.
 type mossVegetationFeature struct {
 	plants []weightedBlock
@@ -686,8 +684,8 @@ func (o *Overworld) newMossVegetation(id func(string) uint32) *mossVegetationFea
 	return f
 }
 
-// newPaleMossVegetation is the pale garden's VegetationFeature (list built at
-// sub_49BC9C0): pale moss carpet 25, short grass 25, tall grass 10.
+// newPaleMossVegetation is the pale garden's VegetationFeature (list built at):
+// pale moss carpet 25, short grass 25, tall grass 10.
 func (o *Overworld) newPaleMossVegetation(id func(string) uint32) *mossVegetationFeature {
 	f := &mossVegetationFeature{double: map[uint32]bool{id(blockTallGrass): true}}
 	f.plants = []weightedBlock{{id("minecraft:pale_moss_carpet"), 25}, {id(blockShortGrass), 25}, {id(blockTallGrass), 10}}
@@ -712,7 +710,7 @@ func (f *mossVegetationFeature) place(w *featureWorld, x, y, z int32, r *rand.MT
 }
 
 // plantSurvives is the plant's mayPlace on the block below (BlockLegacy
-// vfunc +536).
+// vfunc).
 // VERIFY: written from the blocks' vanilla rules, not read from BDS.
 func (o *Overworld) plantSurvives(plant, below uint32) bool {
 	switch o.blockName(plant) {
@@ -726,8 +724,8 @@ func (o *Overworld) plantSurvives(plant, below uint32) bool {
 	return o.hasBlockTag(below, "dirt") || o.blockName(below) == "minecraft:moss_block"
 }
 
-// dripleafFeature is BDS's DripleafFeature (sub_49A13C0): one in five is a
-// small dripleaf facing a random way (sub_CF29ED0), the rest a big
+// dripleafFeature is BDS's DripleafFeature: one in five is a
+// small dripleaf facing a random way, the rest a big
 // dripleaf feature picked by direction.
 type dripleafFeature struct {
 	small uint32
@@ -750,7 +748,7 @@ func (f *dripleafFeature) place(w *featureWorld, x, y, z int32, r *rand.MT) (blo
 }
 
 // placeSmall places a two-block small dripleaf.
-// VERIFY: the direction state and the survival rule (vfuncs +536/+544) are
+// VERIFY: the direction state and the survival rule (vfuncs/) are
 // taken from the block's vanilla rules.
 func (f *dripleafFeature) placeSmall(w *featureWorld, x, y, z, dir int32) (blockPos, bool) {
 	o := w.o

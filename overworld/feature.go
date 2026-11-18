@@ -101,7 +101,7 @@ type featureRule struct {
 }
 
 // coordinateOrders maps coordinate_eval_order to the axis order. BDS's enum
-// is xyz, xzy, yxz, yzx, zxy, zyx (sub_C81F600).
+// is xyz, xzy, yxz, yzx, zxy, zyx.
 func coordinateOrders(name string) ([3]int, bool) {
 	switch name {
 	case "xyz":
@@ -317,7 +317,7 @@ func (o *Overworld) loadFeatureRules(fsys fs.FS, dir string, packs []fs.FS, defs
 		fr.read = append(fr.read, raw.Rules.Description.Identifier)
 	}
 	// Rules keep file name order. BDS reads pack rules first, then the
-	// definitions/feature_rules folder in directory order (sub_D403EB0);
+	// definitions/feature_rules folder in directory order;
 	// against BDS chunks, file name order fits best, except that BDS places
 	// the sand disc before the clay disc. See notes/TODO.md.
 	o.rules = fr
@@ -787,7 +787,7 @@ func (w *featureWorld) heightmap(x, z int32) int32 {
 
 // aboveTopSolid is query.above_top_solid: the y above the highest block of
 // a column whose material is solid, looking through leaves (BDS's
-// LevelChunk::getAboveTopSolidBlock, sub_C9F7970, as the query calls it).
+// BDS's code,, as the query calls it).
 func (w *featureWorld) aboveTopSolid(x, z int32) int32 {
 	for y := int32(MaxY - 1); y >= MinY; y-- {
 		b, ok := w.block(x, y, z)
@@ -896,7 +896,7 @@ func (o *Overworld) keepWater(c *Chunk, base *PackedChunk) {
 }
 
 // holdsWater reports whether a block keeps the water it is placed in: BDS's
-// can-contain-liquid flag (Block+184 bit 0), from bds/liquid_holders.json
+// can-contain-liquid flag (Block bit 0), from bds/liquid_holders.json
 // (exported with the script API's BlockPermutation.canContainLiquid; every
 // state of a block agrees in 1.26.52).
 func (o *Overworld) holdsWater(b uint32) bool {
@@ -905,7 +905,7 @@ func (o *Overworld) holdsWater(b uint32) bool {
 
 // chunkBiomes lists the distinct biomes of a chunk in BDS's order: sub-chunk
 // by sub-chunk from the bottom, in order of first appearance in each
-// sub-chunk's palette, which BDS builds in x, z, y order (sub_C74F340).
+// sub-chunk's palette, which BDS builds in x, z, y order.
 func chunkBiomes(c *Chunk) []uint32 {
 	var out []uint32
 	for s := 0; s < Height/16; s++ {
@@ -932,7 +932,7 @@ func (o *Overworld) decorateFrom(w *featureWorld, ox, oz int32, origin *PackedCh
 	pop := populationSeed(o.seed, ox, oz)
 	// One population random runs the lakes and dungeons and then
 	// math.random in the rules' Molang (it is the random BDS passes to the
-	// rule loop, sub_C7544E0).
+	// rule loop).
 	popMT := rand.NewMT(pop)
 	w.pop = popMT
 	w.shuffleOK = false
@@ -957,7 +957,7 @@ func (o *Overworld) decorateFrom(w *featureWorld, ox, oz int32, origin *PackedCh
 				continue
 			}
 			// variable.worldx/y/z live in the Molang environment BDS makes
-			// once per pass and biome (sub_C7544E0): unset (0) at first,
+			// once per pass and biome: unset (0) at first,
 			// then the last coordinates a slow-path rule evaluated. An axis
 			// evaluated before another reads that axis' previous value, as
 			// the y of rules in xyz order does for z.

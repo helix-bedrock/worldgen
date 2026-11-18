@@ -6,9 +6,9 @@ import (
 )
 
 // Acacia-trunk trees of minecraft:tree_feature (savanna acacias, azaleas,
-// dark and pale oaks), written from BDS 1.26.52: AcaciaTreeTrunk (place
-// sub_D2D0AE0, height sub_D2D1D40), AcaciaTreeCanopy (sub_D2D0440),
-// RoofedTreeCanopy (sub_D2DC7E0) and RandomSpreadTreeCanopy (sub_D2DC200).
+// dark and pale oaks), written from BDS 1.26.52: AcaciaTreeTrunk (place,
+// height), AcaciaTreeCanopy,
+// RoofedTreeCanopy and RandomSpreadTreeCanopy.
 
 type acaciaTrunk struct {
 	width        int32
@@ -54,7 +54,7 @@ func leanZ() [4]int32 {
 	return [4]int32{1, 0, -1, 0}
 }
 
-// acaciaFree is sub_D299C30: a trunk or branch block may go where
+// acaciaFree is: a trunk or branch block may go where
 // may_replace allows, or into air, liquids and replaceable plants.
 // VERIFY: BDS tests a replaceable flag and material types; treeFree lists
 // the same blocks by name.
@@ -77,7 +77,7 @@ func (a *acaciaTrunk) height(r *rand.MT) int32 {
 	return h
 }
 
-// acaciaTrunk is AcaciaTreeTrunk::place.
+// acaciaTrunk matches BDS.
 func (t *treeFeature) acaciaTrunk(w *featureWorld, x, y, z, h int32, r *rand.MT) (blockPos, bool) {
 	a := &t.acacia
 	if !t.valid(w, x, y, z, h) || y >= MaxY-h-1 {
@@ -205,7 +205,7 @@ func (t *treeFeature) acaciaTrunk(w *featureWorld, x, y, z, h int32, r *rand.MT)
 	return blockPos{x, y, z}, true
 }
 
-// place is AcaciaTreeCanopy::place on a trunk top at (x, y, z): a flat top
+// place matches BDS on a trunk top at (x, y, z): a flat top
 // layer above and a wider square below, its corners cut.
 func (c *acaciaCanopy) place(t *treeFeature, w *featureWorld, x, y, z int32) {
 	s := c.size
@@ -241,7 +241,7 @@ func (c *acaciaCanopy) place(t *treeFeature, w *featureWorld, x, y, z int32) {
 	}
 }
 
-// place is RoofedTreeCanopy::place at (x, y, z) with a w x w trunk core:
+// place matches BDS at (x, y, z) with a w x w trunk core:
 // mirrored rings one below and height above, a core cap on half the trees,
 // then height layers of a rounded square. Leaves go only into air.
 func (c *roofedCanopy) place(w *featureWorld, x, y, z, width int32, r *rand.MT) {
@@ -301,7 +301,7 @@ func (r intRange) drawAlways(rnd *rand.MT) int32 {
 	return r.min + rnd.IntN(r.max-r.min+1)
 }
 
-// place is RandomSpreadTreeCanopy::place: around every trunk block that
+// place matches BDS: around every trunk block that
 // feeds the canopy, attempts tries at a weighted leaf block and a random
 // offset within the canopy's height and radius.
 func (c *randomSpreadCanopy) place(t *treeFeature, w *featureWorld, trunk []blockPos, r *rand.MT) {

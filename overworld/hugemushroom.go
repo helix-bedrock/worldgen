@@ -3,7 +3,7 @@ package overworld
 import "github.com/helix-bedrock/worldgen/rand"
 
 // Huge mushrooms (minecraft:huge_mushroom_feature, a built-in feature), written from BDS
-// 1.26.52 HugeMushroomFeature (sub_D2E7E20, placer sub_D2E8090). They grow in mushroom
+// 1.26.52 HugeMushroomFeature (placer). They grow in mushroom
 // fields and dark forests.
 //
 // The cap blocks carry huge_mushroom_bits: 1-9 are the cap's faces, laid out like a
@@ -25,7 +25,7 @@ const (
 	mushroomBitsCount = 11
 )
 
-// Huge mushroom shape constants (sub_D2E8090).
+// Huge mushroom shape constants.
 const (
 	// mushroomMinHeight and mushroomHeightRange give the stem height,
 	// doubled with chance 1 in mushroomTallChance.
@@ -57,7 +57,7 @@ func (o *Overworld) newHugeMushroom() *hugeMushroomFeature {
 	}
 	f.plants[0], _ = o.reg.Default("minecraft:brown_mushroom")
 	f.plants[1], _ = o.reg.Default("minecraft:red_mushroom")
-	// VERIFY: sub_D2E89C0 tests a block tag list plus two blocks; taken as the
+	// VERIFY: tests a block tag list plus two blocks; taken as the
 	// dirt-like blocks.
 	for _, n := range []string{"dirt", "coarse_dirt", "grass_block", "podzol", "mycelium", "dirt_with_roots", "moss_block", "mud", "muddy_mangrove_roots"} {
 		if b, ok := o.reg.Default("minecraft:" + n); ok {
@@ -103,8 +103,8 @@ func (f *hugeMushroomFeature) place(w *featureWorld, x, y, z int32, r *rand.MT) 
 	below, _ := w.block(x, y-1, z)
 	if !inList(f.soil, below) {
 		// One or two blocks of water over soil: the stem reaches down
-		// through them. VERIFY: the block BDS tests here (qword_F613F00) is
-		// taken as water, and the extra check sub_C8E3060 is left out.
+		// through them. VERIFY: the block BDS tests here is
+		// taken as water, and the extra check is left out.
 		if below != f.water {
 			return blockPos{}, false
 		}

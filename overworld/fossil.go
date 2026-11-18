@@ -13,7 +13,7 @@ import (
 // Desert wells and fossils, the two template-like features, written from
 // BDS 1.26.52.
 
-// desertWellFeature is DesertWellFeature (sub_499D900): Java 1.20's well,
+// desertWellFeature is DesertWellFeature: Java 1.20's well,
 // with Bedrock's order for the suspicious sand spots.
 type desertWellFeature struct {
 	sand, redSand, sandstone, slab, water, sus uint32
@@ -28,7 +28,7 @@ func (f *desertWellFeature) place(w *featureWorld, x, y, z int32, r *rand.MT) (b
 	for w.airAt(x, y, z) && y > MinY+2 {
 		y--
 	}
-	// VERIFY: BDS tests a block family list (xmmword_F613D10); taken to
+	// VERIFY: BDS tests a block family list; taken to
 	// be sand and red sand.
 	if b, ok := w.block(x, y, z); !ok || (b != f.sand && b != f.redSand) {
 		return blockPos{}, false
@@ -83,8 +83,8 @@ func (f *desertWellFeature) place(w *featureWorld, x, y, z int32, r *rand.MT) (b
 	// Two suspicious sand blocks under the water: the centre or one of its
 	// sides (BDS's order: centre, west, east, north, south), one and two
 	// blocks down. Both spots are drawn before either is placed.
-	// VERIFY: BDS places them only when a base game version check passes
-	// (byte_F4A2978); taken to pass for new worlds.
+	// VERIFY: BDS places them only when a base game version check passes;
+	// taken to pass for new worlds.
 	a := cross[r.IntN(5)]
 	b := cross[r.IntN(5)]
 	for _, p := range [2][3]int32{{x + a[0], y - 1, z + a[1]}, {x + b[0], y - 2, z + b[1]}} {
@@ -99,13 +99,13 @@ func (f *desertWellFeature) place(w *featureWorld, x, y, z int32, r *rand.MT) (b
 	return blockPos{x, y, z}, true
 }
 
-// fossilTemplates are BDS's fossil templates in its order (sub_51C05A0).
+// fossilTemplates are BDS's fossil templates in its order.
 var fossilTemplates = [8]string{
 	"fossils/fossil_spine_01", "fossils/fossil_spine_02", "fossils/fossil_spine_03", "fossils/fossil_spine_04",
 	"fossils/fossil_skull_01", "fossils/fossil_skull_02", "fossils/fossil_skull_03", "fossils/fossil_skull_04",
 }
 
-// fossilFeature is FossilFeature (sub_51C0A20): a bone template buried
+// fossilFeature is FossilFeature: a bone template buried
 // 15 to 24 blocks under the lowest surface over its footprint, inside the
 // chunk, placed twice from the same integrity seed: bone at 0.9, then at
 // 0.1 with bone blocks turned to the ore.
@@ -139,7 +139,7 @@ func (o *Overworld) parseFossil(raw json.RawMessage) (placer, error) {
 func (f *fossilFeature) place(w *featureWorld, x, y, z int32, r *rand.MT) (blockPos, bool) {
 	o := w.o
 	// VERIFY: BDS first asks the world generator for a structure at the
-	// position and skips when there is one (vtable 336 of the generator);
+	// position and skips when there is one;
 	// not done here.
 	if w.chunk(x, z) == nil {
 		return blockPos{}, false

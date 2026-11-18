@@ -57,7 +57,7 @@ type End struct {
 	ids   struct {
 		air, endStone uint32
 	}
-	// The terrain noises (BDS's TheEndGenerator, constructor sub_51938A0).
+	// The terrain noises (BDS's TheEndGenerator, constructor).
 	minLimit, maxLimit, selector *noise.LegacyOctaves
 	island                       *noise.Simplex
 
@@ -132,7 +132,7 @@ func New(seed int64, reg *blocks.Registry, biomeIDs map[string]uint32, opts ...O
 func (e *End) Seed() int64 { return e.seed }
 
 // GenerateChunk fills c with the terrain of the chunk at (chunkX, chunkZ),
-// in BDS's order (TheEndGenerator loadChunk, sub_5194820). The End's
+// in BDS's order (TheEndGenerator loadChunk). The End's
 // surface builder only turns stone into end stone, and the terrain has no
 // stone, so it is left out. Decorate adds the rest, End cities included.
 func (e *End) GenerateChunk(chunkX, chunkZ int32, c *Chunk) {

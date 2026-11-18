@@ -73,7 +73,7 @@ func (s *Simplex) corner2(gi int32, x, y float32) float32 {
 		return 0
 	}
 	g := &simplexGrad[gi%12]
-	// BDS multiplies t in one at a time (sub_D1EB5D0); (t*t)*(t*t) can
+	// BDS multiplies t in one at a time; (t*t)*(t*t) can
 	// round differently.
 	return (g[0]*x + g[1]*y) * (t * t * t * t)
 }

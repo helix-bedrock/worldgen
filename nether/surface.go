@@ -59,7 +59,7 @@ type biomeSurface struct {
 // surfaceNoises are the per-world noises the builders share.
 type surfaceNoises struct {
 	// adjustment is the overworld builder's material adjustment noise,
-	// drawn last from the terrain noises' Mersenne Twister (sub_515FDF0).
+	// drawn last from the terrain noises' Mersenne Twister.
 	adjustment *noise.SimplexOctaves
 	// beach is the capped builder's beach noise.
 	beach *noise.LegacyOctaves
@@ -123,7 +123,6 @@ func (n *Nether) loadSurfaces(biomeIDs map[string]uint32) error {
 	}
 	seed := uint32(n.seed)
 	// The capped builder's beach noise: one octave from the seed
-	// (sub_C752060).
 	n.surfNoise.beach = noise.NewLegacyOctaves(rand.NewMT(seed), 1)
 
 	var maxID uint32
@@ -159,7 +158,7 @@ func (n *Nether) loadSurfaces(biomeIDs map[string]uint32) error {
 			return err
 		}
 		// Each capped material has a one-octave noise; the floors take
-		// seeds seed, seed+1, ... and the ceilings carry on (sub_C7BFB60).
+		// seeds seed, seed+1,... and the ceilings carry on.
 		ms := seed
 		if err := n.cappedMats(s.FloorMaterials, &bs.floors, &ms); err != nil {
 			return err
@@ -213,7 +212,7 @@ func seaLevelExpr(e string) (int32, error) {
 }
 
 // surface runs the biome surface builders, x outer and z inner, continuing
-// the chunk's Mersenne Twister after the bedrock (sub_5163F50).
+// the chunk's Mersenne Twister after the bedrock.
 func (n *Nether) surface(chunkX, chunkZ int32, c *Chunk, mt *rand.MT) {
 	var depth [256]float32
 	x0, z0 := chunkX*16, chunkZ*16
@@ -362,7 +361,7 @@ func (n *Nether) solid(b uint32) bool {
 	return b != n.ids.air && b != n.ids.lava && b != n.ids.water && b != n.ids.flowingLava && b != n.ids.flowingWater
 }
 
-// cappedSurface is the Nether's capped builder (sub_C752370): walking up
+// cappedSurface is the Nether's capped builder: walking up
 // the column, it caps each ceiling's underside with a ceiling material and
 // each floor's top with a floor material (or the beach material near the
 // lava sea), then turns lava into the sea material and netherrack into the

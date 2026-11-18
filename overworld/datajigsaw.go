@@ -21,20 +21,20 @@ import (
 
 // Data-driven jigsaw structures (br::worldgen::JigsawStructure), written
 // from BDS 1.26.52: trail ruins and abandoned camps from the vanilla
-// worldgen JSON files, and trial chambers, which BDS defines in code (sub_D228C00) with pools built
-// in sub_5092590 (bds/trial_chambers.json).
+// worldgen JSON files, and trial chambers, which BDS defines in code with pools built
+// (bds/trial_chambers.json).
 //
-//   start      sub_D1FF960 / sub_D1FE510: the start height, then a turn
+//   start : the start height, then a turn
 //              (nextInt(4)) and a start element, placed at the chunk
 //              corner, then raised to the surface at its centre when the
 //              structure projects to the height map
-//   assembly   sub_D21B1E0: Java's JigsawPlacement with Bedrock's random:
+//   assembly : Java's JigsawPlacement with Bedrock's random:
 //              pieces expanded by placement priority, each one's jigsaws
 //              shuffled and sorted by selection priority, the pool (not at
 //              the last depth) and its fallback each weight-expanded and
 //              shuffled, the turns shuffled, the candidate's jigsaws
 //              shuffled and sorted
-//   terrain    bury (sub_D1EE730, third list): the terrain grows up to 6
+//   terrain bury (third list): the terrain grows up to 6
 //              blocks around every piece where it is not solid
 //
 // The shuffles here are backward Fisher-Yates (j = rand % i for i = n..2),
@@ -397,7 +397,7 @@ func trialContents(from, to string) [][2]string {
 }
 
 // loadTrialChambers builds the trial chambers from BDS's code-defined
-// settings (sub_D228C00) and the extracted pools.
+// settings and the extracted pools.
 func (o *Overworld) loadTrialChambers() (*djDef, error) {
 	raw, err := worldgen.Data.ReadFile("bds/trial_chambers.json")
 	if err != nil {
@@ -428,7 +428,7 @@ func (o *Overworld) loadTrialChambers() (*djDef, error) {
 		}
 		d.pools[p.Name] = pool
 	}
-	// The pool aliases (sub_D293FC0): the spawner contents, bound once per
+	// The pool aliases: the spawner contents, bound once per
 	// chamber. Their targets are one-template pools of the same name.
 	d.aliases = []djAlias{
 		trialAlias(trialRanged("skeleton"), trialRanged("stray"), trialRanged("poison_skeleton")),
@@ -445,7 +445,7 @@ func (o *Overworld) loadTrialChambers() (*djDef, error) {
 			}
 		}
 	}
-	// The biomes BDS lists for trial chambers (qword_1C9F310): every
+	// The biomes BDS lists for trial chambers: every
 	// Overworld biome of its list but the deep dark.
 	ids := []uint32{48, 49, 16, 27, 28, 156, 155, 192, 26, 44, 30, 31, 158, 45, 47, 43, 24, 41, 2, 17, 130, 188, 3, 20,
 		131, 34, 162, 132, 4, 18, 46, 183, 11, 185, 13, 12, 140, 182, 21, 23, 151, 22, 149, 10, 42, 187, 191, 186, 32, 33,
@@ -461,7 +461,7 @@ func (o *Overworld) loadTrialChambers() (*djDef, error) {
 
 // pick is the start chunk of placement region (rx, rz): a linear random
 // spread drawn with Java's random seeded as Java's setLargeFeatureWithSalt
-// does (sub_D1D2570), x then z.
+// does, x then z.
 func (d *djDef) pick(o *Overworld, rx, rz int32) (int32, int32) {
 	if x, z, ok := o.forcedPick(d.sk, rx, rz); ok {
 		return x, z
@@ -567,7 +567,7 @@ func (a *djAssembly) pool(name string) *structure.Pool {
 var emptyPool = structure.Pool{Name: "minecraft:empty", Fallback: "minecraft:empty"}
 
 // sortedJigsaws are a piece's jigsaws shuffled, then sorted by selection
-// priority, highest first (sub_D1EEED0).
+// priority, highest first.
 func (a *djAssembly) sortedJigsaws(p *structure.Piece) []structure.JigsawBlock {
 	js := p.PlacedJigsaws()
 	shuffleBack(js, a.r)
@@ -670,8 +670,8 @@ func (d *djDef) assembleOne(o *Overworld, cx, cz int32) *djStructure {
 	}
 	a := &djAssembly{o: o, d: d, r: &r, pieces: []*structure.Piece{p}, pools: map[string]string{}}
 	if len(d.aliases) > 0 {
-		// The aliases are bound with Java's legacy positional random
-		// (sub_D23EC10): Random(world seed), forked with one nextLong,
+		// The aliases are bound with Java's legacy positional random:
+		// Random(world seed), forked with one nextLong,
 		// then at the start, before any projection to the surface.
 		var jr, ar rand.Java
 		jr.Seed(o.seed)
@@ -787,9 +787,9 @@ func (a *djAssembly) fit(q djState, j structure.JigsawBlock, target [3]int32, re
 }
 
 // featureTemplate stands in for every feature pool element: size 0, so its
-// box is empty and blocks no other piece (BDS's FeaturePoolElement getSize,
-// sub_D231C90, returns 0), with one jigsaw at its origin facing down, named
-// minecraft:bottom and joining nothing (sub_D231DD0), so the assembly's
+// box is empty and blocks no other piece (BDS's FeaturePoolElement getSize,,
+// returns 0), with one jigsaw at its origin facing down, named
+// minecraft:bottom and joining nothing, so the assembly's
 // draws run as they should. The features are placed during decoration.
 var featureTemplate = &structure.JigsawTemplate{Template: &structure.Template{},
 	Jigsaws: []structure.JigsawBlock{{Facing: "down", Top: "south", Name: "minecraft:bottom", Target: "minecraft:empty", Pool: "minecraft:empty",
@@ -804,7 +804,7 @@ func (o *Overworld) elementTemplate(el *structure.Element) *structure.JigsawTemp
 }
 
 // dataJigsawBeards lists the beards of beard_thin data-driven structures
-// near chunk (cx, cz). BDS keeps these in its classic list (sub_D1F06A0),
+// near chunk (cx, cz). BDS keeps these in its classic list,
 // which works as Java's beard_thin: each piece's own box, not widened as a
 // village's is, with its ground one block above its bottom. Checked against
 // BDS at two abandoned camps (765 of 768 columns the same height at one).
@@ -887,7 +887,7 @@ func (o *Overworld) buryBoxes(cx, cz int32) []structure.Box {
 }
 
 // buryAt is the bury density at (x, y, z): 1 - d/6 for each box within 6
-// blocks, d the whole distance to the box with y halved (sub_D1EE730).
+// blocks, d the whole distance to the box with y halved.
 func buryAt(bs []structure.Box, x, y, z int32) float32 {
 	var sum float32
 	for _, b := range bs {
@@ -983,9 +983,9 @@ func (o *Overworld) NearestDataJigsaw(kind string, x, z, maxRegions int32) (Scat
 // dataJigsawFeatures places the features of the data-driven structures'
 // feature pieces standing in chunk (ox, oz), such as an abandoned camp's
 // trees. BDS runs structure pieces after reseeding the chunk's population
-// random (OverworldGenerator::postProcess, before postProcessStructures),
+// random (before postProcessStructures),
 // and a feature piece places its feature at its own position with that
-// random (FeaturePoolElement::place), as cityFeatures does.
+// random, as cityFeatures does.
 // The features may not change any cell the structure's templates fill, its
 // air included, so a camp's trees never grow through the camp. This is a
 // Helix rule, not BDS's: BDS lets leaves fill a template's air.
@@ -1001,8 +1001,8 @@ func (o *Overworld) dataJigsawFeatures(w *featureWorld, ox, oz int32, pop uint32
 			for _, p := range s.pieces {
 				if p.Element.Feature == "" {
 					// A template piece draws one number per chest it
-					// places in this chunk, for the chest's loot seed
-					// (LegacyStructureTemplate::placeInWorld), before
+					// places in this chunk, for the chest's loot seed,
+					// before
 					// the pieces after it.
 					if n := chestsInChunk(p, ox, oz); n > 0 {
 						if r == nil {

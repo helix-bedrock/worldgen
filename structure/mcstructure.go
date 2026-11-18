@@ -95,8 +95,8 @@ const maxMCStructure = 64 << 20
 
 // mcStructureBody returns the structure compound of an .mcstructure root.
 // Since 1.26.60 a file may set compression to 1: structure is then a byte
-// array holding the compound as zlib-compressed little-endian NBT (BDS
-// sub_D8306C0); 0 or no compression tag is the plain compound.
+// array holding the compound as zlib-compressed little-endian NBT (BDS);
+// 0 or no compression tag is the plain compound.
 func mcStructureBody(root map[string]any) (map[string]any, error) {
 	comp := int32(0)
 	if v, ok := root["compression"]; ok {

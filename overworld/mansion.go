@@ -10,12 +10,12 @@ import (
 )
 
 // Woodland mansions, written from BDS 1.26.52: WoodlandMansionFeature
-// (constructor sub_4FBBDB0, chunk test sub_4FBC500, start sub_4FBC760),
-// the room grid (corridors sub_4FCDE80, edge cleanup sub_4FCE3A0, rooms
-// sub_4FCE780), the piece placer (sub_4FBFFB0 with outer walls sub_4FC7D20,
-// wall pieces sub_4FC82D0 and roofs sub_4FC85E0), the room collections
-// (vtables EE9CBC8, EE9CC48, EE9CDB8), WoodlandMansionPiece (box sub_D27F200,
-// markers sub_4FC6500) and WoodlandMansionStart's post pass (sub_4FBF5B0).
+// (constructor, chunk test, start),
+// the room grid (corridors, edge cleanup, rooms),
+// the piece placer (with outer walls,
+// wall pieces and roofs), the room collections,
+// WoodlandMansionPiece (box,
+// markers) and WoodlandMansionStart's post pass.
 //
 // The start chunk's random drives everything in order: the turn, the grid
 // (corridors, room shuffles and doors, the third floor), then the placer
@@ -38,14 +38,14 @@ import (
 // allay marker draws in every chunk the piece touches; heights come from
 // the undecorated start chunk.
 
-// Woodland mansion placement (sub_4FBC500): triangular spread.
+// Woodland mansion placement: triangular spread.
 const (
 	mansionSalt       = 10387319
 	mansionSpacing    = 80
 	mansionSeparation = 20
 )
 
-// mansionBiomes are the biomes a mansion starts in (sub_4FBBDB0).
+// mansionBiomes are the biomes a mansion starts in.
 func mansionBiomes() []string {
 	return []string{"pale_garden", "roofed_forest", "roofed_forest_mutated", "dripstone_caves",
 		"lush_caves", "sulfur_caves"}
@@ -187,7 +187,7 @@ const (
 	roomFirstID = 10
 )
 
-// Corridor walk lengths and tries (sub_4FCDE80's callers).
+// Corridor walk lengths and tries ('s callers).
 const (
 	// mansionLongCorridor is the length of the corridors from the entrance's
 	// far corners.
@@ -309,7 +309,7 @@ func newMansionLayout(r *rand.MT) *mansionLayout {
 	return l
 }
 
-// corridor is recursiveCorridor (sub_4FCDE80).
+// corridor is recursiveCorridor.
 func (l *mansionLayout) corridor(g *mansionGrid, x, y, dir, length int32) {
 	if length <= 0 {
 		return
@@ -343,7 +343,7 @@ func (l *mansionLayout) corridor(g *mansionGrid, x, y, dir, length int32) {
 }
 
 // cleanEdges turns empty cells mostly surrounded by building into rooms
-// (sub_4FCE3A0) and reports whether it changed any.
+// and reports whether it changed any.
 func cleanEdges(g *mansionGrid) bool {
 	touched := false
 	for y := range int32(mansionGridSize) {
@@ -368,7 +368,7 @@ func cleanEdges(g *mansionGrid) bool {
 }
 
 // identifyRooms groups a floor's room cells into 1x1, 1x2 and 2x2 rooms
-// and picks their doors (sub_4FCE780).
+// and picks their doors.
 func (l *mansionLayout) identifyRooms(base, rooms *mansionGrid) {
 	var cells [][2]int32
 	for y := range int32(mansionGridSize) {
@@ -527,14 +527,14 @@ type mansion struct {
 	bb     structure.Box
 }
 
-// mansionPlacer is MansionPiecePlacer (sub_4FBFFB0).
+// mansionPlacer is MansionPiecePlacer.
 type mansionPlacer struct {
 	o      *Overworld
 	r      *rand.MT
 	pieces []mansionPiece
 }
 
-// add appends a piece, sizing its box from the template (sub_D27F200: the
+// add appends a piece, sizing its box from the template (: the
 // box reaches the template's size on x and z, one past its last block).
 func (p *mansionPlacer) add(name string, pos [3]int32, rot int, mirror uint8) {
 	rot &= 3
@@ -586,7 +586,7 @@ third:
 	}
 }
 
-// outerWalls is traverseOuterWalls (sub_4FC7D20): it walks the building's
+// outerWalls is traverseOuterWalls: it walks the building's
 // edge from (x, y), heading south, until it is back at (endX, endY).
 func (p *mansionPlacer) outerWalls(d *placement, g *mansionGrid, x, y, endX, endY int32) {
 	dir := dirSouth
@@ -623,7 +623,7 @@ func (p *mansionPlacer) turn(d *placement) {
 	d.rot = (d.rot + 1) & 3
 }
 
-// wallPiece is traverseWallPiece (sub_4FC82D0).
+// wallPiece is traverseWallPiece.
 func (p *mansionPlacer) wallPiece(d *placement) {
 	p.add(d.wall, rel(d.pos, rotDir(d.rot, dirEast), 7), d.rot, structure.MirrorNone)
 	d.pos = rel(d.pos, rotDir(d.rot, dirSouth), mansionCellBlocks)
@@ -635,7 +635,7 @@ func cellPos(base [3]int32, rot int, x, y, dx int32) [3]int32 {
 		rotDir(rot, dirEast), dx+(x-mansionStartX)*mansionCellBlocks)
 }
 
-// roof is createRoof (sub_4FC85E0): roofs over g where upper has no
+// roof is createRoof: roofs over g where upper has no
 // building, the small walls where it has, then the roof corners.
 func (p *mansionPlacer) roof(origin [3]int32, rot int, g, upper *mansionGrid) {
 	n, e, s, w := rotDir(rot, dirNorth), rotDir(rot, dirEast), rotDir(rot, dirSouth), rotDir(rot, dirWest)
@@ -851,7 +851,7 @@ func (p *mansionPlacer) room1x1(c [3]int32, rot int, door int32, coll mansionRoo
 }
 
 // room1x2 is addRoom1x2: the table of door side and room direction
-// (sub_4FBFFB0's 1x2 branch).
+// ('s 1x2 branch).
 func (p *mansionPlacer) room1x2(c [3]int32, rot int, dir, door int32, coll mansionRooms, stairs bool) {
 	n, e, s, w := rotDir(rot, dirNorth), rotDir(rot, dirEast), rotDir(rot, dirSouth), rotDir(rot, dirWest)
 	switch {
@@ -1039,13 +1039,13 @@ const (
 	mansionFarLow  = 2
 )
 
-// layMansion is the start (sub_4FBC760): the turn, the height from the
+// layMansion is the start: the turn, the height from the
 // start chunk's terrain, the grid and the pieces.
 func (o *Overworld) layMansion(cx, cz int32, start *PackedChunk) *mansion {
 	r := new(rand.MT)
 	r.Seed(populationSeed(o.seed, cx, cz))
 	rot := int(r.IntN(structRotations))
-	// The far corner columns by turn (qword_1541748, dword_1541754).
+	// The far corner columns by turn.
 	fx := [structRotations]int32{mansionFarHigh, mansionFarLow, mansionFarLow, mansionFarHigh}[rot]
 	fz := [structRotations]int32{mansionFarHigh, mansionFarHigh, mansionFarLow, mansionFarLow}[rot]
 	low := int32(MaxY)
@@ -1127,7 +1127,7 @@ const (
 )
 
 // mansionPiece places one template into the chunk, then handles its
-// markers (sub_4FC6500).
+// markers.
 func (b *scBuild) mansionPiece(p mansionPiece) {
 	o := b.o
 	jt := o.st.Template("mansion/" + p.name)
@@ -1255,7 +1255,7 @@ type mansionStepRun struct {
 }
 
 // mansionSteps lays the two runs of cobblestone stairs beside the entrance
-// (sub_4FBF5B0 with sub_4FBFD00): each starts 9 east of the start, 2 and
+// (with): each starts 9 east of the start, 2 and
 // 12 south, two columns wide, and steps down outward (north for the first,
 // south for the second) while it finds air.
 func (b *scBuild) mansionSteps(m *mansion) {
@@ -1273,7 +1273,7 @@ func (b *scBuild) mansionSteps(m *mansion) {
 	}
 }
 
-// stepRun is sub_4FBFD00: stairs going down along dir from pos while the
+// stepRun is: stairs going down along dir from pos while the
 // spot is air, each with cobblestone under it.
 func (b *scBuild) stepRun(pos [3]int32, dir int32, st uint32) {
 	dx, dz := dirStep(dir)

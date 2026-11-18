@@ -4,8 +4,8 @@ import (
 	"github.com/helix-bedrock/worldgen/rand"
 )
 
-// Coral reefs, written from BDS 1.26.52's CoralFeature (place: sub_4993470,
-// shape builder sub_4993E00, arm sub_4999B70) with the structure taken from
+// Coral reefs, written from BDS 1.26.52's CoralFeature (place:,
+// shape builder, arm) with the structure taken from
 // the 1.21.3 build, which still has the function names (_buildPlantLike,
 // _buildSpire, _buildSmallClump, _buildHand, _buildPlantArm,
 // _starFormation, _starCorners, _placeSideDecorations). Both builds draw
@@ -35,7 +35,7 @@ func wallFanDirection() [4]int32 {
 }
 
 // coralThird picks the plant's third arm direction from the two sides the
-// first two did not use, in BDS's table order (byte_148FC70..7A).
+// first two did not use, in BDS's table order (..7A).
 func coralThird(a, b uint8, r *rand.MT) uint8 {
 	set := uint8(1)<<a | uint8(1)<<b
 	var pair [2]uint8
@@ -128,7 +128,7 @@ func (f *coralFeature) place(w *featureWorld, x, y, z int32, r *rand.MT) (blockP
 	for _, s := range b.sides {
 		base, _ := w.block(s.pos[0], s.pos[1], s.pos[2])
 		attach := f.coralIndex(base) >= 0 || base == f.stone
-		row := coralExceptTable()[2] // BDS's default row (byte_148FC6D)
+		row := coralExceptTable()[2] // BDS's default row
 		if s.dir >= 2 && s.dir <= 5 {
 			row = coralExceptTable()[s.dir-2]
 		}
@@ -140,7 +140,7 @@ func (f *coralFeature) place(w *featureWorld, x, y, z int32, r *rand.MT) (blockP
 			continue
 		}
 		// VERIFY: BDS also asks whether the wall fan may be placed in the
-		// water there (BlockSource vfunc +88); taken to be always yes.
+		// water there (BlockSource vfunc); taken to be always yes.
 		c := r.IntN(2) + 2*r.IntN(3)
 		c = min(max(c, 0), 4)
 		w.set(tx, ty, tz, f.wallFans[c][wallFanDirection()[nd-2]])
@@ -180,7 +180,7 @@ func (b *coralBuild) canOverwrite(p blockPos) bool {
 func (b *coralBuild) put(p blockPos) { b.w.set(p[0], p[1], p[2], b.block) }
 
 // underwater is BDS's "may this coral block go here in water" check
-// (BlockSource vfunc +88) as it works for a solid block: water at the
+// (BlockSource vfunc) as it works for a solid block: water at the
 // position or right above it.
 func (b *coralBuild) underwater(p blockPos) bool {
 	o := b.w.o
@@ -579,7 +579,7 @@ func (b *coralBuild) hand(o blockPos) {
 	}
 }
 
-// coralHangFeature is BDS's CoralHangFeature (place: sub_499C280): a tube
+// coralHangFeature is BDS's CoralHangFeature: a tube
 // or brain wall fan on the side of a coral block or stone, facing water.
 type coralHangFeature struct {
 	coral *coralFeature
@@ -623,7 +623,7 @@ func (f *coralHangFeature) place(w *featureWorld, x, y, z int32, r *rand.MT) (bl
 		return blockPos{}, false
 	}
 	// VERIFY: BDS asks whether a wall fan may go at the rule's position
-	// plus the direction (BlockSource vfunc +88); taken to be always yes.
+	// plus the direction (BlockSource vfunc); taken to be always yes.
 	color := 0
 	if r.IntN(2) > 0 {
 		color = 1

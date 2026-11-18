@@ -9,10 +9,10 @@ import (
 )
 
 // Nether fortresses, written from BDS 1.26.52: the placement shared with
-// bastions (sub_4FD0B70), the fortress feature's biome list (its
-// constructor, sub_4E4F860), the start (sub_4E4FFB0), the piece generator
-// (sub_4E513B0), the end filler (sub_4E51210) and the pieces' children and
-// builds (their vtables' slots 4 and 5). The layout is Java's
+// bastions, the fortress feature's biome list (its
+// constructor), the start, the piece generator,
+// the end filler and the pieces' children and
+// builds. The layout is Java's
 // NetherFortressPieces with Bedrock's random and these differences, all
 // kept:
 //   - a child that would start more than 112 blocks from the start is an

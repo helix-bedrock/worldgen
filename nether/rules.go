@@ -15,7 +15,7 @@ import (
 )
 
 // The Nether biomes' feature rules run in postProcess through the
-// generator's rule step (vtable slot 56, sub_5163DB0): for each placement
+// generator's rule step: for each placement
 // pass, the rules of one biome per chunk, the biome at the chunk's stored
 // position, with no per-position biome check. Each rule draws its
 // positions and its feature from Mersenne Twisters of its own, seeded from

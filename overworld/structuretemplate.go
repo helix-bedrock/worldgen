@@ -10,12 +10,12 @@ import (
 )
 
 // structureTemplateFeature places an .mcstructure template (BDS's
-// StructureTemplateFeature, place sub_D317830, written from BDS 1.26.52): a
+// StructureTemplateFeature, place, written from BDS 1.26.52): a
 // random quarter turn, around the template's centre when
 // rotate_around_center is set, with layer ground_level at the origin. The
 // origin, or a spot on a spiral out to adjustment_radius, must pass every
-// constraint: leveled (sub_D2818D0), unburied (sub_D281FD0) and
-// block_intersection (sub_D280A90). The constraints test their cells
+// constraint: leveled, unburied and
+// block_intersection. The constraints test their cells
 // relative to the origin itself, not shifted down by ground_level as the
 // placed blocks are.
 type structureTemplateFeature struct {
@@ -33,8 +33,7 @@ type structureTemplateFeature struct {
 	once sync.Once
 	t    *structure.MCStructure
 	// The constraint cells, in template coordinates, built from the
-	// template once (the constraint constructors sub_D281340, sub_D281A60,
-	// sub_D280350).
+	// template once (the constraint constructors,).
 	level, open, solidCells, otherCells [][3]int32
 }
 

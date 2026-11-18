@@ -57,7 +57,7 @@ type Nether struct {
 		air, netherrack, lava, bedrock   uint32
 		water, flowingWater, flowingLava uint32
 	}
-	// The terrain noises (BDS's NetherGenerator, sub_515FDF0).
+	// The terrain noises (BDS's NetherGenerator).
 	minLimit, maxLimit, selector *noise.LegacyOctaves
 	surface4                     *noise.SimplexOctaves
 	biomes                       *biomeSource
@@ -190,7 +190,7 @@ func New(seed int64, reg *blocks.Registry, biomeIDs map[string]uint32, opts ...O
 func (n *Nether) Seed() int64 { return n.seed }
 
 // GenerateChunk fills c with the chunk at (chunkX, chunkZ), in BDS's order
-// (NetherGenerator loadChunk, sub_5163F50), and the structure pieces in it.
+// (NetherGenerator loadChunk), and the structure pieces in it.
 // Fence connections across the chunk's sides need its neighbours: Decorate
 // sets them.
 func (n *Nether) GenerateChunk(chunkX, chunkZ int32, c *Chunk) {

@@ -7,9 +7,9 @@ import (
 	"github.com/helix-bedrock/worldgen/structure"
 )
 
-// The code-placed start of BDS's decoration (postProcess sub_517CD10): with
+// The code-placed start of BDS's decoration (postProcess): with
 // the population random, before any feature rule, a chance of a lava lake
-// and then the dungeons (MonsterRoomFeature, sub_51D8680), 4 below y 0 and
+// and then the dungeons (MonsterRoomFeature), 4 below y 0 and
 // 10 anywhere. Written from BDS 1.26.52. New worlds skip the water lake
 // that old (legacy) worlds roll first.
 
@@ -62,7 +62,7 @@ func (o *Overworld) liquidMaterial(b uint32) bool {
 	return false
 }
 
-// lake is LakeFeature (sub_51CE810): a blob of up to 7 ellipsoids in a
+// lake is LakeFeature: a blob of up to 7 ellipsoids in a
 // 16x8x16 box whose corner is 8 blocks west and north of (x, z), its
 // bottom 4 layers liquid, the rest air, ringed by border below the
 // waterline and on half the spots above it. The box sits 4 below the first
@@ -149,7 +149,7 @@ func (o *Overworld) lake(w *featureWorld, x, y, z int32, r *rand.MT, liquid, bor
 			}
 		}
 	}
-	// Dirt and coarse dirt (xmmword_F613CE0) under the air part that sees
+	// Dirt and coarse dirt under the air part that sees
 	// the sky turn to grass.
 	for i := int32(0); i < 16; i++ {
 		for k := int32(0); k < 16; k++ {

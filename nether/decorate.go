@@ -14,7 +14,7 @@ import (
 	"github.com/helix-bedrock/worldgen/structure"
 )
 
-// Decoration is BDS's NetherGenerator postProcess (sub_51650F0): a fixed
+// Decoration is BDS's NetherGenerator postProcess: a fixed
 // sequence of features run from each chunk, the origin, on the 3x3 chunks
 // around it. Springs, fire, glowstone and mushrooms sit at the origin's
 // corner plus 8 (Java's old offset), so they reach into the chunks east
@@ -34,7 +34,7 @@ type region struct {
 	n      *Nether
 	x0, z0 int32 // world coordinates of the north-west corner
 	// biome is the origin's biome for its feature rules: BDS takes the one
-	// at the chunk's stored maximum corner (LevelChunk+68, after the
+	// at the chunk's stored maximum corner (LevelChunk, after the
 	// minimum), the south-east column.
 	biome  uint32
 	blocks [regionSize * regionSize * Height]uint16
@@ -263,8 +263,8 @@ func (n *Nether) decorate(r *region, ox, oz int32) {
 		}
 	}
 	netherrack := []uint32{n.ids.netherrack}
-	// The counts and blocks are VanillaFeatures' registrations
-	// (sub_4E2BB50); BDS gates gold ore, blackstone and ancient debris on
+	// The counts and blocks are VanillaFeatures' registrations;
+	// BDS gates gold ore, blackstone and ancient debris on
 	// the world's base game version, which every new world passes.
 	n.decoOre(r, &d, 10, n.deco.goldOre, netherrack, 10, 108, 10)
 	n.decoOre(r, &d, 14, n.deco.quartzOre, netherrack, 16, 108, 10)
@@ -280,7 +280,7 @@ func (n *Nether) decorate(r *region, ox, oz int32) {
 	mt.Seed(populationSeed(n.seed, ox, oz))
 	// One draw happens between the reseed and the debris: matching BDS's
 	// debris positions needs exactly one (113 of 120 hit with it, 3 without).
-	// VERIFY: which call in the rule passes (sub_5163DB0) makes it.
+	// VERIFY: which call in the rule passes makes it.
 	mt.Uint32()
 	n.runRules(r, ox, oz, r.biome, mt)
 	for range 2 {
@@ -293,7 +293,7 @@ func (n *Nether) decorate(r *region, ox, oz int32) {
 	}
 }
 
-// spring is BDS's NetherSpringFeature (sub_49BE520): lava where netherrack
+// spring is BDS's NetherSpringFeature: lava where netherrack
 // is above and, of the four sides and below, four are netherrack and one
 // is air, or all five are netherrack. A hidden spring needs all five.
 func (n *Nether) spring(r *region, x, y, z int32, hidden bool) {
@@ -325,7 +325,7 @@ func pairOffset(mt *rand.MT, mask uint32) int32 {
 	return a - int32(mt.Uint32()&mask)
 }
 
-// firePatch is BDS's fire patch (sub_49BC4C0): 64 tries scattered around
+// firePatch is BDS's fire patch: 64 tries scattered around
 // the position, z, then y, then x; fire on netherrack, soul fire on soul
 // soil.
 func (n *Nether) firePatch(r *region, x, y, z int32, mt *rand.MT) {
@@ -346,7 +346,7 @@ func (n *Nether) firePatch(r *region, x, y, z int32, mt *rand.MT) {
 	}
 }
 
-// glowstoneBlob is BDS's glowstone feature (sub_51C9160): glowstone in air
+// glowstoneBlob is BDS's glowstone feature: glowstone in air
 // under netherrack, basalt or blackstone, then 1500 tries below it, each
 // kept where exactly one of the six neighbours is glowstone.
 func (n *Nether) glowstoneBlob(r *region, x, y, z int32, mt *rand.MT) {
@@ -378,7 +378,7 @@ func (n *Nether) glowstoneBlob(r *region, x, y, z int32, mt *rand.MT) {
 	}
 }
 
-// mushroomPatch is BDS's 64-try plant patch (sub_49B9020): the first try is
+// mushroomPatch is BDS's 64-try plant patch: the first try is
 // the position itself, each later one scattered around it, z, then y, then
 // x. A mushroom goes in air on a block that holds it.
 func (n *Nether) mushroomPatch(r *region, x, y, z int32, b uint32, mt *rand.MT) {
@@ -397,9 +397,9 @@ func (n *Nether) mushroomPatch(r *region, x, y, z int32, b uint32, mt *rand.MT) 
 }
 
 // holdsMushroom is the mushroom's support rule for the block below. In the
-// Nether the cover test BDS makes first (sub_49EC660) always passes under
+// Nether the cover test BDS makes first always passes under
 // the bedrock roof.
-// VERIFY: BDS reads a flag of the block below (Block+113); this takes the
+// VERIFY: BDS reads a flag of the block below (Block); this takes the
 // states whose top face is sturdy.
 func (n *Nether) holdsMushroom(b uint32) bool {
 	switch b {
@@ -409,7 +409,7 @@ func (n *Nether) holdsMushroom(b uint32) bool {
 	return int(b) < len(n.topSupport) && n.topSupport[b]
 }
 
-// debris is BDS's NoSurfaceOreFeature (sub_49BEAD0) with ancient debris:
+// debris is BDS's NoSurfaceOreFeature with ancient debris:
 // min + nextInt(max-min) tries, try i a walk of 2i random steps from the
 // position; within 6 blocks of it, debris replaces netherrack that touches
 // no air.

@@ -32,8 +32,8 @@ func sinIndex(v float32) float32 { return sinTable[uint16(int32(v))] }
 
 type oreSphere struct{ x, y, z, r2, r float32 }
 
-// OreVein draws the vein of minecraft:ore_feature (BDS OreFeature::place,
-// sub_D2F38D0): count spheres along a short line through (x+8, y, z+8). It
+// OreVein draws the vein of minecraft:ore_feature (BDS BDS's code,):
+// count spheres along a short line through (x+8, y, z+8). It
 // calls visit for every block inside a sphere, in BDS's order, x outer, then
 // z, then y. Draw order: angle, start y, end y, then one radius per sphere;
 // visit may draw too (air-exposure rolls), as BDS does while placing. It

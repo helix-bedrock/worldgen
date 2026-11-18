@@ -23,12 +23,12 @@ func faceBits() [6]uint8 {
 }
 
 // spreadFaceOrder is the face order BDS walks when it spreads a multiface
-// block from every face (sub_CF69030 callers) or removes faces (sub_CF43F70).
+// block from every face (callers) or removes faces.
 func spreadFaceOrder() [6]int {
 	return [6]int{1, 0, 2, 3, 4, 5}
 }
 
-// shuffledFaces is Direction::allShuffled (sub_B4AAAA0): five raw draws
+// shuffledFaces matches BDS: five raw draws
 // insert faces 1 to 5 into [0].
 func shuffledFaces(r *rand.MT) [6]int {
 	a := [6]int{1, 0, 2, 3, 4, 5}
@@ -55,8 +55,8 @@ func shuffledFaces(r *rand.MT) [6]int {
 type multifaceBlock struct {
 	states [64]uint32
 	bits   map[uint32]uint8
-	// vein selects the sculk vein spread config (SculkVeinSpreaderConfig,
-	// vtable off_F33E3D8); otherwise the default config (off_F34B7D8).
+	// vein selects the sculk vein spread config (SculkVeinSpreaderConfig,);
+	// otherwise the default config.
 	vein bool
 }
 
@@ -81,7 +81,7 @@ func (m *multifaceBlock) is(b uint32) bool {
 	return ok
 }
 
-// hasFace is MultifaceBlock::hasFace (sub_CF66420); false for other blocks.
+// hasFace matches BDS; false for other blocks.
 func (m *multifaceBlock) hasFace(b uint32, face int) bool {
 	bits, ok := m.bits[b]
 	return ok && bits&faceBits()[face] != 0
@@ -91,13 +91,13 @@ func (m *multifaceBlock) hasFace(b uint32, face int) bool {
 type sculkBlocks struct {
 	sculk, catalyst, sensor, shrieker, shriekerSummon, movingBlock uint32
 	vein                                                           *multifaceBlock
-	// replace is the world-generation spreader's replaceable set
-	// (sub_CF48280). BDS tests the block pointer, so only each name's
+	// replace is the world-generation spreader's replaceable set.
+	// BDS tests the block pointer, so only each name's
 	// default state matches.
 	replace map[uint32]bool
 }
 
-// sculkReplaceableWorldGen is sub_CF48280's list, in order.
+// sculkReplaceableWorldGen is's list, in order.
 func sculkReplaceableWorldGen() []string {
 	return []string{
 		"stone", "granite", "diorite", "andesite", "tuff", "deepslate", "grass_block", "podzol", "dirt", "coarse_dirt",
@@ -134,11 +134,11 @@ func (o *Overworld) fireOrLava(b uint32) bool {
 	return n == "minecraft:fire" || n == "minecraft:soul_fire"
 }
 
-// regrowable is sub_CF42810: a water-material block only when it is a
+// regrowable is: a water-material block only when it is a
 // source; any other block when it can be built over and is not lava or
 // fire.
-// VERIFY: "can be built over" is IBlockWorldGenAPI vfunc +152, read here as
-// BlockLegacy::canBeBuiltOver through treeFree's list.
+// VERIFY: "can be built over" is IBlockWorldGenAPI vfunc, read here as
+// BDS's code through treeFree's list.
 func (o *Overworld) regrowable(b uint32) bool {
 	if o.waterMaterial(b) {
 		return b == o.ids.water
@@ -146,19 +146,19 @@ func (o *Overworld) regrowable(b uint32) bool {
 	return o.treeFree(b) && !o.fireOrLava(b)
 }
 
-// multifaceReplaceable is the default spread config's stateCanBeReplaced
-// (sub_CF694D0): the same block, air, or a water source.
+// multifaceReplaceable is the default spread config's stateCanBeReplaced:
+// the same block, air, or a water source.
 func (o *Overworld) multifaceReplaceable(m *multifaceBlock, b uint32) bool {
 	return m.is(b) || b == o.ids.air || b == o.ids.water
 }
 
-// canSpreadInto is the spread config's test of a target (vtable +24).
+// canSpreadInto is the spread config's test of a target.
 func (o *Overworld) canSpreadInto(w *featureWorld, sb *sculkBlocks, m *multifaceBlock, x, y, z int32, face int) bool {
 	b, _ := w.block(x, y, z)
 	if !m.vein {
 		return o.multifaceReplaceable(m, b)
 	}
-	// SculkVeinSpreaderConfig (sub_CF4B610).
+	// SculkVeinSpreaderConfig.
 	st := faceStep()[face]
 	nb, _ := w.block(x+st[0], y+st[1], z+st[2])
 	if nb == sb.catalyst || nb == sb.movingBlock || nb == sb.sculk {
@@ -167,7 +167,7 @@ func (o *Overworld) canSpreadInto(w *featureWorld, sb *sculkBlocks, m *multiface
 	return o.regrowable(b) || o.multifaceReplaceable(m, b)
 }
 
-// placementState is MultifaceBlock::getStateForPlacement (sub_CF65FE0): cur
+// placementState matches BDS: cur
 // with face added when the block on that face can hold it, else cur.
 func (o *Overworld) placementState(w *featureWorld, m *multifaceBlock, cur uint32, x, y, z int32, face int) uint32 {
 	var bits uint8
@@ -191,8 +191,8 @@ type spreadPos struct {
 	face    int
 }
 
-// spreadTarget is MultifaceSpreader::getSpreadFromFaceTowardDirection
-// (sub_CF680F0) with the three spread types BDS gives both configs (same
+// spreadTarget matches BDS
+// with the three spread types BDS gives both configs (same
 // position, same plane, wrap around), or only the first when samePosOnly.
 func (o *Overworld) spreadTarget(w *featureWorld, sb *sculkBlocks, m *multifaceBlock, state uint32, x, y, z int32,
 	face, dir int, samePosOnly bool) (spreadPos, bool) {
@@ -237,7 +237,7 @@ func (o *Overworld) spreadTo(w *featureWorld, m *multifaceBlock, p spreadPos) bo
 }
 
 // spreadAll spreads from every face toward every direction
-// (sub_CF69030 for each face) and reports whether anything was placed.
+// (for each face) and reports whether anything was placed.
 func (o *Overworld) spreadAll(w *featureWorld, sb *sculkBlocks, m *multifaceBlock, state uint32, x, y, z int32, samePosOnly bool) bool {
 	n := 0
 	for _, face := range spreadFaceOrder() {
@@ -250,7 +250,7 @@ func (o *Overworld) spreadAll(w *featureWorld, sb *sculkBlocks, m *multifaceBloc
 	return n > 0
 }
 
-// removeVeinFace is MultifaceBlock::removeFace (sub_CF67AA0) without a
+// removeVeinFace matches BDS without a
 // level: the vein loses a face, or turns to air with none left.
 func (o *Overworld) removeVeinFace(w *featureWorld, sb *sculkBlocks, cur uint32, x, y, z int32, face int) {
 	bits := sb.vein.bits[cur] &^ faceBits()[face]
@@ -261,7 +261,7 @@ func (o *Overworld) removeVeinFace(w *featureWorld, sb *sculkBlocks, cur uint32,
 	w.set(x, y, z, o.ids.air)
 }
 
-// veinDischarged is SculkVeinBlock's onDischarged (sub_CF43F70): faces
+// veinDischarged is SculkVeinBlock's onDischarged: faces
 // resting on sculk are removed.
 func (o *Overworld) veinDischarged(w *featureWorld, sb *sculkBlocks, x, y, z int32) {
 	for _, face := range spreadFaceOrder() {
@@ -290,7 +290,7 @@ type sculkCursor struct {
 }
 
 // sculkSpreader is SculkSpreader as the world-generation constructor makes
-// it (sub_CF48190(1, 50, 1, 5, 10)).
+// it ((1, 50, 1, 5, 10)).
 type sculkSpreader struct {
 	cost, noGrowth, decayRate, addDecay int32
 	cursors                             []sculkCursor
@@ -298,7 +298,7 @@ type sculkSpreader struct {
 }
 
 // sculkNeighbours are the 18 non-corner neighbour offsets in BDS's order
-// (qword_1C7B808) before shuffling.
+// before shuffling.
 func sculkNeighbours() [18][3]int32 {
 	return [18][3]int32{
 		{-1, -1, 0}, {0, -1, -1}, {0, -1, 0}, {0, -1, 1}, {1, -1, 0}, {-1, 0, -1}, {-1, 0, 0}, {-1, 0, 1}, {0, 0, -1},
@@ -335,7 +335,7 @@ func (sp *sculkSpreader) addCursors(x, y, z, charge int32) {
 	}
 }
 
-// update is SculkSpreader::updateCursors (sub_CF493C0) for world
+// update matches BDS for world
 // generation. Merging cursors that meet only applies outside world
 // generation, so every cursor still charged is kept, in order.
 func (o *Overworld) updateSculk(w *featureWorld, sb *sculkBlocks, sp *sculkSpreader, ox, oy, oz int32, r *rand.MT, spreadVeins bool) {
@@ -474,8 +474,8 @@ func (o *Overworld) veinOnReplaceable(w *featureWorld, sb *sculkBlocks, b uint32
 	return false
 }
 
-// attemptSpreadVein is SculkBehavior::attemptSpreadVein for each kind
-// (sub_CF423B0 default, sub_CF429C0 sculk, sub_CF433F0 vein).
+// attemptSpreadVein matches BDS for each kind
+// (default, sculk, vein).
 func (o *Overworld) attemptSpreadVein(w *featureWorld, sb *sculkBlocks, kind sculkKind, b uint32, x, y, z int32, faces int32) bool {
 	if kind != sculkDefault || faces == cursorFacesSculk {
 		return o.spreadAll(w, sb, sb.vein, b, x, y, z, false)
@@ -490,7 +490,7 @@ func (o *Overworld) attemptSpreadVein(w *featureWorld, sb *sculkBlocks, kind scu
 	return true
 }
 
-// useCharge is SculkBehavior::attemptUseCharge for each kind.
+// useCharge matches BDS for each kind.
 func (o *Overworld) useCharge(w *featureWorld, sb *sculkBlocks, sp *sculkSpreader, kind sculkKind, c *sculkCursor,
 	ox, oy, oz int32, r *rand.MT, spreadVeins bool) int32 {
 	switch kind {
@@ -505,7 +505,7 @@ func (o *Overworld) useCharge(w *featureWorld, sb *sculkBlocks, sp *sculkSpreade
 	return 0
 }
 
-// sculkUseCharge is the sculk block's attemptUseCharge (sub_CF42BC0): away
+// sculkUseCharge is the sculk block's attemptUseCharge: away
 // from the origin it may grow a sensor or shrieker on top, paying the
 // growth cost; otherwise the charge sometimes decays.
 func (o *Overworld) sculkUseCharge(w *featureWorld, sb *sculkBlocks, sp *sculkSpreader, c *sculkCursor, ox, oy, oz int32, r *rand.MT) int32 {
@@ -570,7 +570,7 @@ func (o *Overworld) growthsNear(w *featureWorld, sb *sculkBlocks, x, y, z int32)
 	return n
 }
 
-// veinUseCharge is the sculk vein's attemptUseCharge (sub_CF435F0): a vein
+// veinUseCharge is the sculk vein's attemptUseCharge: a vein
 // face resting on a replaceable block turns that block to sculk and spreads
 // veins around it.
 func (o *Overworld) veinUseCharge(w *featureWorld, sb *sculkBlocks, sp *sculkSpreader, c *sculkCursor, r *rand.MT, spreadVeins bool) int32 {
@@ -602,7 +602,7 @@ func (o *Overworld) veinUseCharge(w *featureWorld, sb *sculkBlocks, sp *sculkSpr
 	return chargeDecay(r, sp, c)
 }
 
-// sculkPatchFeature is SculkPatchFeature (place: sub_D302240).
+// sculkPatchFeature is SculkPatchFeature.
 type sculkPatchFeature struct {
 	sb                         *sculkBlocks
 	on                         blockMatcher
@@ -702,7 +702,7 @@ func (f *sculkPatchFeature) place(w *featureWorld, x, y, z int32, r *rand.MT) (b
 	return blockPos{x, y, z}, true
 }
 
-// multifaceFeature is MultifaceFeature (place: sub_D2EC400), used by sculk
+// multifaceFeature is MultifaceFeature, used by sculk
 // veins and glow lichen.
 type multifaceFeature struct {
 	sb     *sculkBlocks
@@ -791,7 +791,7 @@ func (f *multifaceFeature) place(w *featureWorld, x, y, z int32, r *rand.MT) (bl
 	return blockPos{}, false
 }
 
-// placeIfValid is sub_D2ECF80: the block goes on the first face, in dirs
+// placeIfValid is: the block goes on the first face, in dirs
 // order, that rests on an allowed block, then may spread once.
 // VERIFY: BDS also skips a neighbour in a chunk not yet far enough along;
 // all neighbours are taken as ready here.
@@ -815,8 +815,8 @@ func (f *multifaceFeature) placeIfValid(w *featureWorld, x, y, z int32, r *rand.
 	}
 	w.set(x, y, z, ns)
 	if f.chance > r.Float() {
-		// MultifaceSpreader::spreadFromFaceTowardRandomDirection
-		// (sub_CF689E0), with the thread-local random.
+		// BDS's code,
+		// with the thread-local random.
 		for _, dir := range shuffledFaces(w.shuffleRandom()) {
 			if p, ok := o.spreadTarget(w, f.sb, f.m, ns, x, y, z, face, dir, false); ok && o.spreadTo(w, f.m, p) {
 				break
@@ -826,8 +826,8 @@ func (f *multifaceFeature) placeIfValid(w *featureWorld, x, y, z int32, r *rand.
 	return true
 }
 
-// surfaceThresholdFeature is SurfaceRelativeThresholdFeature (place:
-// sub_D31EBF0): its feature is placed only at least a distance below the
+// surfaceThresholdFeature is SurfaceRelativeThresholdFeature (place:):
+// its feature is placed only at least a distance below the
 // surface.
 // VERIFY: BDS reads the surface from a cache at quarter resolution, taken
 // here as the preliminary surface level.

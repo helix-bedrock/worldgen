@@ -219,8 +219,7 @@ func (cv *caveCarver) tunnel(parent *rand.MT, x, y, z, thickness, yaw, pitch, yS
 	}
 }
 
-// caveCarvable reports whether a carver may cut block b (BDS
-// sub_498AB80).
+// caveCarvable reports whether a carver may cut block b (BDS).
 func (o *Overworld) caveCarvable(b uint32) bool {
 	_, ok := o.ids.carvable[b]
 	return ok

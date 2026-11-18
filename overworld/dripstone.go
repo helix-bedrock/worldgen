@@ -9,10 +9,10 @@ import (
 )
 
 // Speleothems: the code-registered pointed dripstone, dripstone cluster and
-// large dripstone features (BDS 1.26.52 SpeleothemFeature sub_49C3DD0,
-// SpeleothemClusterFeature sub_49C2D60, LargeSpeleothemFeature sub_51D0860,
-// set up in sub_4E2BB50; in 1.26.60 the cluster is sub_4BC4520, the large
-// feature sub_53FAB40, set up in sub_4C2EBE0). Sulfur caves and the ice
+// large dripstone features (BDS 1.26.52 SpeleothemFeature,
+// SpeleothemClusterFeature, LargeSpeleothemFeature,
+// set up; in 1.26.60 the cluster is, the large
+// feature, set up). Sulfur caves and the ice
 // caves' icicles use the same classes with their own blocks.
 
 // speleothemBlocks are the blocks a speleothem feature places and grows
@@ -20,10 +20,10 @@ import (
 type speleothemBlocks struct {
 	base, tip uint32
 	// replace is what the base block may replace (dirt, coarse dirt, stone,
-	// tuff and deepslate for dripstone, xmmword_F60D630).
+	// tuff and deepslate for dripstone).
 	replace []uint32
 	// tips are the pointed blocks a large speleothem builds over (pointed
-	// dripstone, sulfur spike and icicle, xmmword_FF122D8).
+	// dripstone, sulfur spike and icicle).
 	tips []uint32
 	// attach, when set, is applied to the first block of a pointed column,
 	// the one against the ceiling or floor (icicle clusters set
@@ -31,7 +31,7 @@ type speleothemBlocks struct {
 	attach func(uint32) uint32
 }
 
-// Dripstone thickness states by BDS's index (sub_4DE8B70).
+// Dripstone thickness states by BDS's index.
 func dripstoneThickness() [5]string {
 	return [5]string{"tip", "frustum", "middle", "base", "merge"}
 }
@@ -58,7 +58,7 @@ func (s *speleothemBlocks) tipState(o *Overworld, up bool, thick int) uint32 {
 
 // growTip grows a pointed column of height blocks from (x, y, z), up or
 // down, base first and the tip last, stopping at the first block that is
-// not air or water (sub_4DE8DA0).
+// not air or water.
 func (s *speleothemBlocks) growTip(w *featureWorld, x, y, z int32, up bool, height int32, merge bool) {
 	o := w.o
 	if height <= 0 {
@@ -113,7 +113,7 @@ func (s *speleothemBlocks) replaceBase(w *featureWorld, x, y, z int32) {
 }
 
 // pointedFeature is one pointed dripstone with a patch of dripstone blocks
-// at its root (sub_49C3DD0).
+// at its root.
 type pointedFeature struct {
 	speleothemBlocks
 }
@@ -121,7 +121,7 @@ type pointedFeature struct {
 func (f *pointedFeature) place(w *featureWorld, x, y, z int32, r *rand.MT) (blockPos, bool) {
 	o := w.o
 	// The tip points away from a block it can grow from: up from one
-	// below, down from one above, a coin flip when both are (sub_4DE9050).
+	// below, down from one above, a coin flip when both are.
 	below, _ := w.block(x, y-1, z)
 	above, _ := w.block(x, y+1, z)
 	var up bool
@@ -174,7 +174,7 @@ func (f *pointedFeature) place(w *featureWorld, x, y, z int32, r *rand.MT) (bloc
 
 // columnScan finds the ceiling above and the floor below (x, y, z) within
 // rng blocks through blocks that pass cont, ending at blocks that pass
-// surface (sub_D2D3600). ok is false when the start itself fails cont.
+// surface. ok is false when the start itself fails cont.
 func columnScan(w *featureWorld, x, y, z, rng int32, cont, surface func(uint32) bool) (ceil, floor int32, hasCeil, hasFloor, ok bool) {
 	b, _ := w.block(x, y, z)
 	if !cont(b) {
@@ -190,8 +190,8 @@ func columnScan(w *featureWorld, x, y, z, rng int32, cont, surface func(uint32) 
 }
 
 // clusterFeature is a patch of stalactites, stalagmites, base block layers
-// and small pools (BDS 1.26.60 SpeleothemClusterFeature sub_4BC4520, set up
-// through sub_4C41670). Since 1.26.60 every setting comes from the
+// and small pools (BDS 1.26.60 SpeleothemClusterFeature, set up
+// through). Since 1.26.60 every setting comes from the
 // registration: dripstone uses height 3-5, radius 2-7 on each axis, wetness
 // clamped normal (0.1, 0.3, 0.1, 1.0), density 0.3-0.7 and a scan range of
 // 12; icicles use radius 6, no wetness, a scan range of 32, ceilings only
@@ -221,7 +221,7 @@ type clusterFeature struct {
 }
 
 // clusterSides are the column ends a cluster grows from (BDS's mode at
-// +84 of the feature).
+// of the feature).
 type clusterSides int32
 
 const (
@@ -399,7 +399,7 @@ func (f *clusterFeature) layers(w *featureWorld, x, y, z, dy, n int32) {
 
 // canPool reports whether the floor block at (x, y, z) may become water:
 // not already water or dripstone, no water above, held in by stone,
-// deepslate, tuff or water on its four sides and below (sub_4DE87E0).
+// deepslate, tuff or water on its four sides and below.
 func (f *clusterFeature) canPool(w *featureWorld, x, y, z int32) bool {
 	o := w.o
 	b, _ := w.block(x, y, z)
@@ -419,7 +419,7 @@ func (f *clusterFeature) canPool(w *featureWorld, x, y, z int32) bool {
 }
 
 // largeFeature is a large stalactite and stalagmite pair between a floor
-// and ceiling (sub_51D0860). Settings, hard-coded: search range 30, column
+// and ceiling. Settings, hard-coded: search range 30, column
 // radius 3-18 up to 0.33 of the cave height, stalactite bluntness 0.3-0.9,
 // stalagmite bluntness 0.4-1.0, height scale 0.4-2.0, wind 0-0.3 when the
 // radius is at least 4 and both bluntnesses at least 0.6.
@@ -453,7 +453,7 @@ func (wd *wind) offset(x, y, z int32) (int32, int32, int32) {
 }
 
 // largeHeight is the height of a large speleothem at a distance from its
-// axis (sub_4DE8AB0).
+// axis.
 func largeHeight(dist, radius, scale, blunt float32) float64 {
 	x := float64(float32(float64(float32(max(blunt, dist)/radius)) * 0.384))
 	a := math.Pow(x, 4.0/3.0) * 0.75
@@ -503,7 +503,7 @@ func (f *largeFeature) place(w *featureWorld, x, y, z int32, r *rand.MT) (blockP
 }
 
 // moveBack moves a half back into the rock until its base fits, halving
-// the radius when it cannot (sub_51D0DE0).
+// the radius when it cannot.
 func (f *largeFeature) moveBack(w *featureWorld, t *largeTip, wd *wind) bool {
 	o := w.o
 	if t.radius < 2 {
@@ -535,7 +535,7 @@ func (f *largeFeature) moveBack(w *featureWorld, t *largeTip, wd *wind) bool {
 }
 
 // fits reports whether the base fits at (x, y, z): solid there and on a
-// ring of the radius around it (sub_4DE8490), tested after the wind moved
+// ring of the radius around it, tested after the wind moved
 // the spot.
 func (f *largeFeature) fits(w *featureWorld, x, y, z, radius int32, wd *wind) bool {
 	o := w.o
@@ -559,7 +559,7 @@ func (f *largeFeature) fits(w *featureWorld, x, y, z, radius int32, wd *wind) bo
 	}
 }
 
-// build places a half's columns, widest at the base (sub_51D1030).
+// build places a half's columns, widest at the base.
 func (f *largeFeature) build(w *featureWorld, t *largeTip, wd *wind, r *rand.MT) {
 	o := w.o
 	dy := int32(-1)

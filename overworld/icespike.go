@@ -9,8 +9,8 @@ import (
 )
 
 // Ice spikes and ice patches of the ice spikes biome, written from BDS 1.26.52:
-// IceSpikeFeature (sub_51CB360) and IcePatchFeature (sub_51CAD30), both built-in
-// features (sub_4E2BB50). Both stand on snow blocks: the origin walks down through air
+// IceSpikeFeature and IcePatchFeature, both built-in
+// features. Both stand on snow blocks: the origin walks down through air
 // and gives up unless it lands on snow.
 
 type iceSpikeFeature struct {
@@ -28,7 +28,7 @@ func (o *Overworld) blockID(name string) uint32 {
 	return b
 }
 
-// Ice spike and ice patch constants (sub_51CB360, sub_51CAD30).
+// Ice spike and ice patch constants.
 const (
 	// spikeFloorGap keeps the walk down above the bottom of the world.
 	spikeFloorGap = 2

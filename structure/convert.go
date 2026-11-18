@@ -6,15 +6,14 @@ import (
 )
 
 // Java to Bedrock block conversion for structure templates, as BDS does it
-// when it loads a Java .nbt template (sub_D2B9E40 in 1.26.52).
+// when it loads a Java.nbt template.
 //
-// Names: sub_D279E60 strips "minecraft:" and maps the special cases in
+// Names: strips "minecraft:" and maps the special cases in
 // javaBlockNames (exact) and javaBlockContains (substring, in order); every
 // other name is looked up as is, and an unknown one places nothing.
-// Properties: sub_D276010 applies each Java property to the Bedrock block.
+// Properties: applies each Java property to the Bedrock block.
 // VERIFY: the property rules here are written per Bedrock state name and
 // checked against BDS villages with bdsdiff, not ported line by line from
-// sub_D276010.
 
 // javaBlockName is the Bedrock name of a Java block with a special case.
 func javaBlockName(name string) (string, bool) {
@@ -344,7 +343,6 @@ func (l *Lib) ConvertJavaState(st TemplateState) (uint32, bool, bool) {
 			}
 		case "stone":
 			// BDS keeps these and leaves other variants plain stone
-			// (sub_D276010).
 			switch v {
 			case "granite", "diorite", "andesite":
 				name = v
@@ -469,7 +467,7 @@ func (l *Lib) ConvertJavaState(st TemplateState) (uint32, bool, bool) {
 			}
 		case "shape":
 			// A stair's corner has been its own state since 1.26.50. BDS
-			// 1.26.60 converts Java's shape by name (sub_D837C20), straight
+			// 1.26.60 converts Java's shape by name, straight
 			// becoming none; without it every template stair was straight.
 			setProp(props, stairCornerState, stairCorner(v))
 		case "axis":

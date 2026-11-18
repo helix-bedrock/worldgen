@@ -8,14 +8,14 @@ import (
 
 // Terrain adjustments around structure pieces, after BDS 1.26.52
 // (FeatureTerrainAdjustments). Ancient city pieces register a "beard and
-// shaver" (setBeardAndShaver, sub_D1EDCA0, with 1.0 and 5.0) in every
-// chunk their box reaches within 12 blocks; the terrain fill (sub_5188B10)
-// adds the adjustment (sub_D1EE730) to each block's density after the
+// shaver" (setBeardAndShaver, with 1.0 and 5.0) in every
+// chunk their box reaches within 12 blocks; the terrain fill
+// adds the adjustment to each block's density after the
 // noodle caves and before the aquifer. Below a piece's ground level it
 // fills, above it carves, which leaves the city standing in a cave.
 
-// beardKernel is BDS's 24x24x24 beard kernel (sub_D1EC2F0), indexed
-// (y+12) + 24(x+12) + 576(z+12), computed in float32 as BDS does, with the
+// beardKernel is BDS's 24x24x24 beard kernel, indexed
+// (y) + 24(x) + 576(z), computed in float32 as BDS does, with the
 // fast inverse square root.
 func beardKernel() []float32 {
 	k := make([]float32, 24*24*24)
@@ -90,7 +90,7 @@ func (o *Overworld) cityAdjustments(chunkX, chunkZ int32) []beardShaver {
 			}
 			for _, p := range c.pieces {
 				// A piece is registered in the chunks its box reaches within
-				// 12 blocks (sub_D1EC770).
+				// 12 blocks.
 				if (p.BB.X0-12)>>4 <= chunkX && chunkX <= (p.BB.X1+12)>>4 &&
 					(p.BB.Z0-12)>>4 <= chunkZ && chunkZ <= (p.BB.Z1+12)>>4 {
 					out = append(out, newBeardShaver(p.BB, p.Ground))
@@ -101,7 +101,7 @@ func (o *Overworld) cityAdjustments(chunkX, chunkZ int32) []beardShaver {
 	return out
 }
 
-// beardBox is one registered beard (sub_D1ED140, kind 0 of a jigsaw
+// beardBox is one registered beard (kind 0 of a jigsaw
 // piece: every rigid village piece): the piece box widened by 2 on x and z,
 // and its ground level.
 type beardBox struct {
@@ -131,7 +131,7 @@ func (o *Overworld) villageBeards(chunkX, chunkZ int32) []beardBox {
 			}
 			for _, p := range v.pieces {
 				// Feature pieces get no beard (BDS registers only pieces
-				// whose element places a template, element vfunc +40).
+				// whose element places a template, element vfunc).
 				if p.Element.TerrainMatching || p.Element.Feature != "" {
 					continue
 				}
@@ -146,7 +146,7 @@ func (o *Overworld) villageBeards(chunkX, chunkZ int32) []beardBox {
 }
 
 // adjust is the density added at block (x, y, z) by the beard and shavers,
-// then the beards (the first two loops of sub_D1EE730).
+// then the beards (the first two loops of).
 func (o *Overworld) adjust(bs []beardShaver, beards []beardBox, x, y, z int32) float32 {
 	var sum float32
 	for i := range bs {

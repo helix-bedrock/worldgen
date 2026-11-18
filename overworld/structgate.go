@@ -95,7 +95,7 @@ type startGrid struct {
 	chance                    float32
 }
 
-// mineshaftChance is the chance of a mineshaft in a chunk (sub_4E8BA90).
+// mineshaftChance is the chance of a mineshaft in a chunk.
 const mineshaftChance = 0.004
 
 // vanillaPlacements are the placement grids of BDS 1.26.52. The four

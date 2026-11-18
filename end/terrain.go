@@ -9,7 +9,7 @@ import (
 // The terrain is the old 3D-noise generator: a selector noise blends two
 // limit noises on a grid of 3 x 33 x 3 corners, 8 blocks apart across and
 // 4 tall, plus the island height of the column, slid down to nothing at
-// the bottom and the top (BDS's sub_5195000, filled in by sub_5195960).
+// the bottom and the top (filled in by).
 const (
 	gridXZ = 3
 	gridY  = 33
@@ -32,7 +32,7 @@ const (
 	slideTop    = 15
 )
 
-// The islands (sub_5196720): the main island is a cone around the origin;
+// The islands: the main island is a cone around the origin;
 // outer islands stand on chunks more than 64 chunks out where the island
 // noise is below outerIslandNoise.
 const (
@@ -109,7 +109,7 @@ func (e *End) islandHeight(cx, cz, gx, gz int32) float32 {
 }
 
 // ChunkIslandHeight is the island height at the middle of chunk (cx, cz),
-// as the End's decoration reads it (sub_5196720).
+// as the End's decoration reads it.
 func (e *End) ChunkIslandHeight(cx, cz int32) float32 { return e.islandHeight(cx, cz, 1, 1) }
 
 func clampIsland(v float32) float32 {

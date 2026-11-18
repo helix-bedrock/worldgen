@@ -9,8 +9,8 @@ import (
 )
 
 // Fancy (big oak) tree parts of minecraft:tree_feature, written from BDS
-// 1.26.52: FancyTreeTrunk (place sub_D2D4490, height sub_D2D5750) and
-// FancyTreeCanopy (sub_D2D40F0 with the disk helper sub_D2D4250). The
+// 1.26.52: FancyTreeTrunk (place, height) and
+// FancyTreeCanopy (with the disk helper). The
 // trunk is the classic big tree: foliage clusters around the upper part,
 // a straight trunk, and sloping branch logs from the trunk to each cluster.
 
@@ -56,7 +56,7 @@ func (t *treeFeature) fancyLine(w *featureWorld, x0, y0, z0, x1, y1, z1 int32) b
 	return true
 }
 
-// fancyTrunk is FancyTreeTrunk::place for a tree of height h at (x, y, z).
+// fancyTrunk matches BDS for a tree of height h at (x, y, z).
 func (t *treeFeature) fancyTrunk(w *featureWorld, x, y, z, h int32, r *rand.MT) (blockPos, bool) {
 	f := &t.fancy
 	if !t.mayGrowOn.empty() {
@@ -182,7 +182,7 @@ func (t *treeFeature) fancyTrunk(w *featureWorld, x, y, z, h int32, r *rand.MT) 
 	return blockPos{x, y, z}, true
 }
 
-// fancyCanopy is FancyTreeCanopy::place at a foliage cluster: height
+// fancyCanopy matches BDS at a foliage cluster: height
 // layers of round disks, one smaller at the bottom and the top.
 func (t *treeFeature) fancyCanopy(w *featureWorld, x, y, z int32) bool {
 	h, rad := t.fancyHeight, t.fancyRadius
@@ -202,7 +202,7 @@ func (t *treeFeature) fancyCanopy(w *featureWorld, x, y, z int32) bool {
 	return placed
 }
 
-// fancyDisk is sub_D2D4250: leaves where (|dx|+0.5)^2 + (|dz|+0.5)^2 <= r^2.
+// fancyDisk is: leaves where (|dx|+0.5)^2 + (|dz|+0.5)^2 <= r^2.
 func (t *treeFeature) fancyDisk(w *featureWorld, x, y, z, r int32) bool {
 	placed := false
 	r2 := float64(r * r)

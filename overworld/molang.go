@@ -27,8 +27,8 @@ type molangEnv struct {
 	// noise is query.noise(x, z).
 	noise func(x, z float32) float32
 	// random is math.random's source: BDS's rule context draws nextFloat
-	// from the chunk's population random (the lambda sub_C839AE0 set up in
-	// sub_C81D6D0), which scatter features share through their copied
+	// from the chunk's population random (the lambda set up in),
+	// which scatter features share through their copied
 	// context.
 	random func() float32
 }

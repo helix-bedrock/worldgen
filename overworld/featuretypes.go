@@ -268,7 +268,7 @@ func (o *Overworld) parseFeature(typ string, raw json.RawMessage, set *featureSe
 }
 
 // aggregateFeature places its features at the same position in order
-// (AggregateFeature, sub_D4100E0). It succeeds when any of them was placed,
+// (AggregateFeature). It succeeds when any of them was placed,
 // with the position the last placed one returned. first_success stops at
 // the first one placed; first_failure stops at a failure only while none
 // has been placed yet, so "tree, then optional extras" keeps going once
@@ -336,7 +336,7 @@ const (
 )
 
 // conditionalFeature is minecraft:conditional_list (BDS
-// ConditionalListFeature, 1.26.60 sub_D9B1BE0): each feature whose
+// ConditionalListFeature, 1.26.60): each feature whose
 // condition holds at the position is placed there, in order, sharing the
 // random. variable.worldx/y/z and originx/y/z are the position. A missing
 // condition holds.
@@ -595,8 +595,8 @@ type searchFeature struct {
 	required int32
 }
 
-// searchOrder is the loop order of each search axis (sub_D305930 and its
-// helpers sub_D3064E0, sub_D306A20): outer, middle and inner axis, each with
+// searchOrder is the loop order of each search axis (and its
+// helpers): outer, middle and inner axis, each with
 // its step. The outer axis is the search axis.
 func searchOrder(axis string) ([3][2]int32, bool) {
 	switch axis {
@@ -860,7 +860,7 @@ func (o *Overworld) parseSingleBlock(raw json.RawMessage) (placer, error) {
 		switch name := o.blockName(id); {
 		case name == blockDeadBush, name == "minecraft:short_dry_grass", name == "minecraft:tall_dry_grass":
 			// Dry grass takes the dead bush's ground (ShortDryGrassBlock's
-			// mayPlaceOn, sub_CF1FB20).
+			// mayPlaceOn).
 			f.sand = true
 		case soilPlants[name]:
 			f.soil = true
@@ -927,7 +927,7 @@ func sideOffsets() [6][3]int32 {
 
 func (f *singleBlockFeature) place(w *featureWorld, x, y, z int32, r *rand.MT) (blockPos, bool) {
 	// BDS picks the block from its places_block list with one draw, even
-	// when the list has a single entry (sub_D30BC80: nextInt of the summed
+	// when the list has a single entry (: nextInt of the summed
 	// weights, before the attach and replace checks).
 	block := f.block
 	if f.choices == nil {
@@ -974,10 +974,10 @@ func (f *singleBlockFeature) place(w *featureWorld, x, y, z int32, r *rand.MT) (
 		}
 	}
 	if f.hasAttach {
-		// BDS (sub_D30BC80): a listed top or bottom side must match; only
+		// BDS: a listed top or bottom side must match; only
 		// the four horizontal sides count toward min_sides_must_attach,
-		// and a horizontal side with no list counts as attached
-		// (sub_D30D330). A bee nest so needs leaves right above it.
+		// and a horizontal side with no list counts as attached.
+		// A bee nest so needs leaves right above it.
 		n := 0
 		for i, d := range sideOffsets() {
 			if !f.hasSide[i] {
@@ -1015,7 +1015,7 @@ func (f *singleBlockFeature) place(w *featureWorld, x, y, z int32, r *rand.MT) (
 
 // legacyTree is one of BDS's hard-coded legacy:*_tree_feature: a tree count
 // per chunk and a selector over a list of data-driven trees
-// (LegacyTreeFeature, sub_51D7B00).
+// (LegacyTreeFeature).
 type legacyTree struct {
 	count  float32
 	trees  []string
@@ -1024,8 +1024,8 @@ type legacyTree struct {
 
 func nextBool(r *rand.MT) bool { return r.Uint32()>>27&1 != 0 }
 
-// legacyTrees are the legacy tree features from BDS's constructor
-// (sub_51D3EA0). Forest and mesa plateau use the leaf-litter variants, as
+// legacyTrees are the legacy tree features from BDS's constructor.
+// Forest and mesa plateau use the leaf-litter variants, as
 // BDS does in new worlds (its constructor flag; BDS forests have leaf
 // litter in the bdsdiff test world).
 func legacyTrees() map[string]legacyTree {
@@ -1167,7 +1167,7 @@ func (f *legacyTreeFeature) place(w *featureWorld, x, y, z int32, r *rand.MT) (b
 	return blockPos{x, y, z}, placeLegacyTrees(w, x, z, n, r, f.set, func(r *rand.MT) string { return f.def.trees[f.def.choose(r)] })
 }
 
-// placeLegacyTrees is BDS's per-tree loop (sub_51D3D30): n times, choose
+// placeLegacyTrees is BDS's per-tree loop: n times, choose
 // the tree, draw z then x, place it on the height map, then place
 // scatter_tall_grass_around_tree_feature at the same spot (skipped by BDS
 // only for the old "legacy" world generator).
@@ -1188,7 +1188,7 @@ func placeLegacyTrees(w *featureWorld, x, z, n int32, r *rand.MT, set *featureSe
 }
 
 // swampFoliageFeature is minecraft:legacy:swamp_foliage_feature
-// (LegacySwampFoliageFeature, place sub_51D39D0, constructor sub_51D3480):
+// (LegacySwampFoliageFeature, place, constructor):
 // ten seagrass tries 54 blocks above the origin (they find no water but
 // draw), then two to four swamp trees, one in twenty a huge mushroom.
 type swampFoliageFeature struct {

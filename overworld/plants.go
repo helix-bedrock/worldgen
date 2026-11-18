@@ -6,9 +6,9 @@ import (
 	"github.com/helix-bedrock/worldgen/rand"
 )
 
-// Plant features BDS registers in code (sub_4E2BB50), written from BDS 1.26.52.
+// Plant features BDS registers in code, written from BDS 1.26.52.
 
-// waterlilyFeature is BDS's WaterlilyFeature (place sub_4DE79B0): a lily pad in
+// waterlilyFeature is BDS's WaterlilyFeature (place): a lily pad in
 // air right above water, not under the height map. It draws nothing.
 type waterlilyFeature struct {
 	lily uint32
@@ -19,7 +19,7 @@ func (f *waterlilyFeature) place(w *featureWorld, x, y, z int32, r *rand.MT) (bl
 	if b, ok := w.block(x, y, z); !ok || b != o.ids.air {
 		return blockPos{}, false
 	}
-	// WaterlilyBlock's mayPlaceOn (sub_CE60440): minecraft:water below.
+	// WaterlilyBlock's mayPlaceOn: minecraft:water below.
 	if b, ok := w.block(x, y-1, z); !ok || b != o.ids.water {
 		return blockPos{}, false
 	}
@@ -30,16 +30,16 @@ func (f *waterlilyFeature) place(w *featureWorld, x, y, z int32, r *rand.MT) (bl
 	return blockPos{x, y, z}, true
 }
 
-// builtOver is BlockType's canBeBuiltOver (sub_C5CC550): the block's replaceable
+// builtOver is BlockType's canBeBuiltOver: the block's replaceable
 // component, which snowReplaces lists.
 func (o *Overworld) builtOver(b uint32) bool { return o.snowReplaces(b) }
 
-// cactusFeature is BDS's CactusFeature (place sub_4988860): 10 tries in a box
+// cactusFeature is BDS's CactusFeature (place): 10 tries in a box
 // seven blocks out and three up and down, each a cactus column of 1 to 3 into
 // air, and in new worlds a cactus flower on top one time in three.
 type cactusFeature struct {
 	cactus, flower uint32
-	// flowers is set from a base game version check (sub_4E2BB50), on for
+	// flowers is set from a base game version check, on for
 	// new worlds.
 	flowers bool
 }
@@ -71,9 +71,9 @@ func (f *cactusFeature) place(w *featureWorld, x, y, z int32, r *rand.MT) (block
 	return blockPos{x, y, z}, true
 }
 
-// survives is CactusBlock's canSurvive (sub_C5DA370): no solid block or lava on
+// survives is CactusBlock's canSurvive: no solid block or lava on
 // the four sides, no lava above, and cactus or sand below.
-// VERIFY: the tag below (xmmword_F613DE8) is taken as sand.
+// VERIFY: the tag below is taken as sand.
 func (f *cactusFeature) survives(w *featureWorld, x, y, z int32) bool {
 	o := w.o
 	for _, d := range [4][2]int32{{0, -1}, {0, 1}, {-1, 0}, {1, 0}} {
@@ -88,7 +88,7 @@ func (f *cactusFeature) survives(w *featureWorld, x, y, z int32) bool {
 	return ok && (below == f.cactus || o.hasBlockTag(below, "sand"))
 }
 
-// deadBushFeature is BDS's DeadBushFeature (place sub_499C930): from the origin it
+// deadBushFeature is BDS's DeadBushFeature (place): from the origin it
 // walks down through air and leaves to one block below the first other block,
 // then makes 4 tries around there for a dead bush in air.
 type deadBushFeature struct {
@@ -123,14 +123,14 @@ func (f *deadBushFeature) place(w *featureWorld, x, y, z int32, r *rand.MT) (blo
 	return blockPos{x, y, z}, true
 }
 
-// deadBushSoil is DeadBushBlock's mayPlaceOn (sub_C577C90): sand, terracotta or
+// deadBushSoil is DeadBushBlock's mayPlaceOn: sand, terracotta or
 // dirt.
 // VERIFY: BDS checks a block list and two tags; read here as these three.
 func (o *Overworld) deadBushSoil(b uint32) bool {
 	return o.hasBlockTag(b, "sand") || strings.HasSuffix(o.blockName(b), "terracotta") || o.hasBlockTag(b, "dirt")
 }
 
-// bambooFeature is BDS's BambooFeature (place sub_49856C0): a thick bamboo stalk
+// bambooFeature is BDS's BambooFeature (place): a thick bamboo stalk
 // into air on grass, podzol, dirt or rooted dirt, 5 to 16 tall, with leaves on its
 // top three blocks when it is 3 or more tall.
 type bambooFeature struct {
@@ -177,7 +177,7 @@ func (f *bambooFeature) place(w *featureWorld, x, y, z int32, r *rand.MT) (block
 	return blockPos{x, y, z}, true
 }
 
-// podzolAreaFeature is BDS's PodzolAreaFeature (place sub_49C0EA0): a disc of
+// podzolAreaFeature is BDS's PodzolAreaFeature (place): a disc of
 // radius 1 to 4 one block below the origin, turning dirt and grass blocks into
 // podzol. It fails when it changed nothing.
 type podzolAreaFeature struct {
@@ -202,7 +202,7 @@ func (f *podzolAreaFeature) place(w *featureWorld, x, y, z int32, r *rand.MT) (b
 	return blockPos{x, y, z}, placed
 }
 
-// vinesFeature is BDS's VinesFeature (place sub_49EB9F0): from y 64 up to the top
+// vinesFeature is BDS's VinesFeature (place): from y 64 up to the top
 // of the chunk, a vine in each air block that has a support beside it (tried
 // with faces north, south, west, east); a block in the way moves the column up
 // to three blocks sideways.
@@ -211,7 +211,7 @@ type vinesFeature struct {
 }
 
 // vineFaces are the supports for faces 2 to 5 and the vine_direction_bits each
-// gives (the face's opposite, byte_1491886, as a bit, qword_1ADFEF8).
+// gives (the face's opposite, as a bit).
 type vineFace struct {
 	dx, dz int32
 	bits   float64
@@ -250,7 +250,7 @@ func (f *vinesFeature) place(w *featureWorld, x, y, z int32, r *rand.MT) (blockP
 
 // chunkTop is the y above the highest non-air block of the chunk holding a
 // column, or MinY when it is empty.
-// VERIFY: BDS adds the dimension's minimum height to a chunk field (+4056); it is
+// VERIFY: BDS adds the dimension's minimum height to a chunk field; it is
 // taken to be the highest block.
 func (w *featureWorld) chunkTop(x, z int32) int32 {
 	if w.live != nil {
@@ -288,7 +288,7 @@ func (w *featureWorld) chunkTop(x, z int32) int32 {
 	return MinY
 }
 
-// fireflyBushFeature is BDS's FireflyBushClusterFeature (place sub_51BFC30): up to
+// fireflyBushFeature is BDS's FireflyBushClusterFeature (place): up to
 // 20 tries for a firefly bush on the height map within four blocks of the origin
 // (with water beside the block below when water is set), then 1 to 3 more around
 // the first in up to 20 tries.
@@ -302,7 +302,7 @@ func (f *fireflyBushFeature) mayPlace(w *featureWorld, x, y, z int32) bool {
 	if y < MinY || y >= MaxY {
 		return false
 	}
-	// BushBlock's mayPlace (sub_C5D5A20): no liquid, a block that can be
+	// BushBlock's mayPlace: no liquid, a block that can be
 	// built over, and the bush's ground below (the list BushBlock checks,
 	// read as the dirt tag).
 	b, ok := w.block(x, y, z)
@@ -356,7 +356,7 @@ func (f *fireflyBushFeature) place(w *featureWorld, x, y, z int32, r *rand.MT) (
 	return p, true
 }
 
-// doublePlantFeature is BDS's DoublePlantFeature placing a given plant (sub_49A1160):
+// doublePlantFeature is BDS's DoublePlantFeature placing a given plant:
 // when the origin is no more than four blocks above the top of the chunks within
 // seven blocks, 64 tries in a box seven blocks out and three up and down for the
 // plant in air.
@@ -394,7 +394,7 @@ func (doublePlantFeature) place(w *featureWorld, x, y, z int32, r *rand.MT, plan
 	return placed
 }
 
-// doublePlantMayPlace is DoublePlantBlock's mayPlace (sub_C5831F0): not in a
+// doublePlantMayPlace is DoublePlantBlock's mayPlace: not in a
 // liquid, a block that can be built over, bush ground below, and air or water
 // above.
 func doublePlantMayPlace(w *featureWorld, x, y, z int32) bool {
@@ -413,7 +413,7 @@ func doublePlantMayPlace(w *featureWorld, x, y, z int32) bool {
 	return ok && (above == o.ids.air || o.waterMaterial(above))
 }
 
-// forestFoliageFeature is BDS's LegacyForestFoliageFeature (place sub_51D1E10): a
+// forestFoliageFeature is BDS's LegacyForestFoliageFeature (place): a
 // few groups of lilac, rose bush or peony, each five tries at a random column of
 // the chunk and a random height below the height map plus 32. The forest has
 // two fewer groups than the flower forest.
@@ -437,9 +437,9 @@ func (f *forestFoliageFeature) place(w *featureWorld, x, y, z int32, r *rand.MT)
 	return blockPos{x, y, z}, true
 }
 
-// eyeblossomFeature is BDS's EyeblossomFeature (place sub_51BFAE0): one eyeblossom
+// eyeblossomFeature is BDS's EyeblossomFeature (place): one eyeblossom
 // in air on bush ground. BDS places it open when the level's time of day is
-// 12601 to 23400 when the chunk is made (sub_C55F560), else closed; the
+// 12601 to 23400 when the chunk is made, else closed; the
 // generator has no clock, so it is placed closed, as at a new world's start.
 type eyeblossomFeature struct {
 	flower uint32
@@ -457,7 +457,7 @@ func (f *eyeblossomFeature) place(w *featureWorld, x, y, z int32, r *rand.MT) (b
 	return blockPos{x, y, z}, true
 }
 
-// rootSystemFeature is BDS's TrailToSurfaceFeature (place sub_49C5EE0), registered
+// rootSystemFeature is BDS's TrailToSurfaceFeature (place), registered
 // as minecraft:azalea_root_system_feature: from the origin it climbs, up to the
 // height map and at most 184 blocks, to the first block on solid ground with room
 // for the tree (two blocks above it free, not three of water), places the tree
@@ -473,15 +473,15 @@ type rootSystemFeature struct {
 	space func(o *Overworld, b uint32) bool
 }
 
-// azaleaSpace is the azalea's space test (sub_D299D10): air, a replaceable
+// azaleaSpace is the azalea's space test: air, a replaceable
 // block, water or leaves.
 // VERIFY: plant materials pass only on a region check that was not read.
 func azaleaSpace(o *Overworld, b uint32) bool {
 	return b == o.ids.air || o.builtOver(b) || o.waterMaterial(b) || o.hasBlockTag(b, "leaves")
 }
 
-// sulfurSpringSpace is the sulfur spring trail's space test (sub_4FAE5F0):
-// a block that can be built over (BlockType vfunc +672) and is not a
+// sulfurSpringSpace is the sulfur spring trail's space test:
+// a block that can be built over (BlockType vfunc) and is not a
 // liquid.
 func sulfurSpringSpace(o *Overworld, b uint32) bool {
 	return o.builtOver(b) && !o.liquidMaterial(b)
@@ -540,7 +540,7 @@ func (f *rootSystemFeature) grow(w *featureWorld, x, y, z, treeY int32, r *rand.
 	}
 }
 
-// melonFeature is BDS's MelonFeature (place sub_51D8410): 64 tries in a box seven
+// melonFeature is BDS's MelonFeature (place): 64 tries in a box seven
 // blocks out and three up and down from the origin, each a melon on grass where
 // the block can be built over.
 type melonFeature struct {

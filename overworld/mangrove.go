@@ -10,10 +10,10 @@ import (
 	"github.com/helix-bedrock/worldgen/rand"
 )
 
-// Mangrove trees, written from BDS 1.26.52: MangroveTreeRoots (sub_D2D7D50, root walk
-// sub_D2D8900), MangroveTreeTrunk (sub_D2D8C90, height sub_D2D9630) and
-// MangroveTreeCanopy (sub_D2D6F90). The tree feature draws the trunk height, lets the
-// roots lift the trunk's base, then grows trunk and canopy (sub_D2E8DE0). The shapes
+// Mangrove trees, written from BDS 1.26.52: MangroveTreeRoots (root walk),
+// MangroveTreeTrunk (height) and
+// MangroveTreeCanopy. The tree feature draws the trunk height, lets the
+// roots lift the trunk's base, then grows trunk and canopy. The shapes
 // are Java's mangrove root placer, upwards-branching trunk and random spread foliage,
 // drawn with Bedrock's random.
 
@@ -255,7 +255,7 @@ func (t *treeFeature) mangroveTrunk(w *featureWorld, x, y, z, h int32, r *rand.M
 		if t.acaciaFree(w, x, ly, z) {
 			w.set(x, ly, z, t.log)
 			// VERIFY: BDS decides each branch with a coin flip (Random
-			// vfunc +40) and does not read branch_chance.
+			// vfunc) and does not read branch_chance.
 			if i < h-1 && r.Uint32()&0x8000000 != 0 {
 				dir := r.IntN(4)
 				k := m.branchLen.drawIncl(r)
@@ -362,7 +362,7 @@ func (t *treeFeature) mangroveCanopy(w *featureWorld, spots []blockPos, r *rand.
 	// another (BDS defaults, as Java's attached-to-leaves decorator:
 	// 2 empty blocks, exclusion radius 1 across and 0 up).
 	// VERIFY: the three numbers are read as Java's; their BDS fields
-	// (+468, +472, +476) were not traced to a constructor.
+	// were not traced to a constructor.
 	taken := map[blockPos]bool{}
 	for _, p := range placed {
 		below := blockPos{p[0], p[1] - 1, p[2]}

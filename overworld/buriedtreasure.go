@@ -8,8 +8,8 @@ import (
 )
 
 // Buried treasure, written from BDS 1.26.52: BuriedTreasureFeature
-// (constructor sub_4E3EFC0, chunk test sub_4E3F4A0, start sub_4E3F700) and
-// its piece (postProcess sub_4E3FA50). The piece is one chest at the start
+// (constructor, chunk test, start) and
+// its piece (postProcess). The piece is one chest at the start
 // chunk's local (8, 8) (box corner 3 plus offset 5; Java uses 9, 9).
 //
 // The chest goes nextInt(2)+4 below the column's top solid block (through
@@ -19,14 +19,14 @@ import (
 // VERIFY: "solid" is BDS's material test (not liquid, solid, block flag
 // 0x40000); taken here as the solid material.
 
-// Buried treasure placement (sub_4E3F4A0): triangular spread.
+// Buried treasure placement: triangular spread.
 const (
 	treasureSalt       = 16842397
 	treasureSpacing    = 4
 	treasureSeparation = 2
 )
 
-// Buried treasure chest placement (sub_4E3FA50).
+// Buried treasure chest placement.
 const (
 	// treasureBiomeReach is the radius of the start biome test, in blocks.
 	treasureBiomeReach = 3

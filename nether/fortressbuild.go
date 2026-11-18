@@ -42,7 +42,7 @@ func (n *Nether) loadFortressIDs() error {
 }
 
 // nbWeirdo turns a stairs' weirdo_direction by the piece's orientation
-// (sub_D254F10's table for blocks with that state, as for strongholds).
+// ('s table for blocks with that state, as for strongholds).
 var nbWeirdo = [4][4]int32{{0, 1, 3, 2}, {2, 3, 0, 1}, {0, 1, 2, 3}, {2, 3, 1, 0}}
 
 // placeFortresses builds the pieces of the fortresses that reach chunk
@@ -88,7 +88,7 @@ func (b *nbBuild) put(s uint32, x, y, z int32) {
 	}
 }
 
-// box is generateBox (sub_D260890): edge on the box's faces, inner inside,
+// box is generateBox: edge on the box's faces, inner inside,
 // in y, x, z order.
 func (b *nbBuild) box(x0, y0, z0, x1, y1, z1 int32, edge, inner uint32) {
 	for y := y0; y <= y1; y++ {
@@ -104,7 +104,7 @@ func (b *nbBuild) box(x0, y0, z0, x1, y1, z1 int32, edge, inner uint32) {
 	}
 }
 
-// down is fillColumnDown (sub_D255920) with nether bricks: down through air
+// down is fillColumnDown with nether bricks: down through air
 // and liquid to the first other block, no lower than y 2.
 func (b *nbBuild) down(x, y, z int32) { //nolint:unparam // the parameters of BDS fillColumnDown
 	wx, wy, wz := b.p.worldPos(x, y, z)
@@ -137,7 +137,7 @@ func (b *nbBuild) stairs(d int32) uint32 {
 	return b.n.nb.stairs[nbWeirdo[b.p.orient&3][d&3]]
 }
 
-// chest is createChest (sub_D254CA0): a chest facing west (BDS leaves
+// chest is createChest: a chest facing west (BDS leaves
 // chests unturned) with the fortress loot table and a seed from the
 // chunk's random, unless a chest is already there.
 func (b *nbBuild) chest(x, y, z int32) {

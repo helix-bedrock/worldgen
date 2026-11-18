@@ -3,12 +3,12 @@ package overworld
 import "github.com/helix-bedrock/worldgen/rand"
 
 // Water and lava springs: single liquid sources set into cave walls
-// (SpringFeature sub_49C58B0, LegacySpringsFeature sub_51D30F0, written from
+// (SpringFeature, LegacySpringsFeature, written from
 // BDS 1.26.52, rechecked in 1.26.60). BDS sets the source, then adds a block
 // tick for it one tick later to the chunk's queue (skipped on a client), so it
 // flows once the world runs; the chunk here leaves that tick pending in Ticks.
 
-// Spring placement constants (sub_49C58B0, sub_51D30F0).
+// Spring placement constants.
 const (
 	// springRockSides is how many of the five checked sides must be rock:
 	// the fifth is the one open side.
@@ -32,7 +32,7 @@ const (
 // and the block below.
 type springFeature struct {
 	liquid uint32
-	// rock is what a spring may sit in (sub_49C5D30: stone, deepslate,
+	// rock is what a spring may sit in (: stone, deepslate,
 	// tuff, calcite, snow, powder snow, packed ice, dirt and coarse dirt on
 	// the current base game version).
 	rock map[string]bool

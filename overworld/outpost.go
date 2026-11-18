@@ -8,9 +8,9 @@ import (
 )
 
 // Pillager outposts, written from BDS 1.26.52: PillagerOutpostFeature
-// (constructor sub_4E82040, chunk test sub_4E83110, start sub_4E83390) and
-// PillagerOutpostPiece (constructor sub_4E84580, postProcess sub_4E84CE0,
-// markers sub_4E85170). Bedrock builds outposts from template pieces, not
+// (constructor, chunk test, start) and
+// PillagerOutpostPiece (constructor, postProcess,
+// markers). Bedrock builds outposts from template pieces, not
 // jigsaw pools:
 //   - the watchtower at the start chunk's corner, turned a random quarter,
 //     with its overgrown overlay at integrity 0.05;
@@ -27,14 +27,14 @@ import (
 // VERIFY: heights in BDS come from the live world of the first chunk that
 // builds the piece; here from the undecorated terrain.
 
-// Pillager outpost placement (sub_4E83110): triangular spread.
+// Pillager outpost placement: triangular spread.
 const (
 	outpostSalt       = 165745296
 	outpostSpacing    = 80
 	outpostSeparation = 24
 )
 
-// outpostBiomes are the biomes an outpost starts in (sub_4E82040).
+// outpostBiomes are the biomes an outpost starts in.
 func outpostBiomes() []string {
 	return []string{"plains", "sunflower_plains", "savanna", "ice_plains", "taiga", "taiga_hills",
 		"cold_taiga", "cold_taiga_hills", "desert", "meadow", "frozen_peaks", "jagged_peaks", "stony_peaks",
@@ -42,13 +42,12 @@ func outpostBiomes() []string {
 }
 
 // outpostFeatures are the feature templates in BDS's table order
-// (off_EE8E5B8).
 func outpostFeatures() [7]string {
 	return [...]string{"feature_cage1", "feature_cage2", "feature_cage_with_allays", "feature_logs",
 		"feature_targets", "feature_tent1", "feature_tent2"}
 }
 
-// Pillager outpost layout (sub_4E83390, sub_4E84CE0).
+// Pillager outpost layout.
 const (
 	// outpostSpreadDraws is how many draws the region spread made before
 	// the start continues the same random.
@@ -124,7 +123,7 @@ func (o *Overworld) isOutpostChunk(cx, cz int32) bool {
 }
 
 // outpostAt returns the pieces of the outpost starting in chunk (cx, cz),
-// nil if none does (sub_4E83390). It is computed once per start.
+// nil if none does. It is computed once per start.
 func (o *Overworld) outpostAt(cx, cz int32) []outpostPiece {
 	k := [2]int32{cx, cz}
 	if v, ok := o.outposts.Load(k); ok {
@@ -206,7 +205,6 @@ func (o *Overworld) outpostReaches(cx, cz int32) bool {
 }
 
 // outpostY is a piece's bottom y, ok false when a feature is not placed
-// (sub_4E84CE0).
 func (o *Overworld) outpostY(p outpostPiece, bb structure.Box, raw func(cx, cz int32) *PackedChunk) (int32, bool) {
 	hw, hd := (bb.X1-bb.X0+1)/2, (bb.Z1-bb.Z0+1)/2
 	samples := [5][2]int32{
@@ -261,10 +259,10 @@ func (o *Overworld) placeOutposts(cx, cz int32, c *Chunk, raw func(cx, cz int32)
 
 // outpostFoundations extends the bottom of an outpost's placed pieces down
 // to the ground, after all its pieces (PillagerOutpostStart postProcess,
-// sub_536E8D0 in BDS 1.26.60). Under each column of a piece's bottom layer
-// whose block is not air or leaves (BDS's LeavesBlock flag, BlockType+264
+// in BDS 1.26.60). Under each column of a piece's bottom layer
+// whose block is not air or leaves (BDS's LeavesBlock flag, BlockType
 // bit 0x20), the air and liquid below is filled with that block when it is
-// solid (Block+113) and cobblestone otherwise, down to the first other
+// solid (Block) and cobblestone otherwise, down to the first other
 // block, stopping once y 2 is filled. This keeps a watchtower on a cliff
 // edge or in a lake from floating.
 func (b *scBuild) outpostFoundations(placed []structure.Box) {

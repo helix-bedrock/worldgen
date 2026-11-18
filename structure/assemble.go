@@ -37,7 +37,7 @@ type Queued struct {
 	Shape int
 }
 
-// Assembly is BDS's newer jigsaw assembler (sub_D2AB0E0), which ancient
+// Assembly is BDS's newer jigsaw assembler, which ancient
 // cities and bastions share: d holds the structure's pools and maxDepth is
 // how deep it expands.
 type Assembly struct {
@@ -130,7 +130,7 @@ func (a *Assembly) fit(q Queued, j JigsawBlock, pool *Pool) bool {
 			Shuffle(cjs, a.R)
 			for _, cj := range cjs {
 				// The fronts must face; an aligned vertical joint must also
-				// keep its top (sub_C556580).
+				// keep its top.
 				if cj.Facing != want || cj.Name != j.Target {
 					continue
 				}

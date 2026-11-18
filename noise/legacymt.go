@@ -3,7 +3,7 @@ package noise
 import "github.com/helix-bedrock/worldgen/rand"
 
 // newPerlinMT draws a Perlin octave from a Mersenne Twister the way BDS's
-// legacy-random octave builder does (sub_D23FD60, mode 0): three nextDouble
+// legacy-random octave builder does (mode 0): three nextDouble
 // origins, then a forward shuffle with nextInt(256 - i).
 func newPerlinMT(r *rand.MT) *Perlin {
 	n := &Perlin{}
@@ -46,7 +46,7 @@ func newOctavesMT(r *rand.MT, first int, amps []float32) *Octaves {
 }
 
 // NewNormalMT builds a Normal noise from a Mersenne Twister, as BDS does for
-// features that take the feature random (sub_D2411F0, used by geodes): both
+// features that take the feature random (used by geodes): both
 // octave sets come from r in turn.
 func NewNormalMT(r *rand.MT, first int, amps []float32) *Normal {
 	a := newOctavesMT(r, first, amps)

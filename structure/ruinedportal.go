@@ -6,10 +6,10 @@ import (
 )
 
 // Ruined portals, written from BDS 1.26.52:
-// RuinedPortalFeature (constructor sub_4E87930, chunk test sub_4E87A80,
-// start sub_4E87BE0) and RuinedPortalPiece (postProcess sub_4E88070 with
-// its helpers sub_4E8A680, sub_4E8A710, sub_4E8A7C0, sub_4E8A9F0 and
-// sub_4E8AC30). Bedrock builds the whole portal from its start chunk, in
+// RuinedPortalFeature (constructor, chunk test,
+// start) and RuinedPortalPiece (postProcess with
+// its helpers and).
+// Bedrock builds the whole portal from its start chunk, in
 // this order, all from that chunk's random:
 //   - the underground roll, the turn, the z mirror, then the template
 //     (giant_portal_1..3 one time in 20, else portal_1..10);
@@ -40,10 +40,10 @@ import (
 // VERIFY: heights and corners in BDS read the live world of the start
 // chunk and its neighbours; here the undecorated terrain. The underwater
 // test of the box corners runs only for worlds of a recent base game
-// version (sub_4EA7A10); it is assumed to run. A final pass that refreshes
+// version; it is assumed to run. A final pass that refreshes
 // blocks with the minecraft:corner state is not done. Java's stone_slab has
 
-// Ruined portal placement (sub_4E87A80): linear spread. The Nether uses
+// Ruined portal placement: linear spread. The Nether uses
 // the same salt on a smaller grid.
 const (
 	PortalSalt             = 40552231
@@ -64,7 +64,7 @@ func PortalPick(seed int64, rx, rz, spacing, separation, salt int32) (cx, cz int
 	return cx, rz*spacing + r.IntN(n)
 }
 
-// The portal's rolls and heights (sub_4E88070), all from the start chunk's
+// The portal's rolls and heights, all from the start chunk's
 // random.
 const (
 	// underChance is the underground roll, mirrorChance the z mirror and
@@ -105,7 +105,7 @@ const (
 	chunkMiddle = 8
 )
 
-// The aging pass and netherrack chances (sub_4E8A680 to sub_4E8AC30).
+// The aging pass and netherrack chances (to).
 const (
 	// ageStoneChance is the chance a stone brick ages at all.
 	ageStoneChance = 0.5
@@ -126,8 +126,7 @@ const (
 	stairsUpChance = 0.5
 )
 
-// portalSmall and portalGiant are BDS's template tables (off_F456D50,
-// off_F456E40).
+// portalSmall and portalGiant are BDS's template tables ().
 func portalSmall() [10]string {
 	return [10]string{"portal_1", "portal_2", "portal_3", "portal_4", "portal_5", "portal_6", "portal_7",
 		"portal_8", "portal_9", "portal_10"}
@@ -137,13 +136,12 @@ func portalGiant() [3]string {
 	return [3]string{"giant_portal_1", "giant_portal_2", "giant_portal_3"}
 }
 
-// portalSpread is the netherrack chance by distance (qword_1523CB8).
+// portalSpread is the netherrack chance by distance.
 func portalSpread() [14]float32 {
 	return [14]float32{1, 1, 1, 1, 1, 1, 1, 0.9, 0.9, 0.8, 0.7, 0.6, 0.4, 0.2}
 }
 
-// Block families the aging pass looks at (xmmword_F60D4B0, F60D480,
-// F60D450, F60D528, plus the blocks it names one by one).
+// Block families the aging pass looks at (plus the blocks it names one by one).
 
 // portalFullStone reports the full stone blocks.
 func portalFullStone(name string) bool {
@@ -253,11 +251,11 @@ func (s *portalSim) isLava(b uint32) bool { return b == s.l.lava || b == s.l.flo
 func (s *portalSim) leaves(b uint32) bool { return s.w.Leaves != nil && s.w.Leaves(b) }
 
 // height is one above the top solid block of a column, or of water when
-// water is set, looking through leaves (sub_C9F7970).
+// water is set, looking through leaves.
 func (s *portalSim) height(x, z int32, water bool) int32 {
 	y := s.w.MaxY - 1
 	if s.w.Nether {
-		// Under a roof (the Nether's dimension flag, sub_C8D5D50) BDS first
+		// Under a roof (the Nether's dimension flag) BDS first
 		// goes down through the solid roof, so it finds the floor under it.
 		for ; y >= s.w.MinY; y-- {
 			b := s.get(x, y, z)
@@ -628,7 +626,7 @@ func (l *Lib) vanillaDefault(name string) uint32 {
 	return s
 }
 
-// portalStairs draws a facing and a half (sub_4E8A9F0).
+// portalStairs draws a facing and a half.
 func (l *Lib) portalStairs(r *rand.MT, name string) uint32 {
 	d := r.IntN(quarterTurns)
 	up := r.Float() < stairsUpChance

@@ -22,7 +22,7 @@ func joinKindOf(name string) uint8 {
 // connectBlocks sets the connections of every fence, pane and iron bar in
 // chunk (cx, cz). BDS sets them when a structure template is placed: it
 // recomputes the connections in the template's box and the ring of blocks
-// around it (sub_D262990), so blocks from later pieces join earlier ones.
+// around it, so blocks from later pieces join earlier ones.
 // Features never trigger it, so a fence does not join a tree or plant
 // decorated next to it. connectBlocks reads every neighbour from near, the
 // chunk's terrain with its structures and without features (nil: air).
@@ -118,7 +118,7 @@ func (o *Overworld) faceSturdy(nb uint32, facing int32) bool {
 
 // gateAccepts reports whether a fence gate joins a fence beside it: only
 // along the gate's wall, east and west of a gate facing north or south
-// (BDS's gate connection rule, sub_C566C20).
+// (BDS's gate connection rule).
 func (o *Overworld) gateAccepts(gate uint32, eastWest bool) bool {
 	if !o.isFenceGate(gate) {
 		return false

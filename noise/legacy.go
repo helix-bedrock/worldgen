@@ -178,7 +178,7 @@ type LegacyOctaves struct {
 	scale float32
 }
 
-// NewLegacyOctaves draws n octaves from r, in order (BDS's sub_D241B00).
+// NewLegacyOctaves draws n octaves from r, in order (BDS's code).
 func NewLegacyOctaves(r Random, n int) *LegacyOctaves {
 	o := &LegacyOctaves{octs: make([]legacyOctave, n)}
 	var sum float32
@@ -201,7 +201,7 @@ func (o *LegacyOctaves) Scale() float32 { return o.scale }
 // AddGrid adds the octave sum to out, a grid of GridXZ x ny x GridXZ
 // corners, index (x*GridXZ+z)*ny + y, whose first corner is (x0, y0, z0)
 // in cell units. Octave i is sampled at input scale s*2^-i and weighted
-// 2^i (BDS's sub_D23EF10 per octave).
+// 2^i (BDS's code per octave).
 func (o *LegacyOctaves) AddGrid(out []float32, ny int, x0, y0, z0, sxz, sy float32) {
 	o.AddGridN(out, GridXZ, ny, x0, y0, z0, sxz, sy)
 }
@@ -216,7 +216,7 @@ func (o *LegacyOctaves) AddGridN(out []float32, nxz, ny int, x0, y0, z0, sxz, sy
 }
 
 // Sample returns the octave sum at one point: octave i at input scale 2^-i,
-// weighted 2^i (BDS's sub_D242930). The caller applies the set's scale.
+// weighted 2^i (BDS's code). The caller applies the set's scale.
 func (o *LegacyOctaves) Sample(x, y, z float32) float32 {
 	var v float32
 	a := float32(1)

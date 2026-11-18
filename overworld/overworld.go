@@ -400,7 +400,7 @@ func NewOverworld(seed int64, reg *blocks.Registry, biomeIDs map[string]uint32, 
 	o.caves = newCaveNoises(world)
 	o.ores = newOreNoises(world)
 	o.aquiferNoise = newAquiferNoises(world)
-	// BDS sub_498AB80: the blocks cave carvers may cut.
+	// BDS: the blocks cave carvers may cut.
 	o.ids.carvable = blockSet{}
 	for _, n := range carvableBlocks() {
 		id, ok := reg.Default("minecraft:" + n)
@@ -628,7 +628,7 @@ func (o *Overworld) bedrockFloor(mt *rand.MT, c *Chunk) {
 	}
 }
 
-// carvableBlocks are the blocks BDS's cave carvers may cut (sub_498AB80).
+// carvableBlocks are the blocks BDS's cave carvers may cut.
 func carvableBlocks() []string {
 	return []string{
 		"stone", "dirt", "coarse_dirt", "podzol", "grass_block",
@@ -645,8 +645,7 @@ func carvableBlocks() []string {
 	}
 }
 
-// canyonCarvableBlocks are the blocks BDS's canyons may cut (list at
-// 0xF60D710).
+// canyonCarvableBlocks are the blocks BDS's canyons may cut (list at).
 func canyonCarvableBlocks() []string {
 	return []string{
 		"stone", "granite", "diorite", "andesite", "tuff", "deepslate", "calcite", "dirt", "coarse_dirt", "mud",

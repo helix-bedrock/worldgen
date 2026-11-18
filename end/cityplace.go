@@ -79,12 +79,12 @@ type cityMarker struct {
 	name string
 }
 
-// elytraFacing is the item frame's facing_direction by the piece's turn
-// (dword_15411B4): south, west, north, east.
+// elytraFacing is the item frame's facing_direction by the piece's turn:
+// south, west, north, east.
 var elytraFacing = [4]int32{3, 4, 2, 5}
 
 // placeCityPiece places the part of one piece inside box, then handles its
-// markers (sub_4E492D0): a chest below a Chest marker gets the End city
+// markers: a chest below a Chest marker gets the End city
 // loot table, an Elytra marker becomes an item frame holding an elytra.
 // Sentry markers spawn shulkers, which worldgen does not place.
 func (e *End) placeCityPiece(c *Chunk, box structure.Box, p cityPiece, r *rand.MT) {

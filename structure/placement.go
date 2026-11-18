@@ -9,7 +9,7 @@ const (
 )
 
 // RegionSeed is the Mersenne Twister seed of placement region (rx, rz) of
-// a structure with the given salt (StructureFeature::setRandomSeedFor).
+// a structure with the given salt.
 // With seed and salt 0 it is the part of a chunk's seed that its
 // coordinates give.
 func RegionSeed(seed int64, salt uint32, rx, rz int32) uint32 {

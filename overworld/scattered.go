@@ -10,11 +10,11 @@ import (
 
 // Scattered features: desert pyramids, jungle temples, swamp huts and
 // igloos, written from BDS 1.26.52. They share one placement
-// (RandomScatteredLargeFeature: constructor sub_4E86130, chunk test
-// sub_4E86B40, start sub_4E86DE0) and pick the building by the biome at the
-// start chunk's middle. The pieces are code-built (desert pyramid
-// sub_4E8B6F0, jungle temple sub_4E905B0, swamp hut sub_4E98530) except the
-// igloo, which places templates (sub_4E9A2C0).
+// (RandomScatteredLargeFeature: constructor, chunk test,
+// start) and pick the building by the biome at the
+// start chunk's middle. The pieces are code-built (desert pyramid,
+// jungle temple, swamp hut) except the
+// igloo, which places templates.
 //
 // Bedrock differs from Java here, and the differences are kept:
 //   - every piece has orientation 0, so no building is ever rotated (the
@@ -30,12 +30,12 @@ import (
 //     fewer, and the witch hut's cauldron holds a random potion.
 //
 // BDS builds a piece in every chunk it reaches, each chunk with its own
-// population-seeded random (reseeded per structure type, sub_C970F80). The
+// population-seeded random (reseeded per structure type). The
 // piece's height is fixed by the first chunk that builds it; here that is
 // the start chunk.
 // VERIFY: the start chunk is the first to be built in BDS worlds too.
 
-// Scattered feature placement: linear spread (sub_4E86B40).
+// Scattered feature placement: linear spread.
 const (
 	scatterSalt       = 14357617
 	scatterSpacing    = 32
@@ -51,8 +51,8 @@ const (
 	scatterIgloo
 )
 
-// scatterBiomes are the biomes each kind starts in (sub_4E86130 lists them
-// all; sub_4E86DE0 maps them to kinds).
+// scatterBiomes are the biomes each kind starts in (lists them
+// all; maps them to kinds).
 var scatterBiomes = map[string]uint8{
 	"desert": scatterDesert, "desert_hills": scatterDesert,
 	"jungle": scatterJungle, "jungle_hills": scatterJungle,
@@ -164,7 +164,7 @@ func (o *Overworld) scatteredAt(cx, cz int32) uint8 {
 }
 
 // filledMinHeight is the lowest height-map value of a chunk's terrain fill,
-// before surfaces and carvers: sub_C972C70 fills the chunk again for the
+// before surfaces and carvers: fills the chunk again for the
 // height map the fill records (the y above each column's top block, water
 // included).
 func (o *Overworld) filledMinHeight(cx, cz int32) int32 {
@@ -227,7 +227,7 @@ func (o *Overworld) scatteredReaches(cx, cz int32) bool {
 }
 
 // topSolid is the y above a column's top solid block, looking through
-// leaves and plants; with water, water counts as the top (sub_C9F7970 with
+// leaves and plants; with water, water counts as the top (with
 // its stop-at-water flag, as the scattered pieces call it).
 func (o *Overworld) topSolid(p *PackedChunk, x, z int32, water bool) int32 {
 	if p == nil {
@@ -245,8 +245,8 @@ func (o *Overworld) topSolid(p *PackedChunk, x, z int32, water bool) int32 {
 
 // scatteredY is the bottom of a piece started in chunk (sx, sz), from the
 // start chunk's terrain: the lowest top in the chunk minus nextInt(3) for a
-// desert pyramid (sub_4E8B6F0), the average top for the others
-// (sub_4E8B570) plus 1 (hut), 0 (jungle temple) or -1 (igloo). The average
+// desert pyramid, the average top for the others
+// plus 1 (hut), 0 (jungle temple) or -1 (igloo). The average
 // counts tops under 0 as 0.
 func (o *Overworld) scatteredY(kind uint8, sx, sz int32, start *PackedChunk) int32 {
 	x0, z0 := sx*16, sz*16
@@ -345,7 +345,7 @@ func (b *scBuild) setWorld(wx, wy, wz int32, s uint32) bool {
 		return false
 	}
 	// A block that can hold water keeps the water it replaces, as in
-	// BDS's template placement (sub_D2B7A10).
+	// BDS's template placement.
 	wet := b.o.isWater(uint32(b.c.Blocks[i])) && b.o.holdsWater(s)
 	b.c.set(int(wx&15), int(wy), int(wz&15), s)
 	if wet {
@@ -377,7 +377,7 @@ func (b *scBuild) entity(x, y, z int32, table string) map[string]any {
 	return d
 }
 
-// fill is generateBox (sub_D260890): edge on the box's faces, inner inside,
+// fill is generateBox: edge on the box's faces, inner inside,
 // in y, x, z order; with skipAir only over blocks that are not air.
 func (b *scBuild) fill(x0, y0, z0, x1, y1, z1 int32, edge, inner uint32, skipAir bool) {
 	for y := y0; y <= y1; y++ {
@@ -396,8 +396,8 @@ func (b *scBuild) fill(x0, y0, z0, x1, y1, z1 int32, edge, inner uint32, skipAir
 	}
 }
 
-// fillMoss is generateBox with the moss stone selector (sub_D260DB0 with
-// off_EE8D0E8): a float for every block of the box, inside the chunk or
+// fillMoss is generateBox with the moss stone selector (with):
+// a float for every block of the box, inside the chunk or
 // not; under 0.4 cobblestone, otherwise mossy cobblestone.
 func (b *scBuild) fillMoss(x0, y0, z0, x1, y1, z1 int32) {
 	for y := y0; y <= y1; y++ {
@@ -413,7 +413,7 @@ func (b *scBuild) fillMoss(x0, y0, z0, x1, y1, z1 int32) {
 	}
 }
 
-// fillDown is fillColumnDown (sub_D255920): s down through air and liquid
+// fillDown is fillColumnDown: s down through air and liquid
 // to the first other block (no lower than the second block above the
 // world's bottom), which turns from grass to dirt.
 func (b *scBuild) fillDown(s uint32, x, y, z int32) {
@@ -446,7 +446,7 @@ func (b *scBuild) fillDownWorld(s uint32, wx, wy, wz int32) {
 // to minecraft:cardinal_direction.
 var cardinalOf = map[int32]string{2: "north", 3: "south", 4: "west", 5: "east"}
 
-// chest is createChest (sub_D254CA0): a chest facing dir with a loot table
+// chest is createChest: a chest facing dir with a loot table
 // and a seed drawn from the random, unless a chest is already there.
 func (b *scBuild) chest(x, y, z, dir int32, table string) {
 	wx, wy, wz := b.x0+x, b.y0+y, b.z0+z
@@ -459,7 +459,7 @@ func (b *scBuild) chest(x, y, z, dir int32, table string) {
 	}
 }
 
-// dispenser is createDispenser (sub_D255620), the chest's counterpart.
+// dispenser is createDispenser, the chest's counterpart.
 func (b *scBuild) dispenser(x, y, z, facing int32, table string) {
 	wx, wy, wz := b.x0+x, b.y0+y, b.z0+z
 	if !b.cbox.Contains([3]int32{wx, wy, wz}) || b.o.blockName(b.get(x, y, z)) == "minecraft:dispenser" {
@@ -472,7 +472,7 @@ func (b *scBuild) dispenser(x, y, z, facing int32, table string) {
 }
 
 // stairs is a stair block facing a weirdo_direction. BDS turns the piece's
-// direction d through sub_D254F10, which for orientation 0 swaps 2 and 3.
+// direction d through, which for orientation 0 swaps 2 and 3.
 func (b *scBuild) stairs(name string, d int32) uint32 {
 	switch d {
 	case 2:
@@ -483,7 +483,7 @@ func (b *scBuild) stairs(name string, d int32) uint32 {
 	return b.o.state("minecraft:"+name, map[string]any{"weirdo_direction": d})
 }
 
-// desertPyramid builds a desert pyramid (sub_4E8B6F0), Java 1.20's layout
+// desertPyramid builds a desert pyramid, Java 1.20's layout
 // with its archaeology cellar.
 func (b *scBuild) desertPyramid() {
 	o := b.o
@@ -626,13 +626,13 @@ type layerBlock struct {
 	s uint32
 }
 
-// desertCellar is the archaeology cellar (the second half of sub_4E8B6F0).
-// VERIFY: BDS skips it for worlds of older base game versions (byte_F4A2978
+// desertCellar is the archaeology cellar (the second half of).
+// VERIFY: BDS skips it for worlds of older base game versions (
 // and the version test); new worlds get it.
 func (b *scBuild) desertCellar() {
 	o := b.o
 	sand, sandstone, cut, chis, orange, blue := b.sand, b.sandstone, b.cut, b.chiseled, b.orange, b.blue
-	// nextBoolean is bit 27 of the output (Random vfunc +40, sub_8A5AA20).
+	// nextBoolean is bit 27 of the output (Random vfunc).
 	flip := b.r.Uint32()&0x8000000 != 0
 	s1 := b.stairs("sandstone_stairs", 1)
 	b.put(s1, 13, -1, 17)
@@ -710,7 +710,7 @@ func (b *scBuild) desertCellar() {
 	b.susSand(&xr, sus, [3]int32{x, 0, z})
 }
 
-// jungleTemple builds a jungle temple (sub_4E905B0), Java's layout.
+// jungleTemple builds a jungle temple, Java's layout.
 func (b *scBuild) jungleTemple() {
 	o := b.o
 	const w, d = 12, 15
@@ -789,13 +789,13 @@ func (b *scBuild) jungleTemple() {
 	b.fillMoss(6, -3, 1, 6, -3, 1)
 	b.fillMoss(6, -1, 1, 6, -1, 1)
 	// The tripwire traps. Hooks, levers, pistons and repeaters keep the
-	// direction given (sub_D254F10 leaves them alone).
+	// direction given (leaves them alone).
 	// Placed wire joins its neighbours (BDS updates it after placing).
 	wireX := o.state("minecraft:trip_wire", map[string]any{"attached_bit": true,
 		"minecraft:connection_east": true, "minecraft:connection_west": true})
 	wireZ := o.state("minecraft:trip_wire", map[string]any{"attached_bit": true,
 		"minecraft:connection_north": true, "minecraft:connection_south": true})
-	// VineBlock's all-sides constant (dword_F60D6C0).
+	// VineBlock's all-sides constant.
 	vine := o.state(blockVine, map[string]any{"vine_direction_bits": int32(15)})
 	b.put(o.tripwireHook(3, true), 1, -3, 8)
 	b.put(o.tripwireHook(1, true), 4, -3, 8)
@@ -852,14 +852,14 @@ func (b *scBuild) jungleTemple() {
 
 // hutPotions are the witch hut cauldron's potions by nextInt(100): water
 // breathing under 10, fire resistance under 15, swiftness under 30,
-// slowness under 40, poison under 65, weakness under 75, else healing
-// (sub_4E98530). The values are Bedrock potion IDs.
+// slowness under 40, poison under 65, weakness under 75, else healing.
+// The values are Bedrock potion IDs.
 var hutPotions = [...]struct {
 	below int32
 	id    int16
 }{{10, 19}, {15, 12}, {30, 14}, {40, 17}, {65, 25}, {75, 34}, {100, 21}}
 
-// swampHut builds a witch hut (sub_4E98530).
+// swampHut builds a witch hut.
 func (b *scBuild) swampHut() {
 	o := b.o
 	air := b.air
@@ -917,7 +917,7 @@ func (b *scBuild) swampHut() {
 	}
 }
 
-// igloo builds an igloo (sub_4E9A2C0) at height y: its top, and half the
+// igloo builds an igloo at height y: its top, and half the
 // time a basement under a trapdoor, nextInt(8)+4 ladder sections down. The
 // templates turn about their corner by a random quarter turn.
 func (b *scBuild) igloo(y int32) {
@@ -930,7 +930,7 @@ func (b *scBuild) igloo(y int32) {
 	b.template("igloo/igloo_top_trapdoor", origin, rot)
 	n := b.r.IntN(8) + 4
 	// Each section sits where its connection point meets the top's
-	// (sub_D2B50C0: both points turned, then subtracted).
+	// (: both points turned, then subtracted).
 	for k := range max(n, 1) {
 		b.template("igloo/igloo_middle", iglooSection(origin, rot, [3]int32{3, -1 - 3*k, 5}, [3]int32{1, 2, 1}), rot)
 	}
@@ -940,7 +940,7 @@ func (b *scBuild) igloo(y int32) {
 		switch m.name {
 		case "Villager":
 			// BDS's igloo still places the old villager and zombie
-			// villager (1.26.60 sub_5383130: types 0x100030F, 0x30B2C).
+			// villager (1.26.60: types, 0x30B2C).
 			b.mob(m.pos, structureMob{mobVillagerV1, ""})
 			continue
 		case "Zombie Villager":
@@ -970,7 +970,7 @@ type structureMob struct {
 }
 
 // The mobs the named markers place (BDS 1.26.60's postProcessMobsAt:
-// outpost sub_536FDA0, mansion sub_53A25C0, igloo sub_5383130).
+// outpost, mansion, igloo).
 const (
 	mobAllay            = "minecraft:allay"
 	mobPillager         = "minecraft:pillager"

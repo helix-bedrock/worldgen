@@ -9,15 +9,15 @@ import (
 	"github.com/helix-bedrock/worldgen/rand"
 )
 
-// End cities, written from BDS 1.26.52: EndCityFeature (chunk test
-// sub_4E400E0, height sub_4E402F0, start sub_4E40A30) and EndCityPieces
-// (recursion sub_4E41EA0, the tower, fat tower, bridge and house tower
-// generators sub_4E42570, sub_4E43EF0, sub_4E45340 and sub_4E46930, the
-// piece sub_4E48460 with its markers sub_4E492D0). The layout is Java's
+// End cities, written from BDS 1.26.52: EndCityFeature (chunk test,
+// height, start) and EndCityPieces
+// (recursion, the tower, fat tower, bridge and house tower
+// generators, the
+// piece with its markers). The layout is Java's
 // EndCityPieces with Bedrock's template names; Bedrock never refuses a
 // generator's pieces for overlapping older ones.
 
-// End city placement (sub_D251A10 with these values): a triangular spread.
+// End city placement (with these values): a triangular spread.
 const (
 	citySalt       = 10387313
 	citySpacing    = 20
@@ -53,13 +53,13 @@ func (e *End) cityPick(rx, rz int32) (int32, int32) {
 	return x, z
 }
 
-// cityRot is the start's turn (sub_4E402F0 and sub_4E40A30 both draw it).
+// cityRot is the start's turn (both draw it).
 func cityRot(cx, cz int32) int {
 	return int(rand.NewMT(uint32(cx+citySalt*cz)).Uint32() & 3)
 }
 
 // cityHeight is the lowest of the terrain heights at four columns of the
-// chunk, picked by the turn (sub_4E402F0): one above the top end stone,
+// chunk, picked by the turn: one above the top end stone,
 // 0 for none.
 func (e *End) cityHeight(cx, cz int32, rot int) int32 {
 	var c Chunk

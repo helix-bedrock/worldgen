@@ -24,9 +24,9 @@ const (
 // crystalIdentifier is the entity standing on each pillar.
 const crystalIdentifier = "minecraft:ender_crystal"
 
-// placeCrystals is TheEndGenerator's mob pass (sub_5197E50) for chunk
+// placeCrystals is TheEndGenerator's mob pass for chunk
 // (cx, cz): each pillar whose middle is in the chunk gets a bedrock block on
-// top (infiniburn) and an End crystal standing on it (sub_49C51E0).
+// top (infiniburn) and an End crystal standing on it.
 // VERIFY: BDS turns each crystal by a draw from the chunk's random (yaws
 // seen: 47 to 108 degrees); the crystals here face yaw 0.
 func (e *End) placeCrystals(cx, cz int32, c *Chunk) {
@@ -55,9 +55,9 @@ type PodiumBlock struct {
 }
 
 // ExitPortal returns the blocks of the exit portal on the main island
-// (EndPodiumFeature, sub_D2DE740), open (with end portal blocks) or not.
-// BDS builds it in the dragon fight (EndDragonFight's spawnExitPortal,
-// sub_497D5B0), not in generation: closed when the fight starts, open
+// (EndPodiumFeature), open (with end portal blocks) or not.
+// BDS builds it in the dragon fight (EndDragonFight's spawnExitPortal,),
+// not in generation: closed when the fight starts, open
 // once the dragon dies. It stands on the terrain at the origin: a bedrock
 // bowl with an end stone rim below, a bedrock ring around the portal, air
 // up to four blocks above, and a bedrock pillar with four torches in the

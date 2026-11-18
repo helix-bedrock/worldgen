@@ -10,8 +10,8 @@ import (
 	"github.com/helix-bedrock/worldgen/structure"
 )
 
-// geodeFeature is GeodeFeature (place: sub_51C22E0, per-column lambda
-// sub_51C4910). Written from BDS 1.26.52; the BDS quirks kept here are noted
+// geodeFeature is GeodeFeature (place:, per-column lambda).
+// Written from BDS 1.26.52; the BDS quirks kept here are noted
 // where they differ from Java's GeodeFeature.
 type geodeFeature struct {
 	filler, inner, alternate, middle, outer uint32
@@ -32,7 +32,7 @@ func geodeFaceNames() [6]string {
 	return [6]string{"down", "up", "north", "south", "west", "east"}
 }
 
-// geodeBudFaces is the order BDS tries the faces for a bud (dword_15400DC).
+// geodeBudFaces is the order BDS tries the faces for a bud.
 func geodeBudFaces() [6]int {
 	return [6]int{1, 0, 2, 3, 4, 5}
 }
@@ -91,7 +91,7 @@ func (o *Overworld) parseGeode(raw json.RawMessage) (placer, error) {
 		f.placements = append(f.placements, faces)
 	}
 	// Points fail on bedrock, packed ice and blue ice by name, and on the
-	// air, water, lava and ice materials (list xmmword_F4571C0: 0, 5, 6, 13).
+	// air, water, lava and ice materials (list: 0, 5, 6, 13).
 	// VERIFY: the ice material taken as ice and frosted ice.
 	for i := 0; i < o.reg.Len(); i++ {
 		b := uint32(i)
@@ -158,7 +158,7 @@ type geodeOp struct {
 // insideStructure reports whether a block is inside a structure piece BDS
 // knows when placing a geode.
 // VERIFY: BDS asks the dimension for the structure at the position
-// (vfunc +336 of the structure source); taken here as ancient city and
+// (vfunc of the structure source); taken here as ancient city and
 // mineshaft piece boxes.
 func (o *Overworld) insideStructure(x, y, z int32) bool {
 	p := [3]int32{x, y, z}
@@ -256,7 +256,7 @@ func (f *geodeFeature) place(w *featureWorld, x, y, z int32, r *rand.MT) (blockP
 				if nb != o.ids.air && !o.waterMaterial(nb) {
 					continue
 				}
-				// VERIFY: the bud's survival test (sub_C747C90) is taken as
+				// VERIFY: the bud's survival test is taken as
 				// the block it hangs from being sturdy toward it.
 				if hold, _ := w.block(s[0], s[1], s[2]); !o.sturdyFace(hold, face) {
 					continue
@@ -318,7 +318,7 @@ func (g *geodeRun) column(x, oy int32, found *bool) bool {
 	return !hit && *found
 }
 
-// row is the per-row lambda (sub_51C4910) over z from -radius to +radius
+// row is the per-row lambda over z from -radius to +radius
 // around the origin. It reports whether the walk should stop here.
 func (g *geodeRun) row(x, y int32, hit, crackSeen *bool) bool {
 	f := g.f

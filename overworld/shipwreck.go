@@ -8,9 +8,9 @@ import (
 	"github.com/helix-bedrock/worldgen/structure"
 )
 
-// Shipwrecks, written from BDS 1.26.52: ShipwreckFeature (constructor
-// sub_4E9C480, chunk test sub_4E9D1F0, start sub_4E9D4A0) and ShipwreckPiece
-// (postProcess sub_4E9D850). The start chunk builds the whole ship into its
+// Shipwrecks, written from BDS 1.26.52: ShipwreckFeature (constructor,
+// chunk test, start) and ShipwreckPiece
+// (postProcess). The start chunk builds the whole ship into its
 // neighbours as well; here every chunk the ship reaches lays out the same
 // ship from the start chunk's random and writes its own part.
 //
@@ -19,7 +19,7 @@ import (
 //     must be the start's own biome, and no ship starts within 5 chunks of
 //     an ocean monument; deep warm oceans have none;
 //   - each ship draws a pair of woods: its oak and dark oak stairs, doors,
-//     trapdoors and stripped logs turn into them (qword_1523D20);
+//     trapdoors and stripped logs turn into them;
 //   - the ship sits at the average floor height over the middle half of
 //     its footprint, 2 lower (4 for upside-down ships); a beached ship is
 //     never below sea level;
@@ -31,7 +31,7 @@ import (
 // logs). Planks, slabs and fences keep their wood.
 // VERIFY: markers handled in template order.
 
-// Shipwreck placement (sub_4E9D1F0): linear spread. Worlds with the legacy
+// Shipwreck placement: linear spread. Worlds with the legacy
 // flag use 10 and 5.
 const (
 	shipSalt       = 165745295
@@ -39,16 +39,16 @@ const (
 	shipSeparation = 4
 )
 
-// shipBiomes are the biomes a shipwreck starts in (sub_4E9C480).
+// shipBiomes are the biomes a shipwreck starts in.
 func shipBiomes() []string {
 	return []string{"beach", "cold_beach", "mushroom_island_shore", "ocean", "deep_ocean", "cold_ocean",
 		"deep_cold_ocean", "lukewarm_ocean", "deep_lukewarm_ocean", "frozen_ocean", "deep_frozen_ocean", "warm_ocean"}
 }
 
-// shipBeaches are the biomes that make a beached ship (mask 0x4018000).
+// shipBeaches are the biomes that make a beached ship (mask).
 func shipBeaches() []string { return []string{"beach", "cold_beach", "mushroom_island_shore"} }
 
-// shipTemplates in BDS's order (sub_4E9B6C0); beached ships draw from the
+// shipTemplates in BDS's order; beached ships draw from the
 // first shipUprightTemplates, which leaves out the upside-down ones.
 func shipTemplates() [20]string {
 	return [...]string{"swwithmast", "swwithmastdegraded",
@@ -77,14 +77,14 @@ func woodNames() [6]string {
 }
 
 // shipWoods are the wood pairs a ship draws from: what its oak and its dark
-// oak become (qword_1523D20).
+// oak become.
 func shipWoods() [9][2]uint8 {
 	return [...][2]uint8{{woodOak, woodSpruce}, {woodJungle, woodSpruce}, {woodDarkOak, woodJungle},
 		{woodDarkOak, woodSpruce}, {woodSpruce, woodOak}, {woodSpruce, woodJungle}, {woodSpruce, woodDarkOak},
 		{woodOak, woodBirch}, {woodSpruce, woodAcacia}}
 }
 
-// Shipwreck layout (sub_4E9D1F0, sub_4E9D4A0, sub_4E9D850).
+// Shipwreck layout.
 const (
 	// shipBeachReach and shipOceanReach are the radius, in blocks, of the
 	// same-biome test around a beached and an ocean start.
@@ -174,7 +174,7 @@ func (o *Overworld) isShipChunk(cx, cz int32) bool {
 }
 
 // shipAt lays out the shipwreck starting in chunk (sx, sz), nil if none
-// does, from the start chunk's random (sub_4E9D850). It is computed once
+// does, from the start chunk's random. It is computed once
 // per start; the height is not part of it (shipY).
 func (o *Overworld) shipAt(sx, sz int32) *shipwreck {
 	k := [2]int32{sx, sz}
@@ -314,7 +314,7 @@ type shipMarker struct {
 	name string
 }
 
-// ship places a shipwreck's template (sub_D2B7A10: integrity 1, below sea
+// ship places a shipwreck's template (: integrity 1, below sea
 // level air turns to water and liquid holders are waterlogged unless the
 // ship is beached), then its chest markers.
 func (b *scBuild) ship(s *shipwreck, y int32) {

@@ -7,9 +7,9 @@ import (
 )
 
 // The frozen ocean's ice, written from BDS 1.26.52: legacy:ice_feature
-// (sub_51D2800) places an iceberg in 1 of 8 chunks and up to 19 blue ice
-// patches. The iceberg is IcebergFeature (place: sub_51CC190, with
-// sub_51CD4A0 placing one block and sub_51CD890 carving).
+// places an iceberg in 1 of 8 chunks and up to 19 blue ice
+// patches. The iceberg is IcebergFeature (place:, with
+// placing one block and carving).
 
 // tableSin and tableCos are BDS's sine table lookups (mce::Math, 65536
 // steps per turn).
@@ -260,7 +260,7 @@ func (f *icebergFeature) roundRadius(r *rand.MT, y, height int32, fh float32, wi
 	return ceilf(v * 0.5)
 }
 
-// block places one iceberg block (sub_51CD4A0).
+// block places one iceberg block.
 func (f *icebergFeature) block(w *featureWorld, r *rand.MT, s *icebergShape, height, x, y, z, radius, maxR int32, ellipse bool) {
 	var d float32
 	if ellipse {
@@ -310,7 +310,7 @@ func (f *icebergFeature) block(w *featureWorld, r *rand.MT, s *icebergShape, hei
 	w.set(px, py, pz, b)
 }
 
-// carve cuts one layer of the channel (sub_51CD890): water below sea level,
+// carve cuts one layer of the channel: water below sea level,
 // air above.
 func (f *icebergFeature) carve(w *featureWorld, s *icebergShape, radius, y int32, underwater bool, angle float32, offX, offZ, v160, minor int32) {
 	n := radius + v160/3 + 1
@@ -346,7 +346,7 @@ func (f *icebergFeature) carve(w *featureWorld, s *icebergShape, radius, y int32
 	}
 }
 
-// blueIceFeature is BDS's BlueIceFeature (place: sub_4988230): a patch of
+// blueIceFeature is BDS's BlueIceFeature: a patch of
 // blue ice grown from a block of water next to packed ice, below sea level.
 type blueIceFeature struct {
 	ice *icebergFeature

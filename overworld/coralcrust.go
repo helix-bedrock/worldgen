@@ -10,7 +10,7 @@ import (
 
 // coralCrustFeature lays the dead coral crusts and outcroppings of warm
 // oceans from the coralcrust templates and grows live coral on their data
-// markers (CoralCrustFeature, sub_4990390; marker pass sub_4991AA0).
+// markers (CoralCrustFeature, marker pass).
 type coralCrustFeature struct {
 	coral *coralFeature
 	// crusts and outcrops hold each template's palette per turn, with the
@@ -26,7 +26,7 @@ type crustTemplate struct {
 }
 
 // crustProbe and crustOrigin are BDS's per-crust, per-turn offsets
-// (dword_1491D54..qword_1491DF0): the column the crust is tested on, and
+// (..): the column the crust is tested on, and
 // from it back to the template's corner. Turn 3 is BDS's fallback value.
 func crustProbe() [5][4][2]int32 {
 	return [5][4][2]int32{
@@ -48,7 +48,7 @@ func crustOrigin() [5][4][2]int32 {
 }
 
 // outcropOffset is the outcropping's corner from the probe column, by
-// outcropping and turn (sub_4991970).
+// outcropping and turn.
 func outcropOffset() [6][4][3]int32 {
 	return [6][4][3]int32{
 		{{-5, 0, -2}, {3, 0, -5}, {5, 0, 2}, {-2, 0, 5}},
@@ -74,7 +74,7 @@ func newCoralCrust(cf *coralFeature) *coralCrustFeature {
 // palette converts a template's palette for a turn. BDS turns the
 // templates' coral_block (variant dead_coral) into a dead coral block of a
 // colour drawn from a random seeded with the milliseconds since the server
-// started, once per template load (sub_D276010), so no two BDS runs agree;
+// started, once per template load, so no two BDS runs agree;
 // here the colour comes from the world seed and the template's name.
 func (f *coralCrustFeature) palette(o *Overworld, t *crustTemplate, jt *structure.JigsawTemplate, rot int) []structure.ConvertedState {
 	t.once[rot].Do(func() {
@@ -189,7 +189,7 @@ func (f *coralCrustFeature) placeTemplate(w *featureWorld, t *crustTemplate, at 
 	f.growMarkers(w, markers, r)
 }
 
-// growMarkers is BDS's marker pass (sub_4991AA0): live coral of one colour
+// growMarkers is BDS's marker pass: live coral of one colour
 // in short arms or a small cross on each marker, then fans on top and wall
 // fans on the sides. VERIFY: BDS walks the markers in its hash map's
 // order; they are taken in template order here.

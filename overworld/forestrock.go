@@ -3,12 +3,11 @@ package overworld
 import "github.com/helix-bedrock/worldgen/rand"
 
 // Forest rocks of the giant taigas, written from BDS 1.26.52: legacy:forest_rock_feature
-// (LegacyForestRockFeature, place sub_51D2470) drops zero to two rocks at random spots
+// (LegacyForestRockFeature, place) drops zero to two rocks at random spots
 // of the chunk on the heightmap; each is minecraft:forest_rock_feature, a BlockBlobFeature
-// (place sub_4987380) of mossy cobblestone with start radius 0, registered in
-// sub_4E2BB50.
+// (place) of mossy cobblestone with start radius 0, registered in
 
-// Forest rock constants (sub_51D2470, sub_4987380).
+// Forest rock constants.
 const (
 	// forestRockMaxCount bounds the rocks per chunk (zero to two).
 	forestRockMaxCount = 3
@@ -38,7 +37,7 @@ func (f *legacyForestRockFeature) place(w *featureWorld, x, y, z int32, r *rand.
 
 // blockBlobFeature is three overlapping balls of one block, each a little off the last,
 // on the first grass, dirt or stone below the origin.
-// VERIFY: the ground list (xmmword_F60D690) is taken as grass, the dirt tag and stone,
+// VERIFY: the ground list is taken as grass, the dirt tag and stone,
 // as in Java's old block blob.
 type blockBlobFeature struct {
 	block  uint32

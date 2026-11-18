@@ -10,9 +10,9 @@ import (
 )
 
 // Small plant features around trees, written from BDS 1.26.52:
-// FlowerBedFeature (leaf_litter_feature, wildflowers_feature; place
-// sub_51C0110), MushroomFeature (brown/red_mushroom_feature; sub_49B9020)
-// and minecraft:horizontal_tree_decoration_feature (sub_51C9560, the shelf
+// FlowerBedFeature (leaf_litter_feature, wildflowers_feature; place),
+// MushroomFeature (brown/red_mushroom_feature)
+// and minecraft:horizontal_tree_decoration_feature (the shelf
 // mushrooms on poplar and fallen logs).
 
 // cardinalNames are the values of minecraft:cardinal_direction in BDS's
@@ -68,7 +68,7 @@ func (f *flowerBedFeature) place(w *featureWorld, x, y, z int32, r *rand.MT) (bl
 }
 
 // holdsPlant reports whether a block's top face holds a thin plant such as
-// leaf litter or a mushroom (BlockLegacy::canProvideSupport upwards).
+// leaf litter or a mushroom (upwards).
 // VERIFY: BDS reads a support flag per block; taken to be solid blocks
 // that fully block light, and leaves.
 func (o *Overworld) holdsPlant(b uint32) bool {
@@ -127,7 +127,7 @@ func (f *mushroomFeature) try(w *featureWorld, x, y, z int32) {
 	w.set(x, y, z, f.block)
 }
 
-// covered reports whether a spot is out of the sky (sub_49EC660): below the
+// covered reports whether a spot is out of the sky: below the
 // column's height map, or with a block that is not fully translucent
 // within ten blocks above.
 // VERIFY: BDS takes the height map from a chunk its region returns without
@@ -233,10 +233,10 @@ func (f *horizontalDecoration) place(w *featureWorld, x, y, z int32, r *rand.MT)
 }
 
 // Flowers and sweet berry bushes, written from BDS 1.26.52:
-// LegacyFlowerFeature (minecraft:legacy:*_flower_feature; place
-// sub_51D18F0, flower choice sub_D2D6C50), the meadow flower feature
-// (sub_51D7E00) and CentralSpikedFeature (sweet_berry_bush_feature;
-// sub_498F7D0). Each makes one try in new worlds (sub_4E2BB50 picks the
+// LegacyFlowerFeature (minecraft:legacy:*_flower_feature; place,
+// flower choice), the meadow flower feature
+// and CentralSpikedFeature (sweet_berry_bush_feature;).
+// Each makes one try in new worlds (picks the
 // count by base game version, as for mushrooms).
 
 type flowerKind uint8
@@ -359,7 +359,7 @@ func (o *Overworld) onSoil(w *featureWorld, x, y, z int32) bool {
 }
 
 // meadowFlowerFeature places one plant chosen by noise alone: how many
-// candidates, which ones, and which candidate (sub_51D7E00). It always
+// candidates, which ones, and which candidate. It always
 // reports failure, as BDS does.
 type meadowFlowerFeature struct {
 	blocks [8]uint32

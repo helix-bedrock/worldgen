@@ -11,16 +11,15 @@ import (
 	"github.com/helix-bedrock/worldgen/structure"
 )
 
-// Ocean ruins, written from BDS 1.26.52: OceanRuinFeature (constructor
-// sub_4E7CB90, chunk test sub_4E7D710, start sub_4E7D890, piece choice
-// sub_4E7ECF0) and OceanRuinPiece (postProcess sub_4E80060, chest marker
-// sub_4E80ED0). The pieces are LegacyStructureTemplate placements
-// (sub_D27F3A0 -> sub_D2B7A10).
+// Ocean ruins, written from BDS 1.26.52: OceanRuinFeature (constructor,
+// chunk test, start, piece choice)
+// and OceanRuinPiece (postProcess, chest marker).
+// The pieces are LegacyStructureTemplate placements
 //
 // Bedrock differs from Java here, and the differences are kept:
 //   - a ruin never starts within 5 chunks of an ocean monument start;
 //   - the chance of a large ruin and of a cluster comes from the start
-//     biome (sub_4951300): 0.3/0.25 for ocean, cold and frozen oceans,
+//     biome: 0.3/0.25 for ocean, cold and frozen oceans,
 //     0.5/0.4 for their deep forms, 0.3/0.5 for warm and lukewarm ones;
 //   - cold groups have a plain "ruin4" as their first small template;
 //   - a piece's height is the height map at its corner, lowered to the
@@ -39,7 +38,7 @@ import (
 // suspicious, StructurePoolBlockPredicateCappedArcheologyBlockReplacement,
 // Xoroshiro seeded from the piece corner) is not applied.
 
-// Ocean ruin placement (sub_4E7D710): linear spread. Worlds with the legacy
+// Ocean ruin placement: linear spread. Worlds with the legacy
 // flag use 12 and 7.
 const (
 	ruinSalt       = 14357621
@@ -47,21 +46,21 @@ const (
 	ruinSeparation = 8
 )
 
-// Ocean monument placement (sub_4E5E7B0): triangular spread.
+// Ocean monument placement: triangular spread.
 const (
 	monumentSalt       = 10387313
 	monumentSpacing    = 32
 	monumentSeparation = 5
 )
 
-// ruinBiome is a biome's ocean ruin settings (Biome +0x44..+0x4C).
+// ruinBiome is a biome's ocean ruin settings (..).
 type ruinBiome struct {
 	ok             bool
 	warm           bool
 	large, cluster float32
 }
 
-// Ocean ruin start chances by biome kind (sub_4951300).
+// Ocean ruin start chances by biome kind.
 const (
 	// ruinLargeShallow is a shallow or warm ocean's large ruin chance.
 	ruinLargeShallow = 0.3
@@ -75,8 +74,8 @@ const (
 	ruinClusterWarm = 0.5
 )
 
-// ruinBiomes are the biomes ocean ruins start in (sub_4E7CB90) with their
-// settings (sub_4951300). It is only read when the generator is built.
+// ruinBiomes are the biomes ocean ruins start in with their
+// settings. It is only read when the generator is built.
 func ruinBiomes() map[string]ruinBiome {
 	shallow := ruinBiome{true, false, ruinLargeShallow, ruinClusterShallow}
 	deep := ruinBiome{true, false, ruinLargeDeep, ruinClusterDeep}
@@ -96,25 +95,24 @@ func ruinBiomes() map[string]ruinBiome {
 }
 
 // monumentDeepBiomes are the biomes a monument's middle must be in
-// (sub_4E5D570).
 func monumentDeepBiomes() []string {
 	return []string{"deep_ocean", "deep_cold_ocean", "deep_lukewarm_ocean", "deep_warm_ocean", "deep_frozen_ocean"}
 }
 
-// monumentWaterBiomes are the biomes all around a monument (sub_4E5D570).
+// monumentWaterBiomes are the biomes all around a monument.
 func monumentWaterBiomes() []string {
 	return []string{"ocean", "deep_ocean", "cold_ocean", "deep_cold_ocean", "frozen_ocean", "deep_frozen_ocean",
 		"lukewarm_ocean", "deep_lukewarm_ocean", "warm_ocean", "deep_warm_ocean", "frozen_river", "river"}
 }
 
-// Monument biome test radii in blocks (sub_4E5D570).
+// Monument biome test radii in blocks.
 const (
 	monumentDeepReach  = 16
 	monumentWaterReach = 29
 )
 
 // ruinWarmSmall, ruinWarmBig, ruinColdSmall and ruinColdBig are the ruin
-// templates in BDS's table order (0xEE8E160); the index is drawn.
+// templates in BDS's table order; the index is drawn.
 func ruinWarmSmall() [8]string {
 	return [...]string{"ruin_warm1", "ruin_warm2", "ruin_warm3", "ruin_warm4", "ruin_warm5", "ruin_warm6",
 		"ruin_warm7", "ruin_warm8"}
@@ -143,8 +141,8 @@ const (
 )
 
 // Rotated offsets by rotation 0..3: the main piece's corner inside the start
-// chunk (dword_13ED8BC, dword_15411CC), its box (dword_15411FC,
-// qword_15411F0) and a cluster piece's box (dword_15411E4, qword_15411D8).
+// chunk, its box ()
+// and a cluster piece's box.
 func ruinCornerX() [structRotations]int32 { return [...]int32{0, ruinMainSize, ruinMainSize, 0} }
 
 func ruinCornerZ() [structRotations]int32 { return [...]int32{0, 0, ruinMainSize, ruinMainSize} }
@@ -165,7 +163,7 @@ func ruinClusterZ() [structRotations]int32 {
 	return [...]int32{ruinClusterLong, ruinClusterShort, -ruinClusterLong, -ruinClusterShort}
 }
 
-// Ocean ruin layout (sub_4E7D890, sub_4E7ECF0, sub_4E80060).
+// Ocean ruin layout.
 const (
 	// ruinMonumentGap is how many chunks around a ruin start must hold no
 	// monument start (the box runs from -ruinMonumentGap to
@@ -353,7 +351,7 @@ func (o *Overworld) ruinAt(cx, cz int32) ruinBiome {
 	return o.ruinBiome[b]
 }
 
-// ruinPieces lays out the ruin starting in chunk (cx, cz) (sub_4E7D890):
+// ruinPieces lays out the ruin starting in chunk (cx, cz):
 // the main ruin and, for a large one, a cluster of small ones around it.
 func (o *Overworld) ruinPieces(cx, cz int32, cfg ruinBiome) []ruinPiece {
 	var r rand.MT
@@ -393,7 +391,7 @@ func (o *Overworld) ruinPieces(cx, cz int32, cfg ruinBiome) []ruinPiece {
 	return pieces
 }
 
-// addRuin adds one ruin's pieces (sub_4E7ECF0): a warm template, or a cold
+// addRuin adds one ruin's pieces: a warm template, or a cold
 // one in three layers (brick, cracked at 0.7, mossy at 0.5).
 func addRuin(pieces []ruinPiece, r *rand.MT, x, z int32, rot int, integrity float32, big, warm bool) []ruinPiece {
 	if warm {
@@ -486,7 +484,7 @@ func (o *Overworld) placeRuins(cx, cz int32, c *Chunk, raw func(cx, cz int32) *P
 	})
 }
 
-// ruinY is a piece's bottom y (sub_4E80060): the height map at its corner,
+// ruinY is a piece's bottom y: the height map at its corner,
 // moved down to the lowest floor under the piece when that floor is more
 // than 3 below and most columns are that deep, then one lower.
 func (o *Overworld) ruinY(p ruinPiece, area structure.Box, raw func(cx, cz int32) *PackedChunk) int32 {
@@ -520,7 +518,7 @@ func (o *Overworld) ruinY(p ruinPiece, area structure.Box, raw func(cx, cz int32
 	return h - 1
 }
 
-// ruinPiece places one ruin template into the chunk (sub_D2B7A10 with the
+// ruinPiece places one ruin template into the chunk (with the
 // piece's settings, then its chest markers).
 func (b *scBuild) ruinPiece(p ruinPiece, raw func(cx, cz int32) *PackedChunk) {
 	o := b.o
@@ -578,7 +576,7 @@ func (b *scBuild) ruinPiece(p ruinPiece, raw func(cx, cz int32) *PackedChunk) {
 	}
 }
 
-// ruinChest handles a chest marker (sub_4E80ED0): the marker spot is
+// ruinChest handles a chest marker: the marker spot is
 // filled, the chest goes one block under it, waterlogged at or below sea
 // level, and gets the big or small ruin loot.
 func (b *scBuild) ruinChest(p ruinPiece, pos [3]int32) {

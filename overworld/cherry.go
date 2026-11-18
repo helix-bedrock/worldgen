@@ -6,9 +6,9 @@ import (
 	"github.com/helix-bedrock/worldgen/rand"
 )
 
-// Cherry trees, written from BDS 1.26.52: CherryTreeTrunk (sub_D2D2770, branch builder
-// sub_D2D3250) and CherryTreeCanopy (sub_D2D1DA0, rows sub_D2D1FC0, hanging leaves
-// sub_D2D2350). It is the same shape as Java's cherry trunk and foliage placers, drawn
+// Cherry trees, written from BDS 1.26.52: CherryTreeTrunk (branch builder)
+// and CherryTreeCanopy (rows, hanging leaves).
+// It is the same shape as Java's cherry trunk and foliage placers, drawn
 // with Bedrock's random.
 
 type cherryTrunk struct {
@@ -250,7 +250,7 @@ func (t *treeFeature) cherryRow(w *featureWorld, c *cherryCanopy, p blockPos, ly
 // cherryHanging is a row plus leaves hanging one or two blocks below its edge.
 func (t *treeFeature) cherryHanging(w *featureWorld, c *cherryCanopy, p blockPos, ly, rng int32, r *rand.MT) {
 	t.cherryRow(w, c, p, ly, rng, r)
-	// The perpendicular side of each direction (byte_1ADA5B7).
+	// The perpendicular side of each direction.
 	perp := [4]int{3, 0, 1, 2}
 	for d := range 4 {
 		ox, oz := p[0]+rng*cherryDX()[perp[d]], p[2]+rng*cherryDZ()[perp[d]]

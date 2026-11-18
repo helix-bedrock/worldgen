@@ -7,13 +7,13 @@ import (
 	"github.com/helix-bedrock/worldgen/structure"
 )
 
-// Village placement, from BDS 1.26.52: the feature is built by sub_4FBB600
-// (called from sub_523B5C0) and a chunk is checked by sub_4FBB850.
+// Village placement, from BDS 1.26.52: the feature is built by
+// (called) and a chunk is checked by.
 const (
 	villageSalt = 10387312
 	// o.place[skVillage].spacing and o.place[skVillage].separation are the values for worlds of base
 	// game version 1.18.0 and later; older worlds use 27 and 10
-	// (sub_523B5C0, version constant written by sub_6C01520).
+	// (version constant written by).
 	villageSpacing    = 34
 	villageSeparation = 8
 	// villageBiomeReach is the radius of the start biome test, in blocks.
@@ -24,7 +24,6 @@ const (
 )
 
 // structureSeed seeds r for the placement region (rx, rz) of a structure
-// (StructureFeature::setRandomSeedFor).
 func structureSeed(r *rand.MT, seed int64, rx, rz, salt int32) {
 	r.Seed(structure.RegionSeed(seed, uint32(salt), rx, rz))
 }
@@ -69,7 +68,7 @@ func (o *Overworld) isVillageSpreadPick(chunkX, chunkZ int32) bool {
 }
 
 // biomesOnly reports whether every biome sampled every 4 blocks within r of
-// (x, y, z), y clamped to the world, is in the set (sub_493B030).
+// (x, y, z), y clamped to the world, is in the set.
 func (o *Overworld) biomesOnly(x, y, z, r int32, set []bool) bool {
 	y0, y1 := max(y-r, MinY), min(y+r, MaxY-1)
 	for bx := x - r; bx <= x+r; bx += biomeCellBlocks {

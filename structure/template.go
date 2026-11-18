@@ -11,7 +11,7 @@ import (
 // Template is a structure template in Java Edition's .nbt format, the form
 // BDS ships the jigsaw pieces of villages and other structures in
 // (behavior_packs/*/structures/**/*.nbt). Block states are Java ones; BDS
-// converts them when it loads the file (sub_D2B9E40 in 1.26.52).
+// converts them when it loads the file.
 type Template struct {
 	Size     [3]int32
 	Palette  []TemplateState

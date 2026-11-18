@@ -1,10 +1,10 @@
 package overworld
 
-// The freeze pass BDS runs at the end of decoration (postProcess,
-// sub_517CD10): per column, water at the top freezes to ice and a snow layer
+// The freeze pass BDS runs at the end of decoration (postProcess,):
+// per column, water at the top freezes to ice and a snow layer
 // falls on the top block where the biome is cold enough.
 
-// Constants of the biome temperature (sub_C7B8560, sub_C7B91C0).
+// Constants of the biome temperature.
 const (
 	// coolingStart is how far above sea level the air starts to cool.
 	coolingStart = 17
@@ -22,7 +22,7 @@ const (
 	freezeTemperature = 0.15
 )
 
-// temperature is the biome temperature at a block (sub_C7B8560): the
+// temperature is the biome temperature at a block: the
 // biome's own, frozen ocean patches, and cooling above sea level + 17 that
 // varies per column.
 func (o *Overworld) temperature(b uint32, x, y, z int32) float32 {
@@ -34,14 +34,14 @@ func (o *Overworld) temperature(b uint32, x, y, z int32) float32 {
 	if y <= limit {
 		return t
 	}
-	// The column noise is stored in a byte at 1/8 resolution
-	// (sub_C7B91C0): noise * 8 * 8, read back * 0.125.
+	// The column noise is stored in a byte at 1/8 resolution:
+	// noise * 8 * 8, read back * 0.125.
 	n := o.surfNoise.heightTemp.Sum2(float32(x)*columnNoiseScale, float32(z)*columnNoiseScale)
 	col := float32(int8(int32(n * columnNoiseByte * columnNoiseByte)))
 	return t + float32(float64(((float32(y)+col*columnNoiseScale)-limit)*coolingRate)/coolingDivisor)
 }
 
-// Temperature is BDS's biome temperature at a block (Biome::getTemperature, sub_CD539E0 in
+// Temperature is BDS's biome temperature at a block (BDS's code, in
 // 1.26.60): the biome's own, frozen ocean patches, and cooling above sea level + 17 that
 // varies per column. biome is a biome ID as the chunk holds it. Snow falls and water freezes
 // at freezeTemperature (0.15) and below. Runs: any goroutine.
@@ -50,7 +50,7 @@ func (o *Overworld) Temperature(biome uint32, x, y, z int32) float32 {
 }
 
 // rainTop is the y above the highest block that stops rain in a column of
-// the chunk (LevelChunk::getTopRainBlockPos, sub_C9FBAC0): solid blocks,
+// the chunk: solid blocks,
 // liquids and leaves; plants and snow layers let it through.
 func (o *Overworld) rainTop(c *Chunk, x, z int) int32 {
 	for y := MaxY - 1; y >= MinY; y-- {
@@ -90,8 +90,8 @@ func (o *Overworld) freeze(chunkX, chunkZ int32, c *Chunk) {
 	}
 }
 
-// snowCanStand is the snow layer's placement rule for the block below
-// (TopSnowBlock::mayPlace, sub_CE980E0): leaves, or a full solid block that
+// snowCanStand is the snow layer's placement rule for the block below:
+// leaves, or a full solid block that
 // is not ice or packed ice.
 // VERIFY: "full top face" is approximated by the solid-material list.
 func (o *Overworld) snowCanStand(c *Chunk, x, y, z int) bool {
@@ -116,8 +116,7 @@ func (o *Overworld) snowCanStand(c *Chunk, x, y, z int) bool {
 }
 
 // snowReplaces reports whether a snow layer may take a block's place: air,
-// or a block BDS marks as replaceable (component type 3 in
-// sub_C8028A0).
+// or a block BDS marks as replaceable (component type 3 in).
 // VERIFY: the replaceable set is taken to be the small single plants.
 func (o *Overworld) snowReplaces(b uint32) bool {
 	if b == o.ids.air {

@@ -114,7 +114,7 @@ func (l *Lib) BlockName(id uint32) string {
 func (l *Lib) IsWater(b uint32) bool { return b == l.water || b == l.flowingWater }
 
 // HoldsWater reports whether a block keeps the water it is placed in: BDS's
-// can-contain-liquid flag (Block+184 bit 0), from bds/liquid_holders.json.
+// can-contain-liquid flag (Block bit 0), from bds/liquid_holders.json.
 func (l *Lib) HoldsWater(b uint32) bool {
 	return b != l.air && l.holdsLiquid[l.BlockName(b)]
 }

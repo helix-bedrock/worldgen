@@ -7,12 +7,12 @@ import (
 	"github.com/helix-bedrock/worldgen/structure"
 )
 
-// Ocean monuments, written from BDS 1.26.52: the start (sub_4E5EAA0,
-// sub_4E5EC70), MonumentBuilding (constructor sub_4E5FB80, postProcess
-// sub_4E63B10, wing sub_4E6B560) and its rooms (entry sub_4E6C260, simple
-// sub_4E6CC20, simple top sub_4E6EC20, double Y sub_4E6F990, double X
-// sub_4E70800, double Z sub_4E72500, double XY sub_4E74600, double YZ
-// sub_4E77080, core sub_4E79C40, wing sub_4E7A850, penthouse sub_4E7B8B0).
+// Ocean monuments, written from BDS 1.26.52: the start (),
+// MonumentBuilding (constructor, postProcess,
+// wing) and its rooms (entry, simple,
+// simple top, double Y, double X,
+// double Z, double XY, double YZ,
+// core, wing, penthouse).
 // The layout is Java's OceanMonumentPieces; Bedrock differs in:
 //   - the start's random is reseeded from the world seed and two floats
 //     scaled by the chunk position;
@@ -106,7 +106,7 @@ type monument struct {
 	pieces []monPiece // the building first, then its children in order
 }
 
-// monumentStartSeed is the seed of the start's random (sub_4E5EC70).
+// monumentStartSeed is the seed of the start's random.
 func (o *Overworld) monumentStartSeed(cx, cz int32) uint32 {
 	var r rand.MT
 	r.Seed(uint32(o.seed))
@@ -303,7 +303,7 @@ func (o *Overworld) layMonument(cx, cz int32) *monument {
 	return m
 }
 
-// roomBox is a room piece's box from its grid index (sub_4E5F3D0), before
+// roomBox is a room piece's box from its grid index, before
 // the building moves it.
 func (m *monument) roomBox(rm *monRoom, sx, sy, sz int32) structure.Box {
 	i := int32(rm.index)
@@ -398,8 +398,8 @@ func (o *Overworld) placeMonuments(cx, cz int32, c *Chunk) {
 }
 
 // monBuild builds monument pieces into one chunk, turning piece positions
-// by the monument's orientation (OceanMonumentPiece getWorldX/Z, sub_4E5F600
-// and sub_4E5F650).
+// by the monument's orientation (OceanMonumentPiece getWorldX/Z,
+// and).
 type monBuild struct {
 	scBuild
 	bb                       structure.Box
@@ -442,7 +442,7 @@ func (b *monBuild) at(x, y, z int32) uint32 {
 	return b.c.Block(int(p[0]&15), int(p[1]), int(p[2]&15))
 }
 
-// set is placeBlock (sub_D2604A0).
+// set is placeBlock.
 func (b *monBuild) set(s uint32, x, y, z int32) {
 	wx, wy, wz := b.wx(x, z), b.wy(y), b.wz(x, z)
 	if b.setWorld(wx, wy, wz, s) {
@@ -450,7 +450,7 @@ func (b *monBuild) set(s uint32, x, y, z int32) {
 	}
 }
 
-// box is generateBox (sub_D260890) with one block for edge and inside.
+// box is generateBox with one block for edge and inside.
 func (b *monBuild) box(x0, y0, z0, x1, y1, z1 int32, s uint32) {
 	for y := y0; y <= y1; y++ {
 		for x := x0; x <= x1; x++ {
@@ -499,7 +499,7 @@ func (b *monBuild) hits(x0, z0, x1, z1 int32) bool {
 	return b.cbox.X1 >= min(ax, bx) && b.cbox.X0 <= max(ax, bx) && b.cbox.Z1 >= min(az, bz) && b.cbox.Z0 <= max(az, bz)
 }
 
-// floor is generateDefaultFloor (sub_4E5F680).
+// floor is generateDefaultFloor.
 func (b *monBuild) floor(x, z int32, open bool) {
 	if !open {
 		b.box(x, 0, z, x+7, 0, z+7, b.gray)
@@ -515,7 +515,7 @@ func (b *monBuild) floor(x, z int32, open bool) {
 	b.box(x+5, 0, z+3, x+5, 0, z+4, b.light)
 }
 
-// building is MonumentBuilding's own blocks (sub_4E63B10).
+// building is MonumentBuilding's own blocks.
 func (b *monBuild) building() {
 	b.genWing(false, 0)
 	b.genWing(true, 33)
@@ -767,12 +767,12 @@ func (b *monBuild) sideSteps(x0, dir int32) {
 	}
 }
 
-// down is fillColumnDown (sub_D255920) at a piece position.
+// down is fillColumnDown at a piece position.
 func (b *monBuild) down(s uint32, x, y, z int32) {
 	b.fillDownWorld(s, b.wx(x, z), b.wy(y), b.wz(x, z))
 }
 
-// genWing is generateWing (sub_4E6B560).
+// genWing is generateWing.
 func (b *monBuild) genWing(flip bool, xo int32) {
 	if !b.hits(xo, 0, xo+23, 20) {
 		return
@@ -821,7 +821,7 @@ func (b *monBuild) genWing(flip bool, xo int32) {
 	b.box(xo+12, 1, 11, xo+12, 7, 13, b.gray)
 }
 
-// entry is OceanMonumentEntryRoom (sub_4E6C260).
+// entry is OceanMonumentEntryRoom.
 func (b *monBuild) entry(rm *monRoom) {
 	b.box(0, 3, 0, 2, 3, 7, b.light)
 	b.box(5, 3, 0, 7, 3, 7, b.light)
@@ -843,7 +843,7 @@ func (b *monBuild) entry(rm *monRoom) {
 	}
 }
 
-// core is OceanMonumentCoreRoom (sub_4E79C40).
+// core is OceanMonumentCoreRoom.
 func (b *monBuild) core() {
 	b.ifw(b.gray, 1, 8, 0, 14, 14)
 	b.box(0, 7, 0, 0, 7, 15, b.light)
@@ -896,7 +896,7 @@ func (b *monBuild) hole(d int, y, x0, z0 int32) {
 	}
 }
 
-// simple is OceanMonumentSimpleRoom (sub_4E6CC20).
+// simple is OceanMonumentSimpleRoom.
 func (b *monBuild) simple(rm *monRoom, design int32) {
 	if rm.index >= 25 {
 		b.floor(0, 0, rm.has(dDown))
@@ -1045,7 +1045,7 @@ func (b *monBuild) ringRoom() {
 	b.box(3, 1, 7, 4, 2, 7, b.black)
 }
 
-// simpleTop is OceanMonumentSimpleTopRoom, the sponge room (sub_4E6EC20).
+// simpleTop is OceanMonumentSimpleTopRoom, the sponge room.
 func (b *monBuild) simpleTop(rm *monRoom) {
 	if rm.index >= 25 {
 		b.floor(0, 0, rm.has(dDown))
@@ -1071,7 +1071,7 @@ func (b *monBuild) simpleTop(rm *monRoom) {
 	}
 }
 
-// doubleY is OceanMonumentDoubleYRoom (sub_4E6F990).
+// doubleY is OceanMonumentDoubleYRoom.
 func (b *monBuild) doubleY(rm *monRoom) {
 	if rm.index >= 25 {
 		b.floor(0, 0, rm.has(dSouth))
@@ -1133,7 +1133,7 @@ func (b *monBuild) doubleY(rm *monRoom) {
 	}
 }
 
-// doubleX is OceanMonumentDoubleXRoom (sub_4E70800).
+// doubleX is OceanMonumentDoubleXRoom.
 func (b *monBuild) doubleX(rm *monRoom) {
 	e := rm.conn[dEast]
 	if rm.index >= 25 {
@@ -1181,7 +1181,7 @@ func (b *monBuild) doubleX(rm *monRoom) {
 	}
 }
 
-// doubleZ is OceanMonumentDoubleZRoom (sub_4E72500).
+// doubleZ is OceanMonumentDoubleZRoom.
 func (b *monBuild) doubleZ(rm *monRoom) {
 	n := rm.conn[dNorth]
 	if rm.index >= 25 {
@@ -1240,7 +1240,7 @@ func (b *monBuild) doubleZ(rm *monRoom) {
 	}
 }
 
-// doubleXY is OceanMonumentDoubleXYRoom (sub_4E74600).
+// doubleXY is OceanMonumentDoubleXYRoom.
 func (b *monBuild) doubleXY(rm *monRoom) {
 	e := rm.conn[dEast]
 	u, eu := rm.conn[dUp], e.conn[dUp]
@@ -1320,7 +1320,7 @@ func (b *monBuild) doubleXY(rm *monRoom) {
 	}
 }
 
-// doubleYZ is OceanMonumentDoubleYZRoom (sub_4E77080).
+// doubleYZ is OceanMonumentDoubleYZRoom.
 func (b *monBuild) doubleYZ(rm *monRoom) {
 	n := rm.conn[dNorth]
 	u, nu := rm.conn[dUp], n.conn[dUp]
@@ -1401,7 +1401,7 @@ func (b *monBuild) doubleYZ(rm *monRoom) {
 	}
 }
 
-// wing is OceanMonumentWingRoom (sub_4E7A850).
+// wing is OceanMonumentWingRoom.
 func (b *monBuild) wing(design int32) {
 	if design == 1 {
 		b.box(9, 3, 18, 13, 3, 20, b.light)
@@ -1464,7 +1464,7 @@ func (b *monBuild) wing(design int32) {
 	b.box(15, 0, 21, 16, 4, 21, b.light)
 }
 
-// penthouse is OceanMonumentPenthouse (sub_4E7B8B0).
+// penthouse is OceanMonumentPenthouse.
 func (b *monBuild) penthouse() {
 	b.box(2, -1, 2, 11, -1, 11, b.light)
 	b.box(0, -1, 0, 1, -1, 11, b.gray)

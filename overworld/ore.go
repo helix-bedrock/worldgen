@@ -15,7 +15,7 @@ type oreRule struct {
 	mayReplace []string
 }
 
-// oreFeature is minecraft:ore_feature (BDS OreFeature::place, sub_D2F38D0).
+// oreFeature is minecraft:ore_feature.
 type oreFeature struct {
 	count   int32
 	discard float32

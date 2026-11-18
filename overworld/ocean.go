@@ -11,8 +11,8 @@ import (
 )
 
 // partiallyExposedBlobFeature replaces the blocks around a floor that are
-// buried on every side but one (PartiallyExposedBlobFeature, sub_49BED10).
-// Ocean floor feature constants (sub_D794130, sub_49C1E50).
+// buried on every side but one (PartiallyExposedBlobFeature).
+// Ocean floor feature constants.
 const (
 	// blobAxes is the number of axes: the farthest block within the radius
 	// on each axis is radius times blobAxes away by Manhattan distance.
@@ -81,7 +81,7 @@ func (f *partiallyExposedBlobFeature) place(w *featureWorld, x, y, z int32, r *r
 	cy := y - 1
 	placed := false
 	// Every block within the radius on each axis, nearest first by
-	// Manhattan distance (sub_D794130): one draw per block.
+	// Manhattan distance: one draw per block.
 	rad := f.radius
 	for depth := int32(0); depth <= blobAxes*rad; depth++ {
 		mx := min(depth, rad)
@@ -136,7 +136,7 @@ func (o *Overworld) bubbleColumns(c *Chunk) {
 }
 
 // seaAnemoneFeature puts a live coral or coral fan on the floor below a
-// position (SeaAnemoneFeature, sub_49C1E50).
+// position (SeaAnemoneFeature).
 type seaAnemoneFeature struct {
 	coral  *coralFeature
 	plants [anemonePlants]uint32
@@ -149,7 +149,7 @@ func (f *seaAnemoneFeature) place(w *featureWorld, x, y, z int32, r *rand.MT) (b
 		y--
 	}
 	// VERIFY: BDS also asks whether tube coral may go here (BlockSource
-	// vfunc +88); taken to be yes in water.
+	// vfunc); taken to be yes in water.
 	if b, _ := w.block(x, y, z); !o.waterMaterial(b) || !w.solidMaterialAt(x, y-1, z) || y <= limit {
 		return blockPos{}, false
 	}

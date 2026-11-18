@@ -8,11 +8,11 @@ import (
 
 // msolid is the solid flag of a block's material (Material+5), which the
 // basalt features use to decide which way to search; solid is the block's
-// own flag (Block+113).
+// own flag (Block).
 // VERIFY: both come from the same name list (see loadFungi).
 func (n *Nether) msolid(b uint32) bool { return n.fungi.solid[b] }
 
-// deltaFeature is BDS's DeltaFeature (sub_499D080). From the position it
+// deltaFeature is BDS's DeltaFeature. From the position it
 // searches up (inside solid blocks) or down (inside liquid) for an air
 // block over solid ground; there, in a diamond of a random size, every
 // enclosed air-topped block gets magma when the delta has a rim, and lava
@@ -85,7 +85,7 @@ func (n *Nether) deltaClear(r *region, x, y, z int32) bool {
 	return true
 }
 
-// basaltColumns is BDS's BasaltColumnsFeature (sub_4985E50). From the
+// basaltColumns is BDS's BasaltColumnsFeature. From the
 // position it searches down to a non-solid block over a solid one, then
 // makes 50 (or, a tenth of the time, 15 more spread out) column clusters
 // around it; each cluster raises one basalt column from basalt or
@@ -156,7 +156,7 @@ func (n *Nether) columnCluster(r *region, cx, y0, cz, rad, left int32) {
 	}
 }
 
-// basaltPillar is BDS's BasaltPillarFeature (sub_49864B0). In air under
+// basaltPillar is BDS's BasaltPillarFeature. In air under
 // soul sand, soul soil or netherrack it hangs a basalt column down to the
 // ground, with side pieces wherever a side is air under a solid block, then
 // spreads a base of basalt over the ground around the column's foot.

@@ -121,7 +121,7 @@ func (o *Overworld) cornerDensity(cx, cy, cz float32, j int, col column, noise f
 	} else if s <= 1 {
 		d = (d+10)*s - 10
 	}
-	// Bottom slide: the bottom three cells fade to +15.
+	// Bottom slide: the bottom three cells fade to.
 	if t := float32(j) / 3; t <= 1 {
 		d = (d-15)*t + 15
 	}

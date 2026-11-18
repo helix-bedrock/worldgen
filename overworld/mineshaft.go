@@ -6,10 +6,10 @@ import (
 	"github.com/helix-bedrock/worldgen/structure"
 )
 
-// Mineshafts, written from BDS 1.26.52: the placement test (sub_4E497D0),
-// the start (sub_4E49990), the piece factory (sub_4E4A190) and the pieces
-// (room sub_4E4AD40/sub_4E4B360, corridor sub_4E4B6A0/sub_4E4C0E0,
-// crossing sub_4E4E660/sub_4E4E970, stairs sub_4E4F5E0/sub_4E4F670). The
+// Mineshafts, written from BDS 1.26.52: the placement test,
+// the start, the piece factory and the pieces
+// (room, corridor,
+// crossing, stairs). The
 // layout is Java's MineshaftPieces with Bedrock's random and these
 // differences, all kept: the room's size draws z, y, x; a badlands room
 // branches only half the time; no piece is built in the deep dark; new
@@ -17,8 +17,8 @@ import (
 // 20 up) and torch states are Bedrock's own.
 //
 // BDS builds the pieces of a chunk with a Mersenne Twister seeded with the
-// chunk's population seed, reseeded for each structure type
-// (sub_C970F80), and reads only that chunk's blocks except where noted.
+// chunk's population seed, reseeded for each structure type,
+// and reads only that chunk's blocks except where noted.
 
 // Mineshaft piece kinds.
 const (
@@ -96,7 +96,7 @@ func (o *Overworld) mineshaftAt(cx, cz int32) *mineshaft {
 // then moved to its final height. r continues from the placement test.
 func (o *Overworld) buildMineshaft(cx, cz int32, r *rand.MT) *mineshaft {
 	ms := &mineshaft{}
-	// VERIFY: the badlands test (sub_C7CD780) is assumed to be the mesa
+	// VERIFY: the badlands test is assumed to be the mesa
 	// biome tag, at y 0 of the chunk corner.
 	if b := o.BiomeAt(cx*16, 0, cz*16); int(b) < len(o.biomeTags) {
 		for _, t := range o.biomeTags[b] {
@@ -866,7 +866,7 @@ func (b *msBuild) buildCorridor(p *msPiece) {
 	for z := int32(0); z < length; z++ {
 		wx, wy, wz := p.worldPos(1, -1, z)
 		s := b.boxGet(wx, wy, wz)
-		// VERIFY: BDS tests a block flag (+113) assumed to be "solid".
+		// VERIFY: BDS tests a block flag assumed to be "solid".
 		if s == air || !o.solidMaterial(s) {
 			continue
 		}
@@ -919,7 +919,7 @@ func (b *msBuild) support(p *msPiece, z int32) {
 	}
 }
 
-// cobweb is sub_4E4BB40: when local (x, 3, z) is under the height map, a
+// cobweb is: when local (x, 3, z) is under the height map, a
 // web at (x, 2, z-1) with the chance, if two of its six neighbours in the
 // chunk are not air.
 func (b *msBuild) cobweb(p *msPiece, x, z int32, chance float32) {
@@ -942,7 +942,7 @@ func (b *msBuild) cobweb(p *msPiece, x, z int32, chance float32) {
 	}
 }
 
-// replaceableForPillar is sub_D261FF0: blocks a pillar or chain passes
+// replaceableForPillar is: blocks a pillar or chain passes
 // through.
 func (b *msBuild) replaceableForPillar(s uint32) bool {
 	if s == b.o.ids.air || b.o.liquidMaterial(s) {
@@ -955,7 +955,7 @@ func (b *msBuild) replaceableForPillar(s uint32) bool {
 	return false
 }
 
-// pillar is sub_4E4E1F0: under a support end at (x, y, z), a log column
+// pillar is: under a support end at (x, y, z), a log column
 // down to the first solid block within 10, or else a fence and chain up to
 // a ceiling within 20.
 func (b *msBuild) pillar(x, y, z int32) {
@@ -979,7 +979,7 @@ func (b *msBuild) pillar(x, y, z int32) {
 		}
 		if up {
 			s := b.get(x, y+j, z)
-			// VERIFY: BDS tests the block's hanging support (sub_CC56A20);
+			// VERIFY: BDS tests the block's hanging support;
 			// a fully opaque block is assumed to hold a chain.
 			if !b.replaceableForPillar(s) && o.reg.LightDampening(s) >= 15 {
 				b.set(x, y+1, z, b.fence)

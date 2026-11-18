@@ -4,8 +4,8 @@ import (
 	"github.com/helix-bedrock/worldgen/rand"
 )
 
-// Canyons (ravines), copied from BDS's CanyonFeature (sub_4989150 and slot 0,
-// new-world config at 0x148FC54). They run after the cave carvers. Unlike the
+// Canyons (ravines), copied from BDS's CanyonFeature (and slot 0,
+// new-world config). They run after the cave carvers. Unlike the
 // caves, each target chunk replays the canyons of every source chunk within 8
 // chunks from scratch.
 const (

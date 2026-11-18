@@ -12,22 +12,22 @@ import (
 )
 
 // Bastion remnants, written from BDS 1.26.52:
-//   placement  sub_4FD0B70  the fortress grid: a start not in a basalt delta
-//                           (the feature's biomes, sub_4E3E770: nether
+//   placement the fortress grid: a start not in a basalt delta
+//                           (the feature's biomes,: nether
 //                           wastes, soul sand valley, crimson and warped
 //                           forest) whose draw from six is not a fortress's
-//   start      sub_D2AC6C0  from the placement random: a turn
+//   start from the placement random: a turn
 //                           (nextInt(4)), one of the four start pools
 //                           (nextInt(4)) and one of its elements, at the
 //                           start chunk's corner with no start anchor
 //   height     BastionPiece's slot 14: the sea level plus one; the start
 //                           piece's bottom goes one below it
-//   assembly   sub_D2AB0E0  the assembler ancient cities use, 15 deep,
+//   assembly the assembler ancient cities use, 15 deep,
 //                           within 80 blocks of the start piece's centre
-//   pieces     sub_5071920  all rigid; their terrain adaptation does
+//   pieces all rigid; their terrain adaptation does
 //                           nothing here, as the Nether's terrain is not
 //                           adjusted around structures
-//   rules      sub_506A230  bds/bastion.json
+//   rules bds/bastion.json
 // Pieces go into the chunks they reach on the terrain before decoration,
 // after the ruined portals and before the fortresses (VERIFY: the order
 // where they overlap). The piglins and hoglins of the mob pieces are not

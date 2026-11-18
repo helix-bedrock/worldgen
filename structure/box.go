@@ -124,7 +124,7 @@ func JigsawDir(f string) [3]int32 {
 
 // TemplateBox is the box of a template placed at pos with rotation r.
 func TemplateBox(t *Template, pos [3]int32, r int) Box {
-	// BDS's piece box (sub_D2379D0): the size turned, then the box laid out
+	// BDS's piece box: the size turned, then the box laid out
 	// from pos by the turn. A size of 0 (a feature element) gives an empty
 	// box, one block past pos, that holds nothing.
 	sx, sy, sz := t.Size[0], t.Size[1], t.Size[2]

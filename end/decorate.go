@@ -14,7 +14,7 @@ import (
 	"github.com/helix-bedrock/worldgen/structure"
 )
 
-// Decoration is BDS's TheEndGenerator postProcess (sub_5196E80), run from
+// Decoration is BDS's TheEndGenerator postProcess, run from
 // each chunk, the origin, on the 3x3 chunks around it, with the origin's
 // population random:
 //   - the obsidian spikes whose square starts in the origin;
@@ -27,12 +27,12 @@ import (
 // order chunks are made in. BDS instead sees whatever its neighbours placed
 // first.
 // VERIFY: BDS places a gateway only if the four chunks around it are not
-// yet past an internal state (LevelChunk+184 <= 10); here it always does.
+// yet past an internal state (LevelChunk <= 10); here it always does.
 
 // regionSize is the width of the 3x3 chunks an origin decorates.
 const regionSize = 48
 
-// The decoration's numbers (sub_5196E80 and the features it runs).
+// The decoration's numbers (the features it runs).
 const (
 	// spikeCount is the number of obsidian pillars; spikeRing is the radius
 	// of the circle they stand on.
@@ -306,9 +306,9 @@ type spike struct {
 	guarded bool
 }
 
-// spikes are the pillars of a seed (sub_497D900): spikeCount spots on a
+// spikes are the pillars of a seed: spikeCount spots on a
 // circle of radius spikeRing, each given a size from 0 to 9 in an order
-// shuffled from the world seed. Size s has radius s/3+2 and height 3s+76;
+// shuffled from the world seed. Size s has radius s/3+2 and height 3s;
 // sizes 1 and 2 are guarded.
 func spikes(seed int64) [spikeCount]spike {
 	mt := rand.NewMT(uint32(seed))
@@ -367,7 +367,7 @@ func (e *End) decorate(r *region, ox, oz int32) {
 	// BDS draws once before the islands: every outer origin compared with
 	// a BDS world matches with this draw and none without it.
 	// VERIFY: where it comes from is not traced; the biome decoration step
-	// (sub_5194680) runs first, though the End has no feature rules.
+	// runs first, though the End has no feature rules.
 	mt.Uint32()
 	r.hidden = false
 	for _, s := range e.spikes {
@@ -420,7 +420,7 @@ func (e *End) decorate(r *region, ox, oz int32) {
 	}
 }
 
-// placeSpike builds a pillar (sub_49C44B0): an obsidian disk from the
+// placeSpike builds a pillar: an obsidian disk from the
 // bottom up to its height, the square around it cleared of everything
 // from spikeClearFrom to spikeClearAbove above the top, and the cage of a
 // guarded one.
@@ -473,7 +473,7 @@ func cageBar(dx, dy, dz int32) bool {
 	return dy == cageLid || mathx.Abs(dx) == cageReach || mathx.Abs(dz) == cageReach
 }
 
-// smallIsland is a small floating island (EndIslandFeature, sub_D40FBF0): end
+// smallIsland is a small floating island (EndIslandFeature): end
 // stone disks, each smaller than the one above it.
 func (e *End) smallIsland(r *region, x, y, z int32, mt *rand.MT) {
 	rad := float32(mt.IntN(3)) + 4
@@ -492,12 +492,12 @@ func (e *End) smallIsland(r *region, x, y, z int32, mt *rand.MT) {
 	}
 }
 
-// growChorus grows a chorus plant up from (x, y, z) (sub_C5B70C0): a stem,
+// growChorus grows a chorus plant up from (x, y, z): a stem,
 // then up to four side branches that each grow the same way, within
 // spread blocks of the root (rx, rz) and four levels deep; a stem that
 // branches nowhere ends in a dead flower. A stem whose side is blocked
 // stops without one. A branch's side is drawn as a cube.Direction (BDS's
-// byte_1ADA5C1 lists them in that order).
+// lists them in that order).
 func (e *End) growChorus(r *region, x, y, z, rx, rz int32, mt *rand.MT, spread, depth int32) {
 	h := mt.IntN(4) + 1
 	if depth == 0 {
@@ -545,8 +545,8 @@ func chorusSides() [6][3]int32 {
 }
 
 // joinChorus sets the connection states of the chorus plants the origin
-// placed, as BDS's chorus plant does (sub_CB5B7A0, also run by
-// TheEndGenerator::decorationPostProcessChunk): a side joins a chorus plant
+// placed, as BDS's chorus plant does (also run by
+// BDS's code): a side joins a chorus plant
 // or flower, and the bottom also joins end stone. Plants are grown with no
 // connections, so the growth checks compare one state; the states are set
 // once the origin is done. Neighbours another origin placed are not seen.
@@ -644,7 +644,7 @@ func (e *End) sideClear(r *region, x, y, z int32, d cube.Direction) bool {
 	return r.at(x+sx, y, z+sz) == e.ids.air
 }
 
-// gateway places an end gateway (EndGatewayFeature, sub_D40F3A0) in a
+// gateway places an end gateway (EndGatewayFeature) in a
 // bedrock frame: the gateway block in the middle, bedrock above and below
 // it and around the layers next to it, air elsewhere in the 3x5x3 box. Its
 // exit is gatewayExit.

@@ -36,7 +36,7 @@ func BlockSeed(x, y, z int32) int64 {
 }
 
 // RuleSeed is the seed of the random BDS's structure rule processor
-// (br::worldgen::processors::Rule, sub_D1BE660) draws from at a block:
+// (br::worldgen::processors::Rule) draws from at a block:
 // Mth.getSeed with x*3129871 as a 64-bit product, unlike Java's, so it
 // differs from BlockSeed where |x| > 686.
 func RuleSeed(x, y, z int32) int64 {

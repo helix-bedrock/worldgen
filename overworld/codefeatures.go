@@ -7,7 +7,7 @@ import (
 )
 
 // Features BDS registers in code rather than in features/*.json (the
-// built-in feature table, sub_4E2BB50): clay, sand and gravel discs under
+// built-in feature table): clay, sand and gravel discs under
 // water, sugar cane and pumpkin patches. Written from BDS 1.26.52.
 
 // builtinFeatures adds the code-registered features the rules name. A data
@@ -20,20 +20,20 @@ func (o *Overworld) builtinFeatures(set *featureSet) {
 	set.addBuiltin("minecraft:gravel_feature", &discFeature{block: o.ids.gravel, replace: dirt, radius: 6})
 	set.addBuiltin("minecraft:reeds_feature", &reedsFeature{reeds: o.blockID("minecraft:reeds"), farmland: o.blockID("minecraft:farmland"), frostedIce: o.blockID("minecraft:frosted_ice")})
 	set.addBuiltin("minecraft:pumpkin_feature", &pumpkinFeature{pumpkin: o.blockID("minecraft:pumpkin"), count: 96})
-	// Block piles of village streets (vtable off_EE54AC0).
+	// Block piles of village streets.
 	set.addBuiltin("minecraft:hay_pile_feature", &pileFeature{block: o.blockID("minecraft:hay_block"), kind: pileHay})
 	set.addBuiltin("minecraft:melon_pile_feature", &pileFeature{block: o.blockID("minecraft:melon_block")})
 	set.addBuiltin("minecraft:snow_pile_feature", &pileFeature{block: o.blockID("minecraft:snow")})
 	set.addBuiltin("minecraft:ice_pile_feature", &pileFeature{block: o.blockID("minecraft:packed_ice"), kind: pileIce, other: o.blockID("minecraft:blue_ice")})
 	set.addBuiltin("minecraft:pumpkin_pile_feature", &pileFeature{block: o.blockID("minecraft:pumpkin"), kind: pilePumpkin, other: o.blockID("minecraft:carved_pumpkin")})
-	// Mushroom tries: 1, or 64 in old worlds (sub_4E2BB50 picks by a base
+	// Mushroom tries: 1, or 64 in old worlds (picks by a base
 	// game version check, as for the seagrass count).
 	soil := []uint32{o.blockID("minecraft:mycelium"), o.blockID("minecraft:podzol")}
 	set.addBuiltin("minecraft:brown_mushroom_feature", &mushroomFeature{block: o.blockID("minecraft:brown_mushroom"), count: 1, soil: soil})
 	set.addBuiltin("minecraft:red_mushroom_feature", &mushroomFeature{block: o.blockID("minecraft:red_mushroom"), count: 1, soil: soil})
 	set.addBuiltin("minecraft:moss_vegetation_feature", o.newMossVegetation(o.blockID))
 	set.addBuiltin("minecraft:pale_moss_vegetation_feature", o.newPaleMossVegetation(o.blockID))
-	// Large speleothems build over every pointed block (xmmword_FF122D8;
+	// Large speleothems build over every pointed block (;
 	// the icicle joined it in 1.26.60).
 	tips := []uint32{o.blockID("minecraft:pointed_dripstone"), o.blockID("minecraft:sulfur_spike"), o.blockID(blockIcicle)}
 	clusterStone := []uint32{o.ids.stone, o.ids.deepslate, o.blockID("minecraft:tuff")}
@@ -44,7 +44,7 @@ func (o *Overworld) builtinFeatures(set *featureSet) {
 	dripCluster := newDripstoneCluster(drip, clusterStone, 3, 5)
 	dripCluster.wetBase, dripCluster.wetScale, dripCluster.wetMin, dripCluster.wetMax = 0.1, 0.3, 0.1, 1
 	set.addBuiltin("minecraft:dripstone_cluster_feature", dripCluster)
-	// Sulfur caves use the same classes (sulfur, cinnabar list xmmword_FF0C4B0).
+	// Sulfur caves use the same classes (sulfur, cinnabar list).
 	sulfur := speleothemBlocks{base: o.blockID("minecraft:sulfur"), tip: o.blockID("minecraft:sulfur_spike"),
 		replace: []uint32{o.blockID("minecraft:sulfur"), o.blockID("minecraft:cinnabar")}, tips: tips}
 	set.addBuiltin("minecraft:sulfur_spike_feature", &pointedFeature{sulfur})
@@ -54,7 +54,7 @@ func (o *Overworld) builtinFeatures(set *featureSet) {
 	// Ice caves (Drop 4 of 2026): icicles hang from packed ice in a radius 6
 	// patch, ceilings only, in air only, with the top block attached; large
 	// icicles are packed ice grown into calcite, stone, deepslate and packed
-	// ice (lists xmmword_FF0C510 and xmmword_FF0C480).
+	// ice (lists).
 	packedIce := o.blockID("minecraft:packed_ice")
 	icicle := speleothemBlocks{base: packedIce, tip: o.blockID(blockIcicle), replace: []uint32{packedIce}, tips: tips,
 		attach: func(b uint32) uint32 { return o.withProp(b, "attached_bit", true) }}
@@ -102,14 +102,14 @@ func (o *Overworld) builtinFeatures(set *featureSet) {
 	set.addBuiltin("minecraft:eyeblossom_feature", &eyeblossomFeature{flower: o.blockID("minecraft:closed_eyeblossom")})
 	roots := &rootSystemFeature{tree: featureRef{"minecraft:azalea_tree_feature", set}, hanging: o.blockID("minecraft:hanging_roots"),
 		roots: o.blockID("minecraft:dirt_with_roots"), replace: map[string]bool{}}
-	// The root list (off_F329F10).
+	// The root list.
 	for _, n := range []string{"clay", "moss_block", "sand", "gravel", "dirt", "podzol", "dirt_with_roots", "grass_block", "mycelium",
 		"stone", "deepslate", "tuff", "cave_vines", "cave_vines_head_with_berries", "moss_carpet", "short_grass", "fern"} {
 		roots.replace["minecraft:"+n] = true
 	}
 	set.addBuiltin("minecraft:azalea_root_system_feature", roots)
 	// The same class leads sulfur caves to a spring on the surface, the
-	// trail of sulfur in the column below (xmmword_F60D648).
+	// trail of sulfur in the column below.
 	sulfurTrail := &rootSystemFeature{tree: featureRef{"minecraft:random_sulfur_spring_with_tuff_feature", set},
 		hanging: o.blockID("minecraft:sulfur"), roots: o.blockID("minecraft:sulfur"), replace: map[string]bool{}, space: sulfurSpringSpace}
 	for _, n := range []string{"powder_snow", "snow", "sand", "gravel", "clay", "red_sand", "dirt", "mud", "moss_block",
@@ -124,7 +124,7 @@ func (o *Overworld) builtinFeatures(set *featureSet) {
 
 	short, top, bottom := o.seagrass("default"), o.seagrass("double_top"), o.seagrass("double_bot")
 	// BDS sets the seagrass and kelp counts to 1, or 10 in a mode this
-	// world does not use (sub_4E2BB50, v147).
+	// world does not use (v147).
 	for name, tall := range map[string]float32{"minecraft:seagrass_feature": 0.6, "minecraft:taller_seagrass_feature": 0.8,
 		"minecraft:shorter_seagrass_feature": 0.4, "minecraft:shortest_seagrass_feature": 0.3} {
 		set.addBuiltin(name, &seagrassFeature{short: short, top: top, bottom: bottom, count: 1, tall: tall})
@@ -202,7 +202,7 @@ func (o *Overworld) waterMaterial(b uint32) bool {
 	return false
 }
 
-// clayFeature is BDS's ClayFeature (place: sub_498FD80): under water, a disc
+// clayFeature is BDS's ClayFeature: under water, a disc
 // of clay three blocks thick replacing dirt, coarse dirt and mud.
 type clayFeature struct {
 	clay, mud uint32
@@ -231,7 +231,7 @@ func (f *clayFeature) place(w *featureWorld, x, y, z int32, r *rand.MT) (blockPo
 	return blockPos{x, y, z}, true
 }
 
-// discFeature is BDS's SandFeature (place: sub_49C1620), used for both the
+// discFeature is BDS's SandFeature, used for both the
 // sand and the gravel discs: under water, a disc five blocks thick
 // replacing dirt, coarse dirt and grass.
 type discFeature struct {
@@ -272,7 +272,7 @@ func inList(l []uint32, b uint32) bool {
 	return false
 }
 
-// reedsFeature is BDS's ReedsFeature (place: sub_49C10D0): 20 tries around
+// reedsFeature is BDS's ReedsFeature: 20 tries around
 // the position for sugar cane 2 to 4 tall next to water.
 type reedsFeature struct {
 	reeds, farmland, frostedIce uint32
@@ -308,8 +308,8 @@ func (f *reedsFeature) place(w *featureWorld, x, y, z int32, r *rand.MT) (blockP
 	return blockPos{x, y, z}, true
 }
 
-// mayPlace is sugar cane's placement rule (SugarCaneBlock::mayPlace,
-// sub_CF0D200): on sugar cane, or on a dirt or sand block (or farmland)
+// mayPlace is sugar cane's placement rule (BDS's code,):
+// on sugar cane, or on a dirt or sand block (or farmland)
 // with water or frosted ice beside it.
 func (f *reedsFeature) mayPlace(w *featureWorld, x, y, z int32) bool {
 	below, ok := w.block(x, y-1, z)
@@ -331,7 +331,7 @@ func (f *reedsFeature) mayPlace(w *featureWorld, x, y, z int32) bool {
 	return false
 }
 
-// pumpkinFeature is BDS's PumpkinFeature (place: sub_498F7D0): tries at the
+// pumpkinFeature is BDS's PumpkinFeature: tries at the
 // position and around it for pumpkins on grass. BDS rolls a direction and
 // a growth stage only for blocks with those states; the pumpkin has
 // neither (it uses cardinal_direction), so it is placed in its default
@@ -358,7 +358,7 @@ func (f *pumpkinFeature) place(w *featureWorld, x, y, z int32, r *rand.MT) (bloc
 }
 
 // seaFloor walks down from y to the first solid block (BDS's
-// isSolidBlockingBlock, sub_C8D6250), stopping at the bottom of the world.
+// isSolidBlockingBlock), stopping at the bottom of the world.
 func (w *featureWorld) seaFloor(x, y, z int32) int32 {
 	for ; y > MinY; y-- {
 		if b, ok := w.block(x, y, z); ok && w.o.solidMaterial(b) {
@@ -369,7 +369,7 @@ func (w *featureWorld) seaFloor(x, y, z int32) int32 {
 }
 
 // supportsWaterPlant is seagrass' and kelp's placement rule for the block
-// below (SeagrassBlock::mayPlace, sub_CF4DAB0): not magma or soul sand, and
+// below: not magma or soul sand, and
 // a top face that can hold it, so not a fence, a bottom slab or lower
 // stairs (shipwrecks put those under water).
 // VERIFY: BDS asks each block class for a sturdy top face; this takes the
@@ -381,7 +381,7 @@ func (o *Overworld) supportsWaterPlant(b uint32) bool {
 		return false
 	}
 	// No trapdoor holds it, not even one in the top half (lead, in game).
-	// VERIFY: against BDS's exclusion list xmmword_F613C98.
+	// VERIFY: against BDS's exclusion list.
 	if strings.HasSuffix(name, "trapdoor") {
 		return false
 	}
@@ -389,7 +389,6 @@ func (o *Overworld) supportsWaterPlant(b uint32) bool {
 }
 
 // temperatureAtBlock is the biome temperature at a block, as features see it
-// (Biome::getTemperature, sub_C7B8B70).
 func (w *featureWorld) temperatureAtBlock(x, y, z int32) float32 {
 	if w.live != nil {
 		if b := w.biome(x, y, z); b != ^uint32(0) {
@@ -404,7 +403,7 @@ func (w *featureWorld) temperatureAtBlock(x, y, z int32) float32 {
 	return w.o.temperature(c.Biome(int(x&15), int(y), int(z&15)), x, y, z)
 }
 
-// seagrassFeature is BDS's SeagrassFeature (place: sub_49C2550). The four
+// seagrassFeature is BDS's SeagrassFeature. The four
 // built-in seagrass features differ in count and in the chance of tall
 // seagrass.
 type seagrassFeature struct {
@@ -430,7 +429,7 @@ func (f *seagrassFeature) place(w *featureWorld, x, y, z int32, r *rand.MT) (blo
 			py++
 		}
 		// The climb stops at any water material, but seagrass survives only
-		// in real water (SeagrassBlock::mayPlace).
+		// in real water.
 		below, _ := w.block(px, py-1, pz)
 		if at, ok := w.block(px, py, pz); ok && w.o.isWater(at) && w.o.supportsWaterPlant(below) {
 			if f.tall > r.Float() {
@@ -449,7 +448,7 @@ func (f *seagrassFeature) place(w *featureWorld, x, y, z int32, r *rand.MT) (blo
 	return blockPos{x, y, z}, true
 }
 
-// kelpFeature is BDS's KelpFeature (place: sub_51CDDE0): kelp columns 3 or
+// kelpFeature is BDS's KelpFeature: kelp columns 3 or
 // more blocks tall, ending a few blocks under the water surface.
 type kelpFeature struct {
 	ages  []uint32 // kelp by kelp_age
@@ -525,7 +524,7 @@ func (f *kelpFeature) place(w *featureWorld, x, y, z int32, r *rand.MT) (blockPo
 	return blockPos{x, y, z}, true
 }
 
-// pickleFeature is BDS's SeaPickleFeature (place: sub_49C20D0): four tries
+// pickleFeature is BDS's SeaPickleFeature: four tries
 // for a sea pickle cluster of 1 to 4 within 6 blocks east and south.
 type pickleFeature struct {
 	pickles [4]uint32 // by cluster_count
@@ -578,11 +577,11 @@ func drawDiff(r *rand.MT, mask uint32) int32 {
 	return a - int32(r.Uint32()&mask)
 }
 
-// grassDiscFeature is BDS's DiscFeature (place sub_49A0E50), registered as
+// grassDiscFeature is BDS's DiscFeature (place), registered as
 // minecraft:grass_disc_feature: a disc of grass blocks, radius 2 to
 // radius-1, through the dirt-tagged blocks two above to two below the
 // origin; grass with something on top becomes dirt.
-// VERIFY: the third accepted block (qword_F619630) is taken as mud.
+// VERIFY: the third accepted block is taken as mud.
 type grassDiscFeature struct {
 	grass, dirt, mud uint32
 	radius           int32
@@ -620,8 +619,8 @@ const (
 	pilePumpkin
 )
 
-// pileFeature is BDS's block pile feature (sub_4987920, block choice
-// sub_4988060): two layers around the position, each spot within a ragged
+// pileFeature is BDS's block pile feature (block choice):
+// two layers around the position, each spot within a ragged
 // radius (nextFloat*10 - nextFloat*6 against its squared distance), or
 // else 3.1% of the time, takes the block where it is air and stands on a
 // sturdy top face or a grass path. Nothing is placed within 5 blocks of
@@ -665,7 +664,7 @@ func (f *pileFeature) tryPlace(w *featureWorld, x, y, z int32, r *rand.MT) {
 	w.set(x, y, z, f.pick(w.o, r))
 }
 
-// pick is the block for one spot (sub_4988060).
+// pick is the block for one spot.
 // VERIFY: hay's nextInt(2) indexes pillar_axis taken as y, x, z.
 func (f *pileFeature) pick(o *Overworld, r *rand.MT) uint32 {
 	switch f.kind {

@@ -99,7 +99,7 @@ func rotate(x, z int32, rot int32) (int32, int32) {
 	return x, z
 }
 
-// netherFossil is BDS's NetherFossilFeature (sub_49BD240). From the
+// netherFossil is BDS's NetherFossilFeature. From the
 // position it searches down for a spot where the template's four corners
 // stand on a sturdy top or soul sand with air at the template's
 // second-highest layer, giving up at lava, and places the template there,
@@ -163,7 +163,7 @@ func (n *Nether) netherFossil(r *region, x, y, z int32, mt *rand.MT) {
 	n.driedGhast(r, corners[0], corners[3], y, sy, mt)
 }
 
-// driedGhast is BDS's step after a Nether fossil (sub_49BDFF0): half the
+// driedGhast is BDS's step after a Nether fossil: half the
 // time, at a random column between the corners, it climbs from above the
 // fossil's floor past everything but bone to the first air, and puts a
 // dried ghast there when soul soil is below.

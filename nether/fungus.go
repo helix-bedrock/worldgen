@@ -21,11 +21,10 @@ type fungusIDs struct {
 	// weepingVines and twistingVines hold the vines by age.
 	weepingVines, twistingVines [26]uint32
 	netherWart, warpedWart      uint32
-	// dirt are the other blocks a fungus may grow on (BDS's list at
-	// xmmword_F60E180).
+	// dirt are the other blocks a fungus may grow on (BDS's list at).
 	dirt []uint32
-	// solid is BDS's Block+113 flag, replaceable its can-be-replaced
-	// test (BlockLegacy vtable +672), by state.
+	// solid is BDS's Block flag, replaceable its can-be-replaced
+	// test, by state.
 	solid, replaceable []bool
 }
 
@@ -141,7 +140,7 @@ func (n *Nether) growsFungus(b uint32) bool {
 	return false
 }
 
-// hugeFungus is BDS's HugeFungusFeature (place: sub_D2E7040). From the
+// hugeFungus is BDS's HugeFungusFeature. From the
 // rule's position it walks down (up to 100 blocks) to a block it can grow
 // on, then builds a stem, one block or (6%) three wide, and a hat whose
 // lower three layers only fill the rim.
@@ -275,7 +274,7 @@ func (n *Nether) hangVines(r *region, x, y, z int32, mt *rand.MT) {
 	n.weepingColumn(r, x, y, z, length, 23, 25, mt)
 }
 
-// weepingColumn places a weeping vine column (sub_CE61DF0) from (x, y, z)
+// weepingColumn places a weeping vine column from (x, y, z)
 // down: length+1 blocks at most, each of an age in [minAge, maxAge),
 // stopping above the first block that is not air.
 func (n *Nether) weepingColumn(r *region, x, y, z, length, minAge, maxAge int32, mt *rand.MT) {

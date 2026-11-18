@@ -7,18 +7,18 @@ import (
 )
 
 // Ancient cities, after BDS 1.26.52:
-//   placement  sub_4E3E390  regions of 24 chunks with picks 8 apart (two
+//   placement regions of 24 chunks with picks 8 apart (two
 //                           draws averaged per axis), deep dark at
 //                           (16cx, -27, 16cz)
-//   start      sub_D2AAD50  rotation, then a city_center element; its
+//   start rotation, then a city_center element; its
 //                           minecraft:city_anchor jigsaw goes to
 //                           (16cx, -28, 16cz)
-//   assembly   sub_D2AB0E0  newer than the village one: jigsaws expanded
+//   assembly newer than the village one: jigsaws expanded
 //                           first in, first out, 7 deep, within 128 blocks
-//   expand     sub_D2B1720  jigsaws shuffled; the pool, or at the last
+//   expand jigsaws shuffled; the pool, or at the last
 //                           depth only its fallback, tried
-//   fit        sub_D2B1D00  free-space boxes kept per nesting level
-//   rules      sub_D1BE660  block rules with a Java random per block
+//   fit free-space boxes kept per nesting level
+//   rules block rules with a Java random per block
 // The start draws from the start chunk's population random (VERIFY).
 
 const (
@@ -81,7 +81,7 @@ func (o *Overworld) cityAt(rx, rz int32) *city {
 		// The start is built with the start chunk's population random: of
 		// the seedings tried against BDS's city at chunk (-14, -113) it is
 		// the only one that gets every depth-1 piece right (VERIFY: the
-		// caller of sub_4E3E5B0).
+		// caller of).
 		r.Seed(populationSeed(o.seed, cx, cz))
 		c = o.assembleCity(cx, cz, &r)
 	}
@@ -151,11 +151,11 @@ func (o *Overworld) placeCities(cx, cz int32, c *Chunk) {
 }
 
 // cityFeatures places the feature elements of city pieces in origin chunk
-// (ox, oz) (the sculk patches, FeaturePoolElement place sub_D232280) at
+// (ox, oz) (the sculk patches, FeaturePoolElement place) at
 // each piece's position, in piece order. BDS hands them the random of the
 // structure post-process, a Mersenne Twister seeded with the chunk's
-// population seed (WorldGenerator::postProcessStructureFeatures).
-// VERIFY: BDS 1.26.52 runs this step outside sub_517CD10; its exact place
+// population seed.
+// VERIFY: BDS 1.26.52 runs this step outside; its exact place
 // in the decoration order was not read.
 func (o *Overworld) cityFeatures(w *featureWorld, ox, oz int32, pop uint32) {
 	var r *rand.MT

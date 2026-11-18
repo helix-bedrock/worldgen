@@ -10,7 +10,7 @@ import (
 	"github.com/helix-bedrock/worldgen/rand"
 )
 
-// minecraft:tree_feature (BDS VanillaTreeFeature, driver sub_D2E8DE0): the
+// minecraft:tree_feature (BDS VanillaTreeFeature, driver): the
 // height is drawn, then the trunk places its logs and calls the canopy at
 // its top. Implemented parts: the simple trunk and the simple, spruce and
 // pine canopies. Trees using other parts are not loaded yet.
@@ -148,7 +148,7 @@ func vineSides() [4]vineSide {
 }
 
 // apply rolls each side and hangs a column of the decoration block into
-// air (sub_D299270 / sub_D299070).
+// air.
 func (d *decoration) apply(w *featureWorld, x, y, z int32, r *rand.MT) {
 	d.applyMask(w, x, y, z, r, sideMask{true, true, true, true})
 }
@@ -242,7 +242,7 @@ type treeFeature struct {
 	// below is what the trunk may replace under its original base (sunk
 	// trees) and what the space check accepts; above is what it may
 	// replace from the base up.
-	// VERIFY: BDS keeps two lists (tree +0x68 and +0x50); reading them as
+	// VERIFY: BDS keeps two lists (tree); reading them as
 	// may_replace + may_grow_through and may_replace matches its checks.
 	below, above blockMatcher
 
@@ -463,8 +463,8 @@ func (o *Overworld) parseTree(raw json.RawMessage, set *featureSet) (placer, err
 		}
 		return t, nil
 	}
-	// Defaults are those of BDS's trunk constructors (sub_4D92160,
-	// sub_4C4E410) for fields the JSON leaves out.
+	// Defaults are those of BDS's trunk constructors ()
+	// for fields the JSON leaves out.
 	var trunkBlock biome.Block
 	var trunkDeco *rawDecoration
 	logDeco := ""
@@ -497,7 +497,7 @@ func (o *Overworld) parseTree(raw json.RawMessage, set *featureSet) (placer, err
 	case r.Fancy != nil:
 		fc := r.Fancy
 		t.trunkKind, trunkBlock = trunkFancy, fc.Block
-		// Defaults from the constructor (sub_4C6F6F0).
+		// Defaults from the constructor.
 		t.fancy = fancyTrunk{base: 5, variance: 12, width: 1, scale: 0.618, slope: 0.381, density: 1,
 			minAltitude: 0.2, foliageAltitude: 0.3, widthScale: 1}
 		if fc.Height.Base != 0 || fc.Height.Variance != 0 {
@@ -518,7 +518,7 @@ func (o *Overworld) parseTree(raw json.RawMessage, set *featureSet) (placer, err
 	case r.Acacia != nil:
 		ac := r.Acacia
 		t.trunkKind, trunkBlock, trunkDeco = trunkAcacia, ac.Block, ac.Deco
-		// Defaults from the constructor (sub_4ADA0C0).
+		// Defaults from the constructor.
 		t.acacia = acaciaTrunk{width: 1, base: 5, minCanopy: 3, leanHeight: intRange{1, 4}, leanSteps: intRange{1, 4},
 			diagonal: true, branchLen: intRange{1, 5}, branchPos: intRange{1, 3}}
 		if ac.Width != nil {
@@ -576,7 +576,7 @@ func (o *Overworld) parseTree(raw json.RawMessage, set *featureSet) (placer, err
 	case r.Mega != nil:
 		mg := r.Mega
 		t.trunkKind, trunkBlock, trunkDeco = trunkMega, mg.Block, mg.Deco
-		// Defaults from the constructor (sub_4CB1F60).
+		// Defaults from the constructor.
 		t.mega = megaTrunk{width: 2, base: 5, slope: 0.5}
 		if mg.Width != nil {
 			t.mega.width = *mg.Width
@@ -605,7 +605,7 @@ func (o *Overworld) parseTree(raw json.RawMessage, set *featureSet) (placer, err
 		f := r.Fallen
 		t.trunkKind, trunkBlock, trunkDeco, logDeco = trunkFallen, f.Block, f.Deco, f.LogDeco
 		// VERIFY: the JSON names of the two optional ranges (constructor
-		// fields +16 and +24) were not read from the schema; vanilla files
+		// fields and) were not read from the schema; vanilla files
 		// set neither.
 		t.height, t.modifier, t.stump = intRange{5, 8}, intRange{0, 0}, intRange{1, 1}
 		if f.Length != nil {
@@ -773,7 +773,7 @@ func (t *treeFeature) place(w *featureWorld, x, y, z int32, r *rand.MT) (blockPo
 }
 
 // placeBase replaces the block under a trunk with the first base_block
-// unless it already is one (sub_D298330).
+// unless it already is one.
 func (t *treeFeature) placeBase(w *featureWorld, x, y, z int32) {
 	if len(t.baseBlocks) == 0 {
 		return
@@ -789,7 +789,7 @@ func (t *treeFeature) replaces(b uint32, ok bool) bool {
 	return t.above.empty() || (ok && t.above.match(t.o, b))
 }
 
-// trunk is SimpleTreeTrunk::place (sub_D297980).
+// trunk matches BDS.
 func (t *treeFeature) trunk(w *featureWorld, x, y, z, h int32, r *rand.MT) (blockPos, bool) {
 	origin := y
 	for d := t.submerge; d > 0; d-- {
@@ -847,7 +847,7 @@ func containsID(list []uint32, id uint32) bool {
 	return false
 }
 
-// valid is the trunk space check (sub_D298050): inside the world, on a block
+// valid is the trunk space check: inside the world, on a block
 // it may grow on, and the space around the trunk free.
 func (t *treeFeature) valid(w *featureWorld, x, y, z, h int32) bool {
 	if y <= MinY || y+h >= MaxY {
@@ -917,7 +917,7 @@ func (t *treeFeature) simpleCanopyRadius(dy int32, slope float32) int32 {
 	return t.minWidth + int32(float32(t.offMax)*slope) - int32(float32(dy)*slope)
 }
 
-// simpleCanopy is SimpleTreeCanopy (sub_D2DD1B0).
+// simpleCanopy is SimpleTreeCanopy.
 func (t *treeFeature) simpleCanopy(w *featureWorld, x, top, z int32, r *rand.MT) bool {
 	slope := float32(t.rise) / float32(t.run)
 	placed := false
@@ -963,7 +963,7 @@ func (c chance) skipCorner(r *rand.MT) bool {
 	return c.percent >= 100 || (c.percent > 0 && c.percent > r.Float()*100)
 }
 
-// spruceCanopy is SpruceTreeCanopy (sub_D298430): layers from the top down
+// spruceCanopy is SpruceTreeCanopy: layers from the top down
 // to lower_offset above the base, the radius growing and resetting.
 func (t *treeFeature) spruceCanopy(w *featureWorld, x, top, z int32, r *rand.MT) bool {
 	// Find the trunk's base: walk down until the block below may be grown on.
@@ -1035,7 +1035,7 @@ func (t *treeFeature) disk(w *featureWorld, x, y, z, rad int32, cutCorners, repl
 	return placed
 }
 
-// pineCanopy is PineTreeCanopy (sub_D2DAB10): from one above the top down,
+// pineCanopy is PineTreeCanopy: from one above the top down,
 // the radius grows to its maximum, shrinking once near the bottom.
 func (t *treeFeature) pineCanopy(w *featureWorld, x, top, z int32, r *rand.MT) bool {
 	h := t.pineHeight.draw(r)

@@ -15,7 +15,7 @@ import (
 )
 
 // The Nether's biomes come from a small node graph (BDS's
-// NodeGraphBiomeSource, built in sub_515FDF0): four climate noises at
+// NodeGraphBiomeSource, built): four climate noises at
 // quarter resolution, a nearest-climate pick among the biomes with
 // minecraft:multinoise_generation_rules, then a 4x Voronoi zoom to blocks.
 // It is 2D: a column has one biome at every height.
@@ -31,7 +31,7 @@ const (
 func mix(a, b int64) int64 { return a*(a*lcgMul+lcgAdd) + b }
 
 // climateNoise is one climate channel: two sets of two old-style octaves,
-// the second sampled at a slightly larger scale (sub_519BEF0, sub_519C330).
+// the second sampled at a slightly larger scale.
 type climateNoise struct {
 	a, b       *noise.LegacyOctaves
 	scaleA     float32
@@ -99,7 +99,7 @@ func newBiomeSource(seed int64, biomeIDs map[string]uint32) (*biomeSource, error
 			return fmt.Errorf("nether: read %s: %w", p, err)
 		}
 		// BDS keeps the multinoise rules whose dimension is
-		// minecraft:nether (sub_515FDF0); in the vanilla data those are the
+		// minecraft:nether; in the vanilla data those are the
 		// biomes tagged nether. Some overworld biomes carry old rules too.
 		// VERIFY: how BDS gives a biome's rules their dimension.
 		r := f.Biome.Components.Rules
@@ -126,8 +126,8 @@ func newBiomeSource(seed int64, biomeIDs map[string]uint32) (*biomeSource, error
 	return s, nil
 }
 
-// pick is the biome nearest the climate at quarter position (qx, qz)
-// (sub_519CB70): the weight counts as a fifth, squared distance.
+// pick is the biome nearest the climate at quarter position (qx, qz):
+// the weight counts as a fifth, squared distance.
 func (s *biomeSource) pick(qx, qz int32) uint32 {
 	t, h, a, w := s.climate[0].at(qx, qz), s.climate[1].at(qx, qz), s.climate[2].at(qx, qz), s.climate[3].at(qx, qz)
 	best, bestD := s.biomes[0].id, float32(0)

@@ -26,7 +26,7 @@ type EntitySpawn struct {
 
 // MobAt is the mob a structure places at block (x, y, z): BDS spawns it at
 // the block's corner, unturned, and marks it persistent (the structure
-// pieces' postProcessMobsAt, 1.26.60 sub_53704F0).
+// pieces' postProcessMobsAt, 1.26.60).
 func MobAt(x, y, z int32, identifier, event, source string) EntitySpawn {
 	return EntitySpawn{
 		X: float64(x), Y: float64(y), Z: float64(z),
@@ -34,8 +34,8 @@ func MobAt(x, y, z int32, identifier, event, source string) EntitySpawn {
 	}
 }
 
-// MarkerMob reads a jigsaw data marker's metadata as BDS does
-// (1.26.60 sub_D80D140): "namespace:id[:event]", split on the first colon
+// MarkerMob reads a jigsaw data marker's metadata as BDS does:
+// "namespace:id[:event]", split on the first colon
 // and then the next one, as in "minecraft:villager_v2:minecraft:spawn_from_village".
 // A name with no colon has no namespace. ok is false for empty metadata.
 func MarkerMob(metadata string) (identifier, event string, ok bool) {

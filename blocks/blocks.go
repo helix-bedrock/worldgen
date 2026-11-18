@@ -141,7 +141,7 @@ func (r *Registry) LightDampening(i uint32) uint8 {
 
 // LoadTranslucency reads translucency values: a JSON object from state hash
 // (decimal) to translucency, listing every state that is not 0 (opaque). It
-// is exported from BDS block states (Block::mTranslucency; air is 1). Call
+// is exported from BDS block states (air is 1). Call
 // it before using the registry from several goroutines.
 func (r *Registry) LoadTranslucency(rd io.Reader) error {
 	var m map[string]float32

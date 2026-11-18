@@ -41,7 +41,7 @@ type cityLayout struct {
 	shipBuilt bool
 }
 
-// bool is BDS's nextBoolean: bit 27 of a draw (sub_ED4A020).
+// bool is BDS's nextBoolean: bit 27 of a draw.
 func (l *cityLayout) bool() bool { return l.r.Uint32()&nextBooleanBit != 0 }
 
 // piece adds a template at pos.
@@ -58,13 +58,13 @@ func (l *cityLayout) piece(name string, pos [3]int32, rot int, overwrite bool) c
 }
 
 // add places a template joined to parent at offset, turned by the
-// parent's turn (StructureTemplate's connected position, sub_D2B50C0).
+// parent's turn (StructureTemplate's connected position).
 func (l *cityLayout) add(parent cityPiece, offset [3]int32, name string, rot int, overwrite bool) cityPiece {
 	o := structure.RotatePos(offset, parent.rot)
 	return l.piece(name, [3]int32{parent.pos[0] + o[0], parent.pos[1] + o[1], parent.pos[2] + o[2]}, rot, overwrite)
 }
 
-// children runs a generator below the depth limit (sub_4E41EA0): when it
+// children runs a generator below the depth limit: when it
 // fails, the pieces it added are dropped; when it succeeds, one more draw
 // follows (Java's depth tag).
 func (l *cityLayout) children(g cityGen, depth int32, parent cityPiece, offset [3]int32) bool {
@@ -97,12 +97,12 @@ type cityBridge struct {
 	pos [3]int32
 }
 
-// towerBridges are a tower's (qword_F456CD0).
+// towerBridges are a tower's.
 func towerBridges() [4]cityBridge {
 	return [4]cityBridge{{0, [3]int32{1, -1, 0}}, {1, [3]int32{6, -1, 1}}, {3, [3]int32{0, -1, 5}}, {2, [3]int32{5, -1, 6}}}
 }
 
-// fatTowerBridges are a fat tower's (qword_F456CF0).
+// fatTowerBridges are a fat tower's.
 func fatTowerBridges() [4]cityBridge {
 	return [4]cityBridge{{0, [3]int32{4, -1, 0}}, {1, [3]int32{12, -1, 4}}, {3, [3]int32{0, -1, 8}}, {2, [3]int32{8, -1, 12}}}
 }
@@ -168,7 +168,7 @@ const (
 	houseOffsetZ = -11
 )
 
-// tower is the tower generator (sub_4E42570): a base, two to four pieces,
+// tower is the tower generator: a base, two to four pieces,
 // then bridges from one of the pieces, or a fat tower on top.
 func (l *cityLayout) tower(depth int32, parent cityPiece) bool {
 	rot := parent.rot
@@ -206,7 +206,7 @@ func (l *cityLayout) tower(depth int32, parent cityPiece) bool {
 	return true
 }
 
-// fatTower is the fat tower generator (sub_4E43EF0): a base, a middle, up
+// fatTower is the fat tower generator: a base, a middle, up
 // to two more middles with bridges, and a top.
 func (l *cityLayout) fatTower(depth int32, parent cityPiece) bool {
 	rot := parent.rot
@@ -226,7 +226,7 @@ func (l *cityLayout) fatTower(depth int32, parent cityPiece) bool {
 	return true
 }
 
-// bridge is the bridge generator (sub_4E45340): one to four bridge parts,
+// bridge is the bridge generator: one to four bridge parts,
 // then the city's one ship or a house tower, and a bridge end facing back.
 func (l *cityLayout) bridge(depth int32, parent cityPiece) bool {
 	rot := parent.rot
@@ -259,7 +259,7 @@ func (l *cityLayout) bridge(depth int32, parent cityPiece) bool {
 	return true
 }
 
-// houseTower is the house tower generator (sub_4E46930): a house of one to
+// houseTower is the house tower generator: a house of one to
 // three floors, the taller ones with a tower on top.
 func (l *cityLayout) houseTower(depth int32, parent cityPiece, offset [3]int32) bool {
 	rot := parent.rot
@@ -282,7 +282,7 @@ func (l *cityLayout) houseTower(depth int32, parent cityPiece, offset [3]int32) 
 
 // layCity lays out the city starting in chunk (cx, cz) at height y. The
 // generators draw from the placement random, after the four draws that
-// picked the chunk (sub_4E400E0 hands it on to the start).
+// picked the chunk (hands it on to the start).
 func (e *End) layCity(cx, cz int32, rot int, y int32) *city {
 	l := &cityLayout{e: e, r: e.cityRandom(structure.Region(cx, citySpacing), structure.Region(cz, citySpacing))}
 	for range startDraws {

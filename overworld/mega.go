@@ -9,10 +9,10 @@ import (
 )
 
 // Mega (2x2) tree parts of minecraft:tree_feature, written from BDS
-// 1.26.52: MegaTreeTrunk (place sub_D2D9A00, height sub_D2DAAB0),
-// MegaTreeCanopy (sub_D2D9880), MegaPineTreeCanopy (sub_D2D9670), their
-// layer helper (sub_D299860) and the base cluster (sub_D298920 /
-// sub_D298DB0) that rings giant spruces with podzol.
+// 1.26.52: MegaTreeTrunk (place, height),
+// MegaTreeCanopy, MegaPineTreeCanopy, their
+// layer helper and the base cluster (/)
+// that rings giant spruces with podzol.
 
 type megaTrunk struct {
 	width     int32
@@ -47,7 +47,7 @@ func (m *megaTrunk) megaHeight(r *rand.MT) int32 {
 	return h
 }
 
-// megaLayer is sub_D299860: a layer of leaves around (x, y, z) extended by
+// megaLayer is: a layer of leaves around (x, y, z) extended by
 // the core (ox, oz). Simplified layers keep dx^2+dz^2 <= r^2; others keep a
 // block within r of any of the four core corners.
 func (t *treeFeature) megaLayer(w *featureWorld, x, y, z, rad, ox, oz int32, simplify bool, leaf uint32) {
@@ -100,10 +100,10 @@ func (c *megaCanopy) place(t *treeFeature, w *featureWorld, x, y, z, tw int32, r
 	}
 }
 
-// Decoration side masks (sub_D299270): west, east, north, south.
+// Decoration side masks: west, east, north, south.
 type sideMask [4]bool
 
-// Mega tree constants (MegaTreeTrunk, sub_D298DB0).
+// Mega tree constants (MegaTreeTrunk).
 const (
 	// megaBranchOffset puts a branch at the middle of the 2x2 trunk and
 	// rounds it to the nearest block.
@@ -119,7 +119,7 @@ const (
 	clusterColumnDepth = 3
 )
 
-// megaTrunk is MegaTreeTrunk::place.
+// megaTrunk matches BDS.
 func (t *treeFeature) megaTrunk(w *featureWorld, x, y, z, h int32, r *rand.MT) (blockPos, bool) {
 	m := &t.mega
 	if y <= MinY || y+h >= MaxY {
@@ -214,7 +214,7 @@ func (t *treeFeature) megaTrunk(w *featureWorld, x, y, z, h int32, r *rand.MT) (
 	return blockPos{x, y, z}, true
 }
 
-// baseClusters is sub_D298920: podzol (the first base block) rings around
+// baseClusters is: podzol (the first base block) rings around
 // the four trunk corners, then num_clusters rings at random edge spots of
 // an 8x8 grid around the trunk.
 func (t *treeFeature) baseClusters(w *featureWorld, x, y, z, width int32, r *rand.MT) {
@@ -234,7 +234,7 @@ func (t *treeFeature) baseClusters(w *featureWorld, x, y, z, width int32, r *ran
 	}
 }
 
-// clusterColumn is sub_D298DB0: from two above down to three below y, the
+// clusterColumn is: from two above down to three below y, the
 // first block that is podzol already ends the search; the first one the
 // cluster may replace becomes podzol.
 func (t *treeFeature) clusterColumn(w *featureWorld, x, y, z int32) {

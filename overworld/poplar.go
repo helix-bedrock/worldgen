@@ -7,8 +7,8 @@ import (
 
 // Poplar and fallen tree parts of minecraft:tree_feature (dappled forest's
 // poplars, fallen logs in forests). Written from BDS 1.26.52:
-// PoplarTreeTrunk sub_D2DB8C0, PoplarTreeCanopy sub_D2DAED0 with its layer
-// helper sub_D2DB650, FallenTreeTrunk sub_D2D39F0.
+// PoplarTreeTrunk, PoplarTreeCanopy with its layer
+// helper, FallenTreeTrunk.
 
 // drawInclusive is the range draw these parts use: min + nextInt(max-min+1)
 // when max > min (unlike intRange.draw, max is included).
@@ -51,7 +51,7 @@ func (o *Overworld) withAxis(b uint32, axis string) uint32 {
 	return b
 }
 
-// poplarTrunk is PoplarTreeTrunk::place: a straight trunk of height h, the
+// poplarTrunk matches BDS: a straight trunk of height h, the
 // log decoration feature at every log, up to four side logs (branches)
 // facing shuffled directions just below the canopy, and the canopy around
 // the top `remaining` logs.
@@ -105,7 +105,7 @@ func (t *treeFeature) poplarTrunk(w *featureWorld, x, y, z, h int32, r *rand.MT)
 	return blockPos{x, y, z}, true
 }
 
-// poplarCanopy is PoplarTreeCanopy::place around a trunk whose canopy part
+// poplarCanopy matches BDS around a trunk whose canopy part
 // starts at y: square-ish layers of radius R (a weighted pick, minus one)
 // with holes, narrower at the top and bottom, and log arms inside the
 // widest layer.
@@ -185,7 +185,7 @@ func poplarSkew(dx, dz int32, flip, top bool) int32 {
 	return 0
 }
 
-// poplarLayer is sub_D2DB650: one layer of leaves at y+yo within the
+// poplarLayer is: one layer of leaves at y+yo within the
 // diamond |dx|+|dz| <= rad+skew-1, plus one more where a float beats
 // side_hole_chance. The square's edge is left out on the top two layers.
 func (t *treeFeature) poplarLayer(w *featureWorld, x, y, z int32, r *rand.MT, h, rad, yo int32, flip bool) {
@@ -210,7 +210,7 @@ func (t *treeFeature) poplarLayer(w *featureWorld, x, y, z int32, r *rand.MT, h,
 	}
 }
 
-// fallenTrunk is FallenTreeTrunk::place: a stump at the origin and, two or
+// fallenTrunk matches BDS: a stump at the origin and, two or
 // three blocks away in a random direction, a log lying on the ground if
 // the space is free and at most two blocks in a row hang over air.
 func (t *treeFeature) fallenTrunk(w *featureWorld, x, y, z, h int32, r *rand.MT) (blockPos, bool) {
@@ -283,7 +283,7 @@ func (t *treeFeature) fallenTrunk(w *featureWorld, x, y, z, h int32, r *rand.MT)
 }
 
 // treeFree reports whether a fallen log may lie where b is: air or a block
-// BDS marks replaceable (BlockLegacy::canBeBuiltOver).
+// BDS marks replaceable.
 // VERIFY: the replaceable set is Java's "replaceable" block tag with
 // Bedrock names; BDS's own flag was not exported.
 func (o *Overworld) treeFree(b uint32) bool {

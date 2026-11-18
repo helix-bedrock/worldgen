@@ -10,10 +10,10 @@ import (
 	"github.com/helix-bedrock/worldgen/structure"
 )
 
-// Strongholds, written from BDS 1.26.52: the placement (the first three,
-// sub_4E9F2D0, and the grid test, sub_4E9EFC0), the start (sub_4EA01A0),
-// the child picker (sub_4FB07E0), the piece factory (sub_4FAF3F0), the
-// portal room fallback (sub_4FB2150), the small door (sub_4FB1330) and the
+// Strongholds, written from BDS 1.26.52: the placement (the first three,,
+// and the grid test), the start,
+// the child picker, the piece factory, the
+// portal room fallback, the small door and the
 // pieces' builds. The layout is Java's StrongholdPieces with Bedrock's
 // random and these differences, all kept:
 //   - the first three strongholds sit on village chunks found around a
@@ -794,7 +794,7 @@ func (b *shBuild) maybeBox(chance float32, x0, y0, z0, x1, y1, z1 int32, s uint3
 	}
 }
 
-// Orientation tables of sub_D254F10, by the state a block has, for piece
+// Orientation tables of, by the state a block has, for piece
 // orientations 0, 1 and 3 (2 leaves values unchanged).
 var (
 	shFacing = [4][4]int32{{3, 2, 5, 4}, {4, 5, 3, 2}, {2, 3, 4, 5}, {5, 4, 2, 3}} // facing_direction 2..5
@@ -1365,8 +1365,8 @@ const strongholdRings = 100
 // BDS takes a dimension value less 31, assumed to be the sea level (63).
 const strongholdTargetY = 32
 
-// EnderEyeTarget is BDS 1.26.60's StrongholdFeature nearest search
-// (sub_53886D0), the place an eye of ender flies toward: the first three
+// EnderEyeTarget is BDS 1.26.60's StrongholdFeature nearest search,
+// the place an eye of ender flies toward: the first three
 // strongholds and the grid starts of the cells around (x, z), ring by ring
 // until one ring holds any. The nearest by chunk is returned as a block
 // position, 2 blocks into its start chunk. Because the first three always

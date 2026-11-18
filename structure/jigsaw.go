@@ -63,8 +63,8 @@ func (l *Lib) ApplyRules(rules []BlockRule, cs ConvertedState, x, y, z int32, wo
 }
 
 // applyLegacyRules runs built-in block rules on one block about to be
-// placed at (x, y, z) over world, as BDS's template placement does
-// (sub_D2B7A10): every rule is tested in turn on the block the earlier ones
+// placed at (x, y, z) over world, as BDS's template placement does:
+// every rule is tested in turn on the block the earlier ones
 // left, and r is drawn by a chance input whose block matches and by a
 // position test whose input and location pass.
 func (l *Lib) applyLegacyRules(rules []BlockRule, cs ConvertedState, x, y, z int32, world uint32, pivot [3]int32, r *rand.MT) ConvertedState {
@@ -202,7 +202,7 @@ type axisPosTest struct {
 	axis                 int // 0 x, 1 y, 2 z
 }
 
-// passes is the test (sub_D234BC0) for a block d blocks from the pivot
+// passes is the test for a block d blocks from the pivot
 // along the axis with draw f. BDS returns early before the interpolation
 // when f is at most a chance and the distance range is at least the
 // corresponding distance bound, so a test from 0 to 100 passes on f <=
@@ -848,8 +848,7 @@ func (l *Lib) PlacePiece(p *Piece, w World, chunkBox Box, height func(x, z int32
 	}
 	// Built-in block rules draw from a random of their own, made afresh for
 	// every placement from the seed of the random the piece is placed with:
-	// the population seed of the chunk being decorated (sub_D237F90,
-	// sub_D2B7A10).
+	// the population seed of the chunk being decorated ().
 	var rr *rand.MT
 	ruleSeed := l.populationSeed(chunkBox.X0>>4, chunkBox.Z0>>4)
 	if p.Element.Legacy && len(p.Element.Rules) > 0 {
@@ -905,7 +904,7 @@ func (l *Lib) PlacePiece(p *Piece, w World, chunkBox Box, height func(x, z int32
 		case p.Element.Legacy && st.Name == "minecraft:jigsaw":
 			// A jigsaw's final state is placed apart from the template's
 			// blocks, its rules tested on a random of its own made from the
-			// same seed (sub_D23A770, sub_D2B9B40).
+			// same seed.
 			cs = l.applyLegacyRules(p.Element.Rules, cs, x, y, z, world, p.Pos, rand.NewMT(ruleSeed))
 		case p.Element.Legacy:
 			cs = l.applyLegacyRules(p.Element.Rules, cs, x, y, z, world, p.Pos, rr)
@@ -917,7 +916,7 @@ func (l *Lib) PlacePiece(p *Piece, w World, chunkBox Box, height func(x, z int32
 			cs, loot = ConvertedState{cr.Output, false, true}, cr.Loot
 		}
 		// A block that can hold water keeps the water it replaces, as in
-		// BDS's template placement (sub_D2B7A10).
+		// BDS's template placement.
 		wet := cs.Water || l.IsWater(world) && l.HoldsWater(cs.ID)
 		if !w.Set(x, y, z, cs.ID, wet) {
 			continue
