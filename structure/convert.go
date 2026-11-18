@@ -289,6 +289,18 @@ func leverDirection(p map[string]string) string {
 	return f
 }
 
+// stairCornerState is the Bedrock stair corner state.
+const stairCornerState = "minecraft:corner"
+
+// stairCorner is the Bedrock corner of a Java stair shape: the same names,
+// with straight called none.
+func stairCorner(shape string) string {
+	if shape == "straight" {
+		return "none"
+	}
+	return shape
+}
+
 // withJavaProp returns a copy of p with one property set.
 func withJavaProp(p map[string]string, k, v string) map[string]string {
 	out := make(map[string]string, len(p)+1)
@@ -455,6 +467,11 @@ func (l *Lib) ConvertJavaState(st TemplateState) (uint32, bool, bool) {
 			case "double_wall":
 				setProp(props, "attachment", "multiple")
 			}
+		case "shape":
+			// A stair's corner has been its own state since 1.26.50. BDS
+			// 1.26.60 converts Java's shape by name (sub_D837C20), straight
+			// becoming none; without it every template stair was straight.
+			setProp(props, stairCornerState, stairCorner(v))
 		case "axis":
 			setProp(props, "pillar_axis", v)
 		case "part":

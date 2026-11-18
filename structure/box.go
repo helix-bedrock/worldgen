@@ -180,12 +180,32 @@ func mirrorProps(p map[string]string, a, b string, half int) map[string]string {
 	case "right":
 		out["hinge"] = "left"
 	}
+	// A reflection turns a stair corner the other way.
+	if s, ok := mirrorStairShape(p["shape"]); ok {
+		out["shape"] = s
+	}
 	if v, ok := p["rotation"]; ok {
 		if n, err := strconv.Atoi(v); err == nil {
 			out["rotation"] = strconv.Itoa((half - n + rotationSteps) & rotationMask)
 		}
 	}
 	return out
+}
+
+// mirrorStairShape is a Java stair corner shape's mirror image; ok is false
+// for straight stairs and anything that is not a corner.
+func mirrorStairShape(shape string) (string, bool) {
+	switch shape {
+	case "inner_left":
+		return "inner_right", true
+	case "inner_right":
+		return "inner_left", true
+	case "outer_left":
+		return "outer_right", true
+	case "outer_right":
+		return "outer_left", true
+	}
+	return "", false
 }
 
 // NewBox returns the box with corners (x0, y0, z0) and (x1, y1, z1).
