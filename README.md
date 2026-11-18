@@ -11,6 +11,7 @@
 [![Go](https://img.shields.io/badge/go-1.26-00ADD8?logo=go&logoColor=white)](https://go.dev/)
 [![License](https://img.shields.io/badge/license-noncommercial-orange)](LICENSE)
 [![Status](https://img.shields.io/badge/status-refinement_pass-yellow)](#status)
+[![Discord](https://img.shields.io/discord/1568071670097518763?label=discord&logo=discord&logoColor=white&color=5865F2)](https://discord.gg/Fbmc69Gqr7)
 
 </div>
 
