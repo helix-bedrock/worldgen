@@ -189,6 +189,20 @@ func bedColor(c string) uint8 {
 	return 0
 }
 
+// lastColor is the last colour index, black in Java's order and white in
+// Bedrock's dye order.
+const lastColor = 15
+
+// bannerBase is a Java banner's colour as Bedrock's banner Base, which counts
+// in dye order (black 0 ... white 15), the reverse of Java's colour order.
+// Without it a banner reads Base 0 and shows black. A name with no colour,
+// such as the outpost's ominous banner, is white.
+func bannerBase(javaName string) int32 {
+	n := strings.TrimPrefix(javaName, "minecraft:")
+	n = strings.TrimSuffix(strings.TrimSuffix(n, "_wall_banner"), "_banner")
+	return lastColor - int32(bedColor(n))
+}
+
 // BlockEntityFor returns the block entity data of a converted block placed
 // at (x, y, z), nil if it has none. javaName gives the bed colour.
 func (l *Lib) BlockEntityFor(id uint32, javaName string, x, y, z int32) map[string]any {
@@ -214,6 +228,9 @@ func (l *Lib) BlockEntityFor(id uint32, javaName string, x, y, z int32) map[stri
 	if beID == "Bed" {
 		color := strings.TrimSuffix(strings.TrimPrefix(javaName, "minecraft:"), "_bed")
 		d["color"] = bedColor(color)
+	}
+	if beID == "Banner" {
+		d["Base"] = bannerBase(javaName)
 	}
 	// Outpost templates name the ominous banner illager_captain_wall_banner;
 	// Bedrock keeps it as a banner of type 1 (illager_captain).
