@@ -691,7 +691,14 @@ func (b *msBuild) build(ms *mineshaft) {
 	b.web, b.torch, b.rail = o.blockID("minecraft:web"), o.blockID(blockTorch), o.blockID("minecraft:rail")
 	b.chain, b.spawner = o.blockID("minecraft:iron_chain"), o.blockID("minecraft:mob_spawner")
 	for _, p := range ms.pieces {
-		if !p.bb.Intersects(b.cbox) || b.edgesLiquid(p) {
+		if !p.bb.Intersects(b.cbox) {
+			continue
+		}
+		// BDS's cart pass does not ask whether the piece was built.
+		if p.kind == msCorridor {
+			b.cartSpots(p)
+		}
+		if b.edgesLiquid(p) {
 			continue
 		}
 		switch p.kind {
@@ -705,6 +712,43 @@ func (b *msBuild) build(ms *mineshaft) {
 			b.buildStairs(p)
 		}
 	}
+}
+
+// Chest carts in mineshaft corridors, as BDS 1.26.60: each 5-block section has
+// two floor spots, each with its own 1 in 100 chance.
+const (
+	msCartOneIn     = 100
+	msCartLootTable = "loot_tables/chests/abandoned_mineshaft.json"
+	msCartEntity    = "minecraft:chest_minecart"
+	msSectionLength = 5
+	msCartRightX    = 2 // local x of the spot before a section's support
+	msCartRightZ    = 1
+	msCartLeftX     = 0 // local x of the spot after a section's support
+	msCartLeftZ     = 3
+)
+
+// cartSpots records the corridor's possible chest carts inside the chunk. The
+// engine rolls them on the chunk's first tick, once every later generation step
+// has changed the blocks they depend on.
+func (b *msBuild) cartSpots(p *msPiece) {
+	for n := int32(0); n < p.sections; n++ {
+		b.cartSpot(p, msCartRightX, msSectionLength*n+msCartRightZ)
+		b.cartSpot(p, msCartLeftX, msSectionLength*n+msCartLeftZ)
+	}
+}
+
+// cartSpot records one possible chest cart at local (x, 0, z). BDS spawns it at
+// the block's corner.
+func (b *msBuild) cartSpot(p *msPiece, x, z int32) {
+	wx, wy, wz := p.worldPos(x, 0, z)
+	if !b.cbox.Contains([3]int32{wx, wy, wz}) || wy <= MinY {
+		return
+	}
+	b.c.Entities = append(b.c.Entities, structure.EntitySpawn{
+		X: float64(wx), Y: float64(wy), Z: float64(wz),
+		Identifier: msCartEntity, Source: "mineshaft",
+		OneIn: msCartOneIn, LootTable: msCartLootTable,
+	})
 }
 
 func (b *msBuild) buildRoom(p *msPiece) {

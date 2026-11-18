@@ -22,6 +22,12 @@ type EntitySpawn struct {
 	NBT map[string]any
 	// Source names what placed it ("end_spike", "village").
 	Source string
+	// OneIn, when above 0, makes this only a possible spot: the engine rolls a
+	// 1 in OneIn chance and checks the finished blocks there when the chunk is
+	// first ticked. Mineshaft chest carts are placed this way.
+	OneIn int32
+	// LootTable is the loot table of a container entity, empty for none.
+	LootTable string
 }
 
 // MobAt is the mob a structure places at block (x, y, z): BDS spawns it at
