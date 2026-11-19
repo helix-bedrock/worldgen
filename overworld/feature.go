@@ -9,7 +9,6 @@ import (
 	"slices"
 	"strconv"
 	"strings"
-	"sync/atomic"
 
 	"github.com/helix-bedrock/worldgen/biome"
 	"github.com/helix-bedrock/worldgen/feature"
@@ -440,12 +439,13 @@ func (a axis) sample(r *rand.MT) int32 {
 }
 
 // featureWorld is the block view one origin chunk's features place into.
-// They see the undecorated terrain plus their own placements only
-// (overlay), never other chunks' decorations. So a feature reaching over a
-// chunk border makes the same decisions whichever chunk is being built, its
-// parts in neighbouring chunks always agree, and an origin's placements can
-// be computed once and applied to each chunk they reach. BDS instead sees
-// whatever its neighbours placed first, which depends on chunk load order.
+// They see the terrain, what the origins of earlier phases placed (see
+// originPhase) and their own placements (overlay). As in BDS a feature finds
+// what its neighbours placed first, but the order is fixed: BDS's follows the
+// players, which would make a seed's world depend on how it was explored. A
+// feature reaching over a chunk border still makes the same decisions
+// whichever chunk is being built, and an origin's placements can be computed
+// once and applied to each chunk they reach.
 type featureWorld struct {
 	// guard holds blocks no write may change while it is set: the cells of
 	// a structure whose own feature pieces (a camp's trees) are placing.
@@ -645,16 +645,27 @@ type writeList struct {
 // east/south (Decorate runs the origins two chunks west/north to one
 // east/south of a chunk). It is immutable once made.
 type featureWrites struct {
-	off [17]int32 // slot i holds pos/blk[off[i]:off[i+1]]
-	// uses counts the chunks that took these placements (TerrainCache).
-	uses     atomic.Int32
+	off      [17]int32 // slot i holds pos/blk[off[i]:off[i+1]]
 	pos      []uint32
 	blk      []uint16
 	entities [16][]structure.BlockEntity // by slot; nil for most origins
 	ticks    [16][]Tick                  // by slot; nil for most origins
 }
 
-// originFeatures runs the rules of origin chunk (ox, oz). It returns nil
+// originPhases is how many phases origin chunks are decorated in.
+const originPhases = 4
+
+// originPhase is the phase origin chunk (ox, oz) is decorated in: the chunks
+// of a phase form a grid two chunks apart. Features of one phase start at
+// least 17 blocks apart along an axis, so they rarely reach each other, and
+// every origin sees all that earlier phases placed. Few phases keep the chain
+// of chunks one chunk depends on short.
+func originPhase(ox, oz int32) int {
+	return int(ox&1) | int(oz&1)<<1
+}
+
+// originFeatures runs the rules of origin chunk (ox, oz). neighbour must give
+// the chunks as the origin's phase finds them (see stageChunk). It returns nil
 // when neighbour cannot provide the origin.
 func (o *Overworld) originFeatures(ox, oz int32, neighbour func(cx, cz int32) *PackedChunk) *featureWrites {
 	return o.originFeaturesTraced(ox, oz, neighbour, nil)
@@ -713,10 +724,10 @@ func (o *Overworld) applyWrites(c *Chunk, base *PackedChunk, fw *featureWrites, 
 				continue
 			}
 		} else if o.soilPlant[b] && o.takenByEarlierOrigin(c, base, i) {
-			// A block an earlier origin placed here stays when this origin
-			// puts a plant on it: this origin cannot see it, but in BDS the
-			// plant feature would have found the spot taken. Without this, a
-			// flower could take the bottom log of a tree.
+			// A block another origin of this phase placed here stays when this
+			// origin puts a plant on it: this origin cannot see it, but in BDS
+			// the plant feature would have found the spot taken. Without this,
+			// a flower could take the bottom log of a tree.
 			continue
 		}
 		c.Blocks[i] = b
@@ -860,9 +871,12 @@ func (w *featureWorld) biomeTags(x, y, z int32) []string {
 
 // Decorate runs the feature rules on c, a copy of the terrain of chunk
 // (chunkX, chunkZ) from GenerateChunk. Features started in nearby chunks
-// reach into c, so neighbour must return the unchanged GenerateChunk output
-// of any chunk within 3 chunks, the target's own included (it may return nil for a chunk it cannot provide; features then
-// skip it). It is safe to call from many goroutines if neighbour is.
+// reach into c, and they depend on the features of earlier phases around
+// them, so neighbour must return the unchanged GenerateChunk output of any
+// chunk within 16 chunks, the target's own included (it may return nil for a
+// chunk it cannot provide; features then skip it). Each call works out those
+// chunks' features again: use a TerrainCache to generate many chunks. It is
+// safe to call from many goroutines if neighbour is.
 func (o *Overworld) Decorate(chunkX, chunkZ int32, c *Chunk, neighbour func(cx, cz int32) *PackedChunk) {
 	structured := o.structuredView(neighbour)
 	base := structured(chunkX, chunkZ)
@@ -870,9 +884,7 @@ func (o *Overworld) Decorate(chunkX, chunkZ int32, c *Chunk, neighbour func(cx, 
 		// Structures reach this chunk: start from the terrain with them.
 		base.Unpack(c)
 	}
-	o.decorate(chunkX, chunkZ, c, base, func(ox, oz int32) *featureWrites {
-		return o.originFeatures(ox, oz, structured)
-	})
+	o.decorate(chunkX, chunkZ, c, base, newOriginMemo(o, structured).writes)
 	o.connectBlocks(c, chunkX, chunkZ, structured)
 	o.finishChunk(c)
 }
@@ -885,17 +897,92 @@ func (o *Overworld) decorate(chunkX, chunkZ int32, c *Chunk, base *PackedChunk, 
 	if o.rules == nil {
 		return
 	}
-	for ox := chunkX - 2; ox <= chunkX+1; ox++ {
-		for oz := chunkZ - 2; oz <= chunkZ+1; oz++ {
-			o.applyWrites(c, base, writes(ox, oz), int(chunkX-ox+1)*4+int(chunkZ-oz+1))
-		}
-	}
+	o.applyOrigins(chunkX, chunkZ, c, base, originPhases, writes)
 	if !o.skip.Freeze {
 		o.freeze(chunkX, chunkZ, c)
 	}
 	o.bubbleColumns(c)
 	o.keepWater(c, base)
 	o.dropOverwrittenBlockEntities(c)
+}
+
+// applyOrigins applies to c the placements of the origins that reach chunk
+// (chunkX, chunkZ), phase by phase, for the first phases phases.
+func (o *Overworld) applyOrigins(chunkX, chunkZ int32, c *Chunk, base *PackedChunk, phases int, writes func(ox, oz int32) *featureWrites) {
+	for phase := range phases {
+		for ox := chunkX - 2; ox <= chunkX+1; ox++ {
+			for oz := chunkZ - 2; oz <= chunkZ+1; oz++ {
+				if originPhase(ox, oz) == phase {
+					o.applyWrites(c, base, writes(ox, oz), int(chunkX-ox+1)*4+int(chunkZ-oz+1))
+				}
+			}
+		}
+	}
+}
+
+// stageChunk returns chunk (chunkX, chunkZ) as the origins of a phase find it:
+// base with the placements of all earlier phases. Only its blocks differ from
+// base, and only features read it. scratch is overwritten.
+func (o *Overworld) stageChunk(chunkX, chunkZ int32, phase int, base *PackedChunk, scratch *Chunk, writes func(ox, oz int32) *featureWrites) *PackedChunk {
+	if base == nil {
+		return nil
+	}
+	unpackSubs(&base.subs, scratch.Blocks[:])
+	o.applyOrigins(chunkX, chunkZ, scratch, base, phase, writes)
+	clear(scratch.BlockEntities)
+	clear(scratch.Ticks)
+	scratch.BlockEntities, scratch.Ticks = scratch.BlockEntities[:0], scratch.Ticks[:0]
+	p := &PackedChunk{biomes: base.biomes, biomeList: base.biomeList}
+	packSubs(&p.subs, scratch.Blocks[:])
+	return p
+}
+
+// originMemo remembers the placements and stages one Decorate call works out.
+type originMemo struct {
+	o       *Overworld
+	base    func(cx, cz int32) *PackedChunk
+	origins map[[2]int32]*featureWrites
+	stages  [originPhases]map[[2]int32]*PackedChunk
+	// scratch has a chunk per phase: making a stage makes earlier ones.
+	scratch [originPhases]*Chunk
+}
+
+// newOriginMemo returns an empty memo over the chunks of base.
+func newOriginMemo(o *Overworld, base func(cx, cz int32) *PackedChunk) *originMemo {
+	m := &originMemo{o: o, base: base, origins: map[[2]int32]*featureWrites{}}
+	for i := range m.stages {
+		m.stages[i] = map[[2]int32]*PackedChunk{}
+	}
+	return m
+}
+
+// writes returns the placements of origin chunk (ox, oz).
+func (m *originMemo) writes(ox, oz int32) *featureWrites {
+	pos := [2]int32{ox, oz}
+	fw, ok := m.origins[pos]
+	if !ok {
+		phase := originPhase(ox, oz)
+		fw = m.o.originFeatures(ox, oz, func(cx, cz int32) *PackedChunk { return m.stage(cx, cz, phase) })
+		m.origins[pos] = fw
+	}
+	return fw
+}
+
+// stage returns chunk (cx, cz) as the origins of a phase find it.
+func (m *originMemo) stage(cx, cz int32, phase int) *PackedChunk {
+	if phase == 0 {
+		return m.base(cx, cz)
+	}
+	pos := [2]int32{cx, cz}
+	p, ok := m.stages[phase][pos]
+	if !ok {
+		if m.scratch[phase] == nil {
+			m.scratch[phase] = new(Chunk)
+		}
+		p = m.o.stageChunk(cx, cz, phase, m.base(cx, cz), m.scratch[phase], m.writes)
+		m.stages[phase][pos] = p
+	}
+	return p
 }
 
 // keepWater marks the blocks that features put where the terrain had source

@@ -19,19 +19,24 @@ type TerrainCache struct {
 	terrain    lru.LRU[*PackedChunk]
 	structured lru.LRU[*PackedChunk]
 	features   lru.LRU[*featureWrites]
+	// stages holds chunks as the origins of phases 1 and up find them.
+	stages [originPhases - 1]lru.LRU[*PackedChunk]
 }
 
 // NewTerrainCache returns a cache holding at most size chunks of terrain,
 // packed (see PackedChunk), and the placements of at most size origins.
-// Decorating a chunk reads the terrain of the chunks up to 3 away and the
-// placements of the 16 origins around it, so the cache must hold the ring
-// of chunks being loaded around a player, or they are made again and
-// again. At a 32-chunk view radius 1024 is enough: 768 ran 15% slower,
-// 2048 no faster.
+// Decorating a chunk reads the placements of the 16 origins around it, and
+// those depend on the origins of earlier phases around them, so the cache must
+// hold the ring of chunks being loaded around a player, or they are made again
+// and again.
 func NewTerrainCache(gen *Overworld, size int) *TerrainCache {
 	size = max(size, 64)
-	return &TerrainCache{gen: gen, terrain: lru.New[*PackedChunk](size), structured: lru.New[*PackedChunk](size),
+	t := &TerrainCache{gen: gen, terrain: lru.New[*PackedChunk](size), structured: lru.New[*PackedChunk](size),
 		features: lru.New[*featureWrites](size)}
+	for i := range t.stages {
+		t.stages[i] = lru.New[*PackedChunk](size)
+	}
+	return t
 }
 
 // Get returns the undecorated chunk at (chunkX, chunkZ) with the structures
@@ -71,18 +76,28 @@ func (t *TerrainCache) Raw(chunkX, chunkZ int32) *PackedChunk {
 	})
 }
 
-// originFeatures returns the cached placements of origin chunk (ox, oz) for
-// one chunk being decorated. After all 16 chunks they reach have taken
-// them, they are dropped: a chunk made again later recomputes them.
+// originFeatures returns the cached placements of origin chunk (ox, oz).
 func (t *TerrainCache) originFeatures(ox, oz int32) *featureWrites {
-	pos := [2]int32{ox, oz}
-	fw := t.features.Get(pos, func() *featureWrites {
-		return t.gen.originFeatures(ox, oz, t.Get)
+	return t.features.Get([2]int32{ox, oz}, func() *featureWrites {
+		return t.gen.originFeatures(ox, oz, t.phaseView(originPhase(ox, oz)))
 	})
-	if fw != nil && fw.uses.Add(1) == 16 {
-		t.features.Remove(pos)
+}
+
+// phaseView returns the chunks as the origins of a phase find them.
+func (t *TerrainCache) phaseView(phase int) func(cx, cz int32) *PackedChunk {
+	if phase == 0 {
+		return t.Get
 	}
-	return fw
+	return func(cx, cz int32) *PackedChunk {
+		return t.stages[phase-1].Get([2]int32{cx, cz}, func() *PackedChunk {
+			scratch, _ := t.scratch.Get().(*Chunk)
+			if scratch == nil {
+				scratch = new(Chunk)
+			}
+			defer t.scratch.Put(scratch)
+			return t.gen.stageChunk(cx, cz, phase, t.Get(cx, cz), scratch, t.originFeatures)
+		})
+	}
 }
 
 // Generate writes the finished chunk at (chunkX, chunkZ), terrain and

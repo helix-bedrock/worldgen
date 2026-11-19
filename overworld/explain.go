@@ -33,7 +33,7 @@ func (t *TerrainCache) Explain(x, y, z int32) ([]Explanation, error) {
 	for ox := cx - 2; ox <= cx+1; ox++ {
 		for oz := cz - 2; oz <= cz+1; oz++ {
 			tr := &featureTrace{pos: [3]int32{x, y, z}}
-			o.originFeaturesTraced(ox, oz, t.Get, tr)
+			o.originFeaturesTraced(ox, oz, t.phaseView(originPhase(ox, oz)), tr)
 			for _, w := range tr.writes {
 				w.Step = fmt.Sprintf("%s (from chunk %d %d)", w.Step, ox, oz)
 				out = append(out, w)
