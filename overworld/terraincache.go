@@ -23,14 +23,20 @@ type TerrainCache struct {
 	stages [originPhases - 1]lru.LRU[*PackedChunk]
 }
 
+// cacheScale widens a TerrainCache for the chunks decoration phases depend on.
+// Loading a 32-chunk radius with a size of 1024 ran at 18 chunks a second
+// unscaled and 209 with this scale; twice this scale reached only 238 and took
+// over 50% more memory.
+const cacheScale = 2
+
 // NewTerrainCache returns a cache holding at most size chunks of terrain,
 // packed (see PackedChunk), and the placements of at most size origins.
 // Decorating a chunk reads the placements of the 16 origins around it, and
 // those depend on the origins of earlier phases around them, so the cache must
 // hold the ring of chunks being loaded around a player, or they are made again
-// and again.
+// and again. Each part keeps cacheScale times size entries for that wider ring.
 func NewTerrainCache(gen *Overworld, size int) *TerrainCache {
-	size = max(size, 64)
+	size = max(size, 64) * cacheScale
 	t := &TerrainCache{gen: gen, terrain: lru.New[*PackedChunk](size), structured: lru.New[*PackedChunk](size),
 		features: lru.New[*featureWrites](size)}
 	for i := range t.stages {
