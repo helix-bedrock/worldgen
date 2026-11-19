@@ -181,8 +181,12 @@ func (o *Overworld) fillBlocksAdj(chunkX, chunkZ int32, g *grids, aq *aquifer, c
 						for dy := range cellY {
 							x, z := i*cellXZ+dx, k*cellXZ+dz
 							y := MinY + j*cellY + dy
-							c.set(x, y, z, o.fillBlock(g, aq, adj, beards, bury, i, j, k, dx, dy, dz,
-								chunkX*16+int32(x), int32(y), chunkZ*16+int32(z)))
+							wx, wy, wz := chunkX*16+int32(x), int32(y), chunkZ*16+int32(z)
+							b, fluid := o.fillBlock(g, aq, adj, beards, bury, i, j, k, dx, dy, dz, wx, wy, wz)
+							c.set(x, y, z, b)
+							if fluid && aq.needsTick() {
+								c.Ticks = append(c.Ticks, Tick{X: wx, Y: wy, Z: wz, Block: b, Delay: fluidTickDelay})
+							}
 						}
 					}
 				}
@@ -191,7 +195,8 @@ func (o *Overworld) fillBlocksAdj(chunkX, chunkZ int32, g *grids, aq *aquifer, c
 	}
 }
 
-func (o *Overworld) fillBlock(g *grids, aq *aquifer, adj []beardShaver, beards []beardBox, bury []structure.Box, i, j, k, dx, dy, dz int, x, y, z int32) uint32 {
+// fillBlock returns the block at (x, y, z) and whether it is aquifer fluid.
+func (o *Overworld) fillBlock(g *grids, aq *aquifer, adj []beardShaver, beards []beardBox, bury []structure.Box, i, j, k, dx, dy, dz int, x, y, z int32) (uint32, bool) {
 	d := squeeze(interp(&g.density, i, j, k, dx, dy, dz))
 	if y >= MinY+4 && d > 0 && interp(&g.aux[auxNoodle], i, j, k, dx, dy, dz) >= 0 {
 		t := (interp(&g.aux[auxNoodleThickness], i, j, k, dx, dy, dz) + 1) * 0.5
@@ -222,18 +227,18 @@ func (o *Overworld) fillBlock(g *grids, aq *aquifer, adj []beardShaver, beards [
 		if !(d+aq.density > 0) {
 			if y < aq.level {
 				if aq.isLava {
-					return o.ids.lava
+					return o.ids.lava, true
 				}
-				return o.seaFluid
+				return o.seaFluid, true
 			}
-			return o.ids.air
+			return o.ids.air, false
 		}
 	}
 	block := o.stoneAt(x, y, z)
 	if o.terrain.NoOreVeins {
-		return block
+		return block, false
 	}
-	return o.oreVein(g, i, j, k, dx, dy, dz, x, y, z, block)
+	return o.oreVein(g, i, j, k, dx, dy, dz, x, y, z, block), false
 }
 
 // oreVein places copper or iron veins in solid ground.

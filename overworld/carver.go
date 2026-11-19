@@ -320,6 +320,9 @@ func (cv *caveCarver) carveBlock(o *Overworld, c *Chunk, aq *aquifer, x int, ly 
 			if aq.isLava {
 				fill = o.ids.lava
 			}
+			if aq.needsTick() {
+				c.Ticks = append(c.Ticks, Tick{X: wx, Y: wy, Z: wz, Block: fill, Delay: fluidTickDelay})
+			}
 		}
 		c.put(x, ly, z, fill)
 	}

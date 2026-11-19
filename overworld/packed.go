@@ -24,6 +24,8 @@ type PackedChunk struct {
 	blockEntities []structure.BlockEntity
 	// entities are the mobs structures placed in the chunk.
 	entities []structure.EntitySpawn
+	// ticks are the terrain's pending fluid ticks still on their block.
+	ticks []Tick
 }
 
 type packedSub struct {
@@ -76,6 +78,7 @@ func Pack(c *Chunk) *PackedChunk {
 	if len(c.Entities) > 0 {
 		p.entities = append([]structure.EntitySpawn(nil), c.Entities...)
 	}
+	p.ticks = liveTicks(c)
 	packSubs(&p.subs, c.Blocks[:])
 	packSubs(&p.biomes, c.Biomes[:])
 	return p
@@ -168,7 +171,7 @@ func (p *PackedChunk) Unpack(c *Chunk) {
 	copy(c.Water[:], p.water)
 	c.BlockEntities = c.BlockEntities[:0]
 	c.Entities = append(c.Entities[:0], p.entities...)
-	c.Ticks = c.Ticks[:0]
+	c.Ticks = append(c.Ticks[:0], p.ticks...)
 	for _, be := range p.blockEntities {
 		// Each chunk gets its own data: servers fill chests in it.
 		be.Data = maps.Clone(be.Data)
@@ -176,4 +179,17 @@ func (p *PackedChunk) Unpack(c *Chunk) {
 	}
 	unpackSubs(&p.subs, c.Blocks[:])
 	unpackSubs(&p.biomes, c.Biomes[:])
+}
+
+// liveTicks returns a copy of c's pending ticks whose block is still in
+// place, or nil: a carver or structure that replaced the fluid made its tick
+// one that would never run.
+func liveTicks(c *Chunk) []Tick {
+	var out []Tick
+	for _, t := range c.Ticks {
+		if c.Block(int(t.X&15), int(t.Y), int(t.Z&15)) == t.Block {
+			out = append(out, t)
+		}
+	}
+	return out
 }

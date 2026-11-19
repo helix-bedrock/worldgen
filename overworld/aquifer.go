@@ -69,7 +69,25 @@ type aquifer struct {
 	level   int32
 	isLava  bool
 	density float32
+	// tick is BDS's "needs fluid tick" for the last sample; tickKnown is
+	// false after a uniform group's sample, which skips the distances it
+	// needs, until needsTick works it out.
+	tick, tickKnown bool
+	// sx, sy, sz is the last sampled block.
+	sx, sy, sz int32
 }
+
+// fluidTickSpread is how close the two nearest cell centres must be for a
+// fluid block to get a block tick, as BDS: 1 - |d2 - d1| * 0.04 > -0.4.
+const fluidTickSpread = -0.4
+
+// fluidTickDelay is how many ticks after generation an aquifer fluid
+// block's first tick is due: BDS adds it one tick ahead, as for springs.
+const fluidTickDelay = 1
+
+// lavaSeaTickY is the one height of the lava sea under y -54 whose blocks
+// get a tick in BDS.
+const lavaSeaTickY = -55
 
 // aquiferGroup is the 12 cells a block samples, in search order. When they
 // all hold the same fluid the sample does not depend on which is nearest:
@@ -263,19 +281,61 @@ func pressureTerm(y, levelA, levelB int32, lavaA, lavaB bool) (float32, bool) {
 // sample computes the aquifer at block (x, y, z): fluid level, lava flag and
 // the extra density that keeps fluids of different levels apart.
 func (a *aquifer) sample(x, y, z int32) {
+	a.sx, a.sy, a.sz = x, y, z
 	if y <= -55 {
 		a.level, a.isLava, a.density = -54, true, 0
+		a.tick, a.tickKnown = y == lavaSeaTickY, true
 		return
 	}
 	cx, cy, cz := mathx.FloorDiv(x-5, 16), mathx.FloorDiv(y+1, 12), mathx.FloorDiv(z-5, 16)
 	g := a.group(cx, cy, cz)
 	if g != nil && g.uniform {
 		a.level, a.isLava, a.density = g.level, g.lava, 0
+		a.tickKnown = false
 		return
 	}
+	c1, c2, c3, d1, d2, d3 := a.nearest(g, cx, cy, cz, x, y, z)
+	l1, lava1 := a.fluid(c1)
+	f12 := float32(absDiff(d2, d1))*-0.04 + 1
+	a.level, a.isLava = l1, lava1
+	a.tick, a.tickKnown = f12 > fluidTickSpread, true
+	if !(f12 > -1) {
+		a.density = 0
+		return
+	}
+	l2, lava2 := a.fluid(c2)
+	l3, lava3 := a.fluid(c3)
+	f13 := 1 - float32(absDiff(d3, d1))*0.04
+	f23 := 1 - float32(absDiff(d3, d2))*0.04
+
+	barrier := barrierSample{n: a.o.aquiferNoise.barrier, x: x, y: y, z: z}
+	p12 := barrier.add(pressureTerm(y, l1, l2, lava1, lava2))
+	p13 := barrier.add(pressureTerm(y, l1, l3, lava1, lava3))
+	p23 := barrier.add(pressureTerm(y, l2, l3, lava2, lava3))
+	f := max(0, f12)
+	a.density = max(0, (f+f)*max(p12, max(max(0, f13)*p13, max(0, f23)*p23)))
+}
+
+// needsTick reports whether the fluid at the last sampled block gets a
+// block tick, as BDS schedules one for it when it places the fluid.
+func (a *aquifer) needsTick() bool {
+	if a.tickKnown {
+		return a.tick
+	}
+	x, y, z := a.sx, a.sy, a.sz
+	cx, cy, cz := mathx.FloorDiv(x-5, 16), mathx.FloorDiv(y+1, 12), mathx.FloorDiv(z-5, 16)
+	_, _, _, d1, d2, _ := a.nearest(a.group(cx, cy, cz), cx, cy, cz, x, y, z)
+	a.tick = float32(absDiff(d2, d1))*-0.04+1 > fluidTickSpread
+	a.tickKnown = true
+	return a.tick
+}
+
+// nearest returns the three cell centres nearest block (x, y, z) among the
+// 12 its search starts at (cx, cy, cz), with their squared distances, ties
+// going to the later cell. g is that search's group, or nil.
+func (a *aquifer) nearest(g *aquiferGroup, cx, cy, cz, x, y, z int32) (c1, c2, c3 *aquiferCenter, d1, d2, d3 uint64) {
 	const maxDist = ^uint64(0)
-	d1, d2, d3 := maxDist, maxDist, maxDist
-	var c1, c2, c3 *aquiferCenter
+	d1, d2, d3 = maxDist, maxDist, maxDist
 	n := 0
 	for dx := int32(0); dx <= 1; dx++ {
 		for dy := int32(-1); dy <= 1; dy++ {
@@ -303,24 +363,7 @@ func (a *aquifer) sample(x, y, z int32) {
 			}
 		}
 	}
-	l1, lava1 := a.fluid(c1)
-	f12 := float32(absDiff(d2, d1))*-0.04 + 1
-	a.level, a.isLava = l1, lava1
-	if !(f12 > -1) {
-		a.density = 0
-		return
-	}
-	l2, lava2 := a.fluid(c2)
-	l3, lava3 := a.fluid(c3)
-	f13 := 1 - float32(absDiff(d3, d1))*0.04
-	f23 := 1 - float32(absDiff(d3, d2))*0.04
-
-	barrier := barrierSample{n: a.o.aquiferNoise.barrier, x: x, y: y, z: z}
-	p12 := barrier.add(pressureTerm(y, l1, l2, lava1, lava2))
-	p13 := barrier.add(pressureTerm(y, l1, l3, lava1, lava3))
-	p23 := barrier.add(pressureTerm(y, l2, l3, lava2, lava3))
-	f := max(0, f12)
-	a.density = max(0, (f+f)*max(p12, max(max(0, f13)*p13, max(0, f23)*p23)))
+	return c1, c2, c3, d1, d2, d3
 }
 
 // barrierSample is the aquifer barrier noise at one block, sampled only

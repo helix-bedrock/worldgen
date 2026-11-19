@@ -167,6 +167,9 @@ func (o *Overworld) carveCanyon(c *Chunk, aq *aquifer, cx, cz int32, x, y, z, hr
 						if aq.isLava {
 							fill = o.ids.lava
 						}
+						if aq.needsTick() {
+							c.Ticks = append(c.Ticks, Tick{X: wx, Y: wy, Z: wz, Block: fill, Delay: fluidTickDelay})
+						}
 					}
 					c.put(int(lx), ly, int(lz), fill)
 				}

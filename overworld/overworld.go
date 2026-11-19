@@ -50,9 +50,10 @@ type Chunk struct {
 	// generated.
 	Entities []structure.EntitySpawn
 	// Ticks are the block ticks generation left pending in the chunk, as BDS
-	// saves them with it: the springs, which BDS sets and then schedules a tick
-	// for so they flow once the world runs. A server runs them in its own block
-	// ticks.
+	// saves them with it: the springs, and the aquifer water and lava the
+	// terrain and the carvers place where BDS marks it as needing a tick
+	// (near a cell edge, and the top layer of the lava sea), so they flow
+	// once the world runs. A server runs them in its own block ticks.
 	Ticks []Tick
 }
 
