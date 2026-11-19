@@ -785,6 +785,28 @@ func (w *featureWorld) heightmap(x, z int32) int32 {
 	return h
 }
 
+// sunlitHeight is the lowest y in full sunlight, where BDS starts its legacy
+// trees: above the highest block that dims light at all or is a half slab,
+// so water and leaves count. A swamp tree therefore starts at the water's
+// surface and can only sink as deep as its trunk allows.
+func (w *featureWorld) sunlitHeight(x, z int32) int32 {
+	for y := int32(MaxY - 1); y >= MinY; y-- {
+		b, ok := w.block(x, y, z)
+		if !ok {
+			return MinY
+		}
+		if w.o.reg.LightDampening(b) != 0 || isHalfSlab(w.o.blockName(b)) {
+			return y + 1
+		}
+	}
+	return MinY
+}
+
+// isHalfSlab reports whether name is a single slab block.
+func isHalfSlab(name string) bool {
+	return strings.HasSuffix(name, "_slab") && !strings.Contains(name, "double_")
+}
+
 // aboveTopSolid is query.above_top_solid: the y above the highest block of
 // a column whose material is solid, looking through leaves (BDS's
 // BDS's code,, as the query calls it).

@@ -1178,7 +1178,7 @@ func placeLegacyTrees(w *featureWorld, x, z, n int32, r *rand.MT, set *featureSe
 		tree := featureRef{"minecraft:" + choose(r), set}
 		tz := z + r.IntN(14) + 1
 		tx := x + r.IntN(14) + 1
-		ty := w.heightmap(tx, tz)
+		ty := w.sunlitHeight(tx, tz)
 		if _, ok := tree.place(w, tx, ty, tz, r); ok {
 			placed = true
 		}
