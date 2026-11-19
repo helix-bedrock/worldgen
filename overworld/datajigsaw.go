@@ -755,7 +755,7 @@ func (a *djAssembly) fit(q djState, j structure.JigsawBlock, target [3]int32, re
 		}
 		tpl := a.o.elementTemplate(el)
 		if tpl == nil {
-			return
+			tpl = missingTemplate
 		}
 		rots := []int{0, 1, 2, 3}
 		shuffleBack(rots, a.r)
@@ -794,6 +794,12 @@ func (a *djAssembly) fit(q djState, j structure.JigsawBlock, target [3]int32, re
 var featureTemplate = &structure.JigsawTemplate{Template: &structure.Template{},
 	Jigsaws: []structure.JigsawBlock{{Facing: "down", Top: "south", Name: "minecraft:bottom", Target: "minecraft:empty", Pool: "minecraft:empty",
 		Attachment: "minecraft:bottom"}}}
+
+// missingTemplate stands in for an element whose template does not exist
+// (BDS's trial chamber decor pool names one such pot). As in BDS it is still
+// tried: its turns are drawn, but with no jigsaws it never attaches, and the
+// next candidate is tried.
+var missingTemplate = &structure.JigsawTemplate{Template: &structure.Template{}}
 
 // elementTemplate is the template an element places.
 func (o *Overworld) elementTemplate(el *structure.Element) *structure.JigsawTemplate {
