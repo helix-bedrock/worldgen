@@ -31,6 +31,11 @@ type acaciaCanopy struct {
 	leaf     uint32
 }
 
+// roofedCanopyLayers is how many full layers a roofed canopy has. The feature
+// files say canopy_height 4, but worlds BDS generates have one layer, which is
+// what gives dark oaks their flat roof.
+const roofedCanopyLayers = 1
+
 type roofedCanopy struct {
 	height       int32
 	core         int32

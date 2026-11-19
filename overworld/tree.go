@@ -378,11 +378,10 @@ type rawTree struct {
 	Cherry       *rawCherryTrunk  `json:"cherry_trunk"`
 	CherryCanopy *rawCherryCanopy `json:"cherry_canopy"`
 	RoofedCanopy *struct {
-		Height int32       `json:"canopy_height"`
-		Core   *int32      `json:"core_width"`
-		Outer  int32       `json:"outer_radius"`
-		Inner  int32       `json:"inner_radius"`
-		Leaf   biome.Block `json:"leaf_block"`
+		Core  *int32      `json:"core_width"`
+		Outer int32       `json:"outer_radius"`
+		Inner int32       `json:"inner_radius"`
+		Leaf  biome.Block `json:"leaf_block"`
 	} `json:"roofed_canopy"`
 	SpreadCanopy *struct {
 		Height   intRange            `json:"canopy_height"`
@@ -647,7 +646,7 @@ func (o *Overworld) parseTree(raw json.RawMessage, set *featureSet) (placer, err
 			t.canopy, t.acaciaCanopy = canopyAcacia, c
 		case r.RoofedCanopy != nil:
 			rc := r.RoofedCanopy
-			c := &roofedCanopy{height: rc.Height, outer: rc.Outer, inner: rc.Inner}
+			c := &roofedCanopy{height: roofedCanopyLayers, outer: rc.Outer, inner: rc.Inner}
 			if rc.Core != nil {
 				c.core, c.hasCore = *rc.Core, true
 			}
